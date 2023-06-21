@@ -1,6 +1,6 @@
 # @version 0.3.9
 """
-@title CurveStableswapFactory
+@title CurveStableswapFactoryNG
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2023 - all rights reserved
 @notice Permissionless pool deployer and registry
@@ -118,7 +118,6 @@ OLD_FACTORY: constant(address) = 0x0959158b6040D32d04c301A72CBFD6b39E21c9AE
 
 admin: public(address)
 future_admin: public(address)
-manager: public(address)
 
 pool_list: public(address[4294967296])   # master list of pools
 pool_count: public(uint256)              # actual length of pool_list
@@ -154,7 +153,6 @@ def __init__(_fee_receiver: address, _weth: address):
     WETH20 = _weth
 
     self.admin = msg.sender
-    self.manager = msg.sender
     self.fee_receiver = _fee_receiver
 
 
@@ -835,7 +833,7 @@ def batch_set_pool_asset_type(_pools: address[32], _asset_types: uint256[32]):
     @notice Batch set the asset type for factory pools
     @dev Used to modify asset types that were set incorrectly at deployment
     """
-    assert msg.sender in [self.manager, self.admin]  # dev: admin-only function
+    assert msg.sender in [self.admin]  # dev: admin-only function
 
     for i in range(32):
         if _pools[i] == empty(address):
@@ -865,18 +863,6 @@ def accept_transfer_ownership():
 
     self.admin = _admin
     self.future_admin = empty(address)
-
-
-@external
-def set_manager(_manager: address):
-    """
-    @notice Set the manager
-    @dev Callable by the admin or existing manager
-    @param _manager Manager address
-    """
-    assert msg.sender in [self.manager, self.admin]  # dev: admin-only function
-
-    self.manager = _manager
 
 
 @external

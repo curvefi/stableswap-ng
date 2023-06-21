@@ -1,6 +1,6 @@
 # @version 0.3.9
 """
-@title CurveStableswapFactoryHandler
+@title CurveStableswapFactoryNGHandler
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2023 - all rights reserved
 @notice StableFactory handler for the Metaregistry

@@ -163,17 +163,7 @@ ma_last_time: public(uint256)
 
 
 @external
-def __init__(_weth: address):
-
-    WETH20 = _weth
-
-    # we do this to prevent the implementation contract from being used as a pool
-    self.factory = 0x0000000000000000000000000000000000000001
-    assert N_COINS == 2
-
-
-@external
-def initialize(
+def __init__(
     _name: String[32],
     _symbol: String[10],
     _coins: address[4],
@@ -183,7 +173,7 @@ def initialize(
     _weth: address,
     _ma_exp_time: uint256,
     _method_ids: bytes4[4],
-    _oracles: address[4]
+    _oracles: address[4],
 ):
     """
     @notice Initialize the pool contract
@@ -208,8 +198,7 @@ def initialize(
     @param _oracles Array of rate oracle addresses.
     """
 
-    # check if factory was already set to prevent initializing contract twice
-    assert self.factory == empty(address)
+    WETH20 = _weth
 
     for i in range(N_COINS):
 
