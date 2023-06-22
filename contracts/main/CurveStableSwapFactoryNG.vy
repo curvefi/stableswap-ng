@@ -791,6 +791,9 @@ def set_metapool_implementations(
     @param _base_pool Pool address to add
     @param _implementations Implementation address to use when deploying metapools
     """
+
+    # TODO: ensure only one implementation can be set at a time
+
     assert msg.sender == self.admin  # dev: admin-only function
     assert self.base_pool_data[_base_pool].coins[0] != empty(address)  # dev: base pool does not exist
 
@@ -807,18 +810,11 @@ def set_metapool_implementations(
 @external
 def set_plain_implementations(
     _n_coins: uint256,
-    _implementations: address[10],
+    _implementation_index: uint256,
+    _implementation: address,
 ):
     assert msg.sender == self.admin  # dev: admin-only function
-
-    for i in range(10):
-        new_imp: address = _implementations[i]
-        current_imp: address = self.plain_implementations[_n_coins][i]
-        if new_imp == current_imp:
-            if new_imp == empty(address):
-                break
-        else:
-            self.plain_implementations[_n_coins][i] = new_imp
+    self.plain_implementations[_n_coins][_implementation_index] = _implementation
 
 
 @external

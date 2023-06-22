@@ -36,7 +36,7 @@ def amm_implementation_meta(deployer, amm_interface_meta):
 
 
 @pytest.fixture(scope="module")
-def stableswap_factory(
+def factory(
     deployer,
     fee_receiver,
     owner,
@@ -45,21 +45,23 @@ def stableswap_factory(
     weth,
 ):
     with boa.env.prank(deployer):
-        factory = boa.load(
-            "contracts/main/CurveTricryptoFactory.vy",
+        _factory = boa.load(
+            "contracts/main/CurveStableSwapFactoryNG.vy",
             fee_receiver,
             owner,
             weth,
         )
 
     with boa.env.prank(owner):
-        factory.set_plain_implementations(2, amm_implementation_plain)
-        factory.set_gauge_implementation(gauge_implementation)
+        _factory.set_plain_implementations(2, 0, amm_implementation_plain)
+        _factory.set_gauge_implementation(gauge_implementation)
+        # TODO: add Factory Meta Implementation
 
-    return factory
+    return _factory
 
 
 @pytest.fixture(scope="module")
-def stableswap_factory_meta(factory, amm_implementation_meta):
-    # TODO: add Factory Meta Implementation
-    pass
+def factory_populated(
+    factory, swap_plain, swap_eth_rebasing, swap_oracle, swap_meta
+):
+    return factory

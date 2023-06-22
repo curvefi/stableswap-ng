@@ -2,14 +2,14 @@ import boa
 import pytest
 from eth_utils import function_signature_to_4byte_selector
 
-# TODO: rebasing pool, pool with oracles, normal pool, pool with ETH
+# TODO: rebasing pool, meta pool
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 @pytest.fixture(scope="module")
 def swap_plain(
-    stableswap_factory,
+    factory,
     dai,
     usdc,
     bob,
@@ -18,14 +18,14 @@ def swap_plain(
 
     with boa.env.prank(bob):
 
-        pool = stableswap_factory.deploy_plain_pool(
+        pool = factory.deploy_plain_pool(
             "test",
             "test",
-            [dai, usdc],
+            [dai, usdc, ZERO_ADDRESS, ZERO_ADDRESS],
             2000,
             1000000,
             866,
-            [b""] * 4,
+            [bytes(b"")] * 4,
             [ZERO_ADDRESS] * 4,
             0,
             0,
@@ -36,7 +36,7 @@ def swap_plain(
 
 @pytest.fixture(scope="module")
 def swap_eth_rebasing(
-    stableswap_factory,
+    factory,
     weth,
     steth,
     charlie,
@@ -47,7 +47,7 @@ def swap_eth_rebasing(
 
     with boa.env.prank(charlie):
 
-        pool = stableswap_factory.deploy_plain_pool(
+        pool = factory.deploy_plain_pool(
             "test",
             "test",
             [weth, steth],
@@ -65,7 +65,7 @@ def swap_eth_rebasing(
 
 @pytest.fixture(scope="module")
 def swap_oracle(
-    stableswap_factory,
+    factory,
     oracle_token_a,
     oracle_token_b,
     charlie,
@@ -75,7 +75,7 @@ def swap_oracle(
 
     with boa.env.prank(charlie):
 
-        pool = stableswap_factory.deploy_plain_pool(
+        pool = factory.deploy_plain_pool(
             "test",
             "test",
             [oracle_token_a, oracle_token_b],
@@ -93,7 +93,7 @@ def swap_oracle(
 
 @pytest.fixture(scope="module")
 def swap_meta(
-    stableswap_factory,
+    factory,
     dai,
     base_pool_token,  # TODO: implement base pool token
     charlie,

@@ -9,7 +9,7 @@ def weth(deployer):
 
 
 @pytest.fixture(scope="module")
-def usdt(deployer):
+def usdc(deployer):
     with boa.env.prank(deployer):
         return boa.load("contracts/mocks/ERC20.vy", "USDT", "USDT", 6)
 
