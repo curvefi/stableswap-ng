@@ -1,6 +1,7 @@
 # @version 0.3.9
+# TODO: convert this to Meta implementation!!!!!
 """
-@title CurveStableSwap2NG
+@title CurveStableSwapMetaNG
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
 @notice 2 coin pool implementation with no lending, i.e. tokens are not

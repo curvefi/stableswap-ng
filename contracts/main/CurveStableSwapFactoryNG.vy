@@ -579,9 +579,8 @@ def deploy_plain_pool(
 
     implementation: address = self.plain_implementations[n_coins][_implementation_idx]
     assert implementation != empty(address), "Invalid implementation index"
-    pool: address = create_minimal_proxy_to(implementation)
-
-    CurvePlainPool(pool).initialize(
+    pool: address = create_from_blueprint(
+        implementation,
         _name,
         _symbol,
         _coins,
@@ -591,7 +590,8 @@ def deploy_plain_pool(
         WETH20,
         _ma_exp_time,
         _method_ids,
-        _oracles
+        _oracles,
+        code_offset=3
     )
 
     length: uint256 = self.pool_count
@@ -670,8 +670,10 @@ def deploy_metapool(
     decimals: uint256 = ERC20(_coin).decimals()
     assert decimals < 19, "Max 18 decimals for coins"
 
+    # TODO: the following needs an implementaiton contract AND create_from_blueprint
     pool: address = create_minimal_proxy_to(implementation)
     CurvePool(pool).initialize(_name, _symbol, _coin, 10 ** (36 - decimals), _A, _fee)
+
     ERC20(_coin).approve(pool, max_value(uint256))
 
     # add pool to pool_list
@@ -718,8 +720,7 @@ def deploy_gauge(_pool: address) -> address:
     implementation: address = self.gauge_implementation
     assert implementation != empty(address), "Gauge implementation not set"
 
-    gauge: address = create_minimal_proxy_to(implementation)
-    LiquidityGauge(gauge).initialize(_pool)
+    gauge: address = create_from_blueprint(self.gauge_implementation, _pool, code_offset=3)
     self.pool_data[_pool].liquidity_gauge = gauge
 
     log LiquidityGaugeDeployed(_pool, gauge)
