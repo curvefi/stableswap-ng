@@ -11,3 +11,55 @@ def gauge_interface():
 def gauge_implementation(deployer, gauge_interface):
     with boa.env.prank(deployer):
         return gauge_interface.deploy_as_blueprint()
+
+
+@pytest.fixture(scope="module")
+def amm_interface_plain():
+    return boa.load_partial("contracts/main/CurveStableSwap2NG.vy")
+
+
+@pytest.fixture(scope="module")
+def amm_implementation_plain(deployer, amm_interface_plain):
+    with boa.env.prank(deployer):
+        return amm_interface_plain.deploy_as_blueprint()
+
+
+@pytest.fixture(scope="module")
+def amm_interface_meta():
+    return boa.load_partial("contracts/main/CurveStableSwapMetaNG.vy")
+
+
+@pytest.fixture(scope="module")
+def amm_implementation_meta(deployer, amm_interface_meta):
+    with boa.env.prank(deployer):
+        return amm_interface_meta.deploy_as_blueprint()
+
+
+@pytest.fixture(scope="module")
+def stableswap_factory(
+    deployer,
+    fee_receiver,
+    owner,
+    amm_implementation_plain,
+    gauge_implementation,
+    weth,
+):
+    with boa.env.prank(deployer):
+        factory = boa.load(
+            "contracts/main/CurveTricryptoFactory.vy",
+            fee_receiver,
+            owner,
+            weth,
+        )
+
+    with boa.env.prank(owner):
+        factory.set_plain_implementations(2, amm_implementation_plain)
+        factory.set_gauge_implementation(gauge_implementation)
+
+    return factory
+
+
+@pytest.fixture(scope="module")
+def stableswap_factory_meta(factory, amm_implementation_meta):
+    # TODO: add Factory Meta Implementation
+    pass

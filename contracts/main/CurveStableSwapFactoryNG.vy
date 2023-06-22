@@ -148,12 +148,12 @@ market_counts: HashMap[uint256, uint256]
 
 
 @external
-def __init__(_fee_receiver: address, _weth: address):
+def __init__(_fee_receiver: address, _owner: address, _weth: address):
+
+    self.fee_receiver = _fee_receiver
+    self.admin = _owner
 
     WETH20 = _weth
-
-    self.admin = msg.sender
-    self.fee_receiver = _fee_receiver
 
 
 # <--- Factory Getters --->
