@@ -4,17 +4,22 @@
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
 @notice 2 coin pool implementation with no lending, i.e. tokens are not
-        deposited into lending markets
+        deposited into lending markets. Supports only token pairs that are
+        similarly priced (or the underlying is similarly priced).
 @dev ERC20 support for return True/revert, return True/False, return None
      ERC20 tokens can have arbitrary decimals (<=18).
      Additional features include:
-        1. Support for positive-rebasing and fee-on-transfer tokens
+        1. Support for rebasing tokens: but this disables
+           exchange_optimistically
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
         3. Support for ETH/WETH transfers
         4. Adds oracles for coin[1] w.r.t coin[0]
         5. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
+        6. Adds feature called exchange_with_rebase, which is inspired
+           by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
+           prior to executing the swap. This is disabled for rebasing tokens.
 """
 
 from vyper.interfaces import ERC20
@@ -108,6 +113,7 @@ coins: public(address[N_COINS])
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
+IS_REBASING: immutable(bool)
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -189,6 +195,7 @@ def __init__(
     _ma_exp_time: uint256,
     _method_ids: bytes4[4],
     _oracles: address[4],
+    _is_rebasing: bool
 ):
     """
     @notice Initialize the pool contract
@@ -211,9 +218,11 @@ def __init__(
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
+    @param _is_rebasing
     """
 
     WETH20 = _weth
+    IS_REBASING = _is_rebasing
 
     name = concat("Curve.fi Factory Plain Pool: ", _name)
     symbol = concat(_symbol, "-f")
@@ -221,6 +230,7 @@ def __init__(
     for i in range(N_COINS):
 
         coin: address = _coins[i]
+
         if coin == empty(address):
             break
 
@@ -271,6 +281,7 @@ def set_ma_exp_time(_ma_exp_time: uint256):
 
 
 # ------------------ Token transfers in and out of the AMM -------------------
+
 
 @payable
 @external
@@ -385,6 +396,57 @@ def _transfer_out(
             receiver, _amount, default_return_value=True
         )
 
+# -------------------------- AMM Special Methods -----------------------------
+
+
+@view
+@internal
+def _stored_rates() -> uint256[N_COINS]:
+    """
+    @notice Gets rate multipliers for each coin.
+    @dev If the coin has a rate oracle that has been properly initialised,
+         this method queries that rate by static-calling an external
+         contract.
+    """
+
+    rates: uint256[N_COINS] = self.rate_multipliers
+
+    for i in range(N_COINS):
+        oracle: uint256 = self.oracles[i]
+        if oracle == 0:
+            continue
+
+        # NOTE: assumed that response is of precision 10**18
+        response: Bytes[32] = raw_call(
+            convert(oracle % 2**160, address),
+            _abi_encode(oracle & ORACLE_BIT_MASK),
+            max_outsize=32,
+            is_static_call=True,
+        )
+
+        assert len(response) != 0
+        rates[1] = rates[1] * convert(response, uint256) / PRECISION
+
+    return rates
+
+
+@view
+@internal
+def _balances() -> uint256[N_COINS]:
+    """
+    @notice Calculates the pool's balances _excluding_ the admin's balances
+    @dev
+    """
+    result: uint256[N_COINS] = empty(uint256[N_COINS])
+
+    if IS_REBASING:
+        for i in range(N_COINS):
+            result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
+        return result
+    else:
+        # TODO: add non rebasing support
+        return result
+
 
 # -------------------------- AMM Main Functions ------------------------------
 
@@ -460,6 +522,23 @@ def exchange_extended(
         msg.sender,  # <---------------------------- callbacker is msg.sender.
         _cb
     )
+
+
+@external
+@nonreentrant('lock')
+def exchange_optimistically(
+    i: int128,
+    j: int128,
+    _dx: uint256,
+    _min_dy: uint256,
+    _use_eth: bool = False,
+    _receiver: address = msg.sender,
+) -> uint256:
+
+    if IS_REBASING:
+        raise
+
+    return 0
 
 
 @payable
@@ -791,40 +870,6 @@ def _exchange(
     log TokenExchange(msg.sender, i, _dx, j, dy)
 
     return dy
-
-
-@view
-@internal
-def _stored_rates() -> uint256[N_COINS]:
-
-    rates: uint256[N_COINS] = self.rate_multipliers
-
-    for i in range(N_COINS):
-        oracle: uint256 = self.oracles[i]
-        if oracle == 0:
-            continue
-
-        # NOTE: assumed that response is of precision 10**18
-        response: Bytes[32] = raw_call(
-            convert(oracle % 2**160, address),
-            _abi_encode(oracle & ORACLE_BIT_MASK),
-            max_outsize=32,
-            is_static_call=True,
-        )
-
-        assert len(response) != 0
-        rates[1] = rates[1] * convert(response, uint256) / PRECISION
-
-    return rates
-
-
-@view
-@internal
-def _balances() -> uint256[N_COINS]:
-    result: uint256[N_COINS] = empty(uint256[N_COINS])
-    for i in range(N_COINS):
-        result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
-    return result
 
 
 @view

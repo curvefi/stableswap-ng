@@ -142,7 +142,7 @@ admin_balances: public(uint256[N_COINS])
 
 rate_multiplier: uint256[N_COINS]
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
-oracle: uint256[N_COINS]
+oracles: uint256
 
 last_prices_packed: uint256  #  [last_price, ma_price]
 ma_exp_time: public(uint256)
@@ -233,7 +233,7 @@ def __init__(
 
     self.coins = [_coin, BASE_LP_TOKEN]
     self.rate_multiplier = _rate_multiplier
-    self.oracle = convert(_method_id, uint256) * 2**224 | convert(_oracle, uint256)
+    self.oracles = convert(_method_id, uint256) * 2**224 | convert(_oracle, uint256)
 
     # TODO: initialise up base coins and base n coins here
     for coin in BASE_COINS:
@@ -1542,9 +1542,7 @@ def get_balances() -> uint256[N_COINS]:
 @view
 @external
 def oracle(_idx: uint256) -> address:
-    if _idx < N_COINS:
-        return convert(self.oracles[_idx] % 2**160, address)
-    return empty(address)
+    return convert(self.oracle % 2**160, address)
 
 
 # --------------------------- AMM Admin Functions ----------------------------
