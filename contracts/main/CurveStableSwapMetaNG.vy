@@ -140,9 +140,9 @@ admin_balances: public(uint256[N_COINS])
 
 # ----------------------- Oracle Specific vars -------------------------------
 
-rate_multipliers: uint256[N_COINS]
+rate_multiplier: uint256[N_COINS]
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
-oracles: uint256[N_COINS]
+oracles: uint256
 
 last_prices_packed: uint256  #  [last_price, ma_price]
 ma_exp_time: public(uint256)
@@ -174,6 +174,13 @@ CACHED_CHAIN_ID: immutable(uint256)
 salt: public(immutable(bytes32))
 CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 
+# ----------------------- Base Pool Specific vars ----------------------------
+
+BASE_POOL: immutable(address)
+BASE_LP_TOKEN: immutable(address)
+BASE_COINS: immutable(address[4])
+BASE_N_COINS: immutable(int128)
+
 
 # ------------------------------ AMM Setup -----------------------------------
 
@@ -182,21 +189,24 @@ CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 def __init__(
     _name: String[32],
     _symbol: String[10],
-    _coins: address[4],
-    _rate_multipliers: uint256[4],
+    _coin: address,
+    _rate_multiplier: uint256,
     _A: uint256,
     _fee: uint256,
     _weth: address,
     _ma_exp_time: uint256,
-    _method_ids: bytes4[4],
-    _oracles: address[4],
+    _method_id: bytes4,
+    _oracle: address,
+    _base_pool: address,
+    _base_lp_token: address,
+    _base_pool_coins: address[4],
 ):
     """
     @notice Initialize the pool contract
     @param _name Name of the new plain pool
     @param _symbol Symbol for the new plain pool - will be
                    concatenated with factory symbol
-    @param _coins List of addresses of the coins being used in the pool.
+    @param _coin Addresses of the coin paired against the base pool's lp token.
     @param _A Amplification co-efficient - a lower value here means
               less tolerance for imbalance within the pool's assets.
               Suggested values include:
@@ -208,26 +218,26 @@ def __init__(
                 50% of the fee is distributed to veCRV holders.
     @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
-    @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
-                       of the oracle addresses that gives rate oracles.
-                       Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
-    @param _oracles Array of rate oracle addresses.
+    @param _method_id First four bytes of the Keccak-256 hash of the function signature
+                      of the oracle addresse that gives returns token rate.
+                      Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
+    @param _oracles Rate oracle addresse.
     """
 
     WETH20 = _weth
+    BASE_POOL = _base_pool
+    BASE_LP_TOKEN = _base_lp_token
 
-    name = concat("Curve.fi Factory Plain Pool: ", _name)
+    name = concat("Curve.fi Factory Meta Pool: ", _name)
     symbol = concat(_symbol, "-f")
 
-    for i in range(N_COINS):
+    self.coins = [_coin, BASE_LP_TOKEN]
+    self.rate_multiplier = _rate_multiplier
+    self.oracles = convert(_method_id, uint256) * 2**224 | convert(_oracle, uint256)
 
-        coin: address = _coins[i]
-        if coin == empty(address):
-            break
-
-        self.coins[i] = coin
-        self.rate_multipliers[i] = _rate_multipliers[i]
-        self.oracles[i] = convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256)
+    # TODO: initialise up base coins and base n coins here
+    for coin in BASE_COINS:
+        ERC20(coin).approve(BASE_POOL, MAX_UINT256)
 
     A: uint256 = _A * A_PRECISION
     self.initial_A = A
@@ -237,10 +247,9 @@ def __init__(
 
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
-    self.last_prices_packed = self.pack_prices(10**18, 10**18)
+    self.last_prices_packed = self.pack_prices(10**18, 10**18)  # TODO: check if this line is correct
     self.ma_last_time = block.timestamp
 
-    # EIP712
     NAME_HASH = keccak256(name)
     salt = block.prevhash
     CACHED_CHAIN_ID = chain.id
@@ -1533,9 +1542,7 @@ def get_balances() -> uint256[N_COINS]:
 @view
 @external
 def oracle(_idx: uint256) -> address:
-    if _idx < N_COINS:
-        return convert(self.oracles[_idx] % 2**160, address)
-    return empty(address)
+    return convert(self.oracle % 2**160, address)
 
 
 # --------------------------- AMM Admin Functions ----------------------------
