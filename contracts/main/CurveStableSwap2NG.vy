@@ -236,7 +236,7 @@ def __init__(
 
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
-    self.last_prices_packed = self.pack_prices(10**18, 10**18)
+    self.last_prices_packed = self.pack_prices(10**18, 10**18)  # TODO: check if this line is correct
     self.ma_last_time = block.timestamp
 
     # EIP712
