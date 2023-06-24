@@ -12,9 +12,9 @@
         1. Support for rebasing tokens: but this disables
            `exchange_optimistically`
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
-           Note: Oracle precision _must_ be 10**18
+           Note: Oracle precision _must_ be 10**18.
         3. Support for ETH/WETH transfers
-        4. Adds oracles for coin[1] w.r.t coin[0]
+        4. Adds oracles based on AMM State Price (and _not_ last traded price).
         5. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
@@ -241,6 +241,10 @@ def __init__(
         if coin == empty(address):
             break
 
+        # Enforce native token as coin[0] (makes integrators happy)
+        if coin == WETH20 and i > 0:
+            raise "ETH must be at index 0"
+
         self.coins[i] = coin
         self.rate_multipliers[i] = _rate_multipliers[i]
         self.oracles[i] = convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256)
@@ -273,18 +277,6 @@ def __init__(
 
     # fire a transfer event so block explorers identify the contract as an ERC20
     log Transfer(empty(address), self, 0)
-
-
-@external
-def set_ma_exp_time(_ma_exp_time: uint256):
-    """
-    @notice Set the moving average window of the price oracle.
-    @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
-    """
-    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
-    assert _ma_exp_time != 0
-
-    self.ma_exp_time = _ma_exp_time
 
 
 # ------------------ Token transfers in and out of the AMM -------------------
@@ -1716,3 +1708,15 @@ def apply_new_fee():
     self.fee = fee
     self.admin_action_deadline = 0
     log ApplyNewFee(fee)
+
+
+@external
+def set_ma_exp_time(_ma_exp_time: uint256):
+    """
+    @notice Set the moving average window of the price oracle.
+    @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
+    """
+    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
+    assert _ma_exp_time != 0
+
+    self.ma_exp_time = _ma_exp_time
