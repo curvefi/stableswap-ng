@@ -103,17 +103,18 @@ event ApplyNewFee:
     fee: uint256
 
 
-# ---------------------------- Pool Parameters -------------------------------
+# ---------------------------- Pool Variables --------------------------------
 
 WETH20: public(immutable(address))
-factory: public(address)
-
-coins: public(address[N_COINS])
 
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 IS_REBASING: immutable(bool)
+
+factory: public(address)
+coins: public(address[N_COINS])
+stored_balances: uint256[N_COINS]
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -434,18 +435,34 @@ def _stored_rates() -> uint256[N_COINS]:
 @internal
 def _balances() -> uint256[N_COINS]:
     """
-    @notice Calculates the pool's balances _excluding_ the admin's balances
-    @dev
+    @notice Calculates the pool's balances _excluding_ the admin's balances.
+    @dev This method ensures LPs keep all rebases and admin only claims swap fees.
     """
     result: uint256[N_COINS] = empty(uint256[N_COINS])
 
-    if IS_REBASING:
+    if not IS_REBASING:
+        return self.stored_balances  # only used for optimistic swaps
+    else:
         for i in range(N_COINS):
             result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
-        return result
-    else:
-        # TODO: add non rebasing support
-        return result
+
+    return result
+
+
+@internal
+def _increase_balances(balances: uint256[N_COINS]):
+    stored_balances: uint256[N_COINS] = self.stored_balances
+    for i in range(N_COINS):
+        stored_balances[i] += balances[i]
+    self.stored_balances = stored_balances
+
+
+@internal
+def _decrease_balances(balances: uint256[N_COINS]):
+    stored_balances: uint256[N_COINS] = self.stored_balances
+    for i in range(N_COINS):
+        stored_balances[i] -= balances[i]
+    self.stored_balances = stored_balances
 
 
 # -------------------------- AMM Main Functions ------------------------------
@@ -463,6 +480,7 @@ def exchange(
     _receiver: address = msg.sender,
 ) -> uint256:
     """
+    # TODO: Add docs
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
          Allows for native token swaps (e.g. ETH <> whatever)
@@ -483,7 +501,8 @@ def exchange(
         _use_eth,
         _receiver,
         empty(address),
-        empty(bytes32)
+        empty(bytes32),
+        False
     )
 
 
@@ -500,6 +519,7 @@ def exchange_extended(
     _cb: bytes32
 ) -> uint256:
     """
+    # TODO: Add docs
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
          Not payable (does not accept eth)
@@ -520,7 +540,8 @@ def exchange_extended(
         _use_eth,
         _receiver,
         msg.sender,  # <---------------------------- callbacker is msg.sender.
-        _cb
+        _cb,
+        False
     )
 
 
@@ -534,11 +555,24 @@ def exchange_optimistically(
     _use_eth: bool = False,
     _receiver: address = msg.sender,
 ) -> uint256:
-
-    if IS_REBASING:
-        raise
-
-    return 0
+    """
+    @notice Exchange
+    # TODO: Add docs
+    """
+    assert not IS_REBASING, "Cannot swap optimistically if pool contains rebasing token(s)"
+    return self._exchange(
+        msg.sender,
+        0,
+        i,
+        j,
+        _dx,
+        _min_dy,
+        _use_eth,
+        _receiver,
+        empty(address),
+        empty(bytes32),
+        True,  # <--------------------------------------- swap optimistically.
+    )
 
 
 @payable
@@ -603,6 +637,9 @@ def add_liquidity(
         else:
 
             assert total_supply != 0  # dev: initial deposit requires all coins
+
+    # Add incoming balance
+    self._increase_balances(new_balances)
 
     # Invariant after change
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
@@ -680,6 +717,9 @@ def remove_liquidity_one_coin(
 
     self._transfer_out(self.coins[i], dy[0], _use_eth, _receiver)
 
+    # Decrease coin[i] balance in self.stored_balances
+    self.stored_balances[i] -= dy[0]
+
     log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy[0], total_supply)
 
     self.save_p_from_price(dy[2])
@@ -710,11 +750,12 @@ def remove_liquidity_imbalance(
 
     new_balances: uint256[N_COINS] = old_balances
     for i in range(N_COINS):
-        amount: uint256 = _amounts[i]
-        if amount != 0:
-            new_balances[i] -= amount
+        if _amounts[i] != 0:
+            new_balances[i] -= _amounts[i]
+            self._transfer_out(coins[i], _amounts[i], _use_eth, _receiver)
 
-            self._transfer_out(coins[i], amount, _use_eth, _receiver)
+    # Decrease balances in self.stored_balances
+    self._decrease_balances(_amounts)
 
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
 
@@ -776,8 +817,10 @@ def remove_liquidity(
         value: uint256 = balances[i] * _burn_amount / total_supply
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
         amounts[i] = value
-
         self._transfer_out(coins[i], value, _use_eth, _receiver)
+
+    # Decrease balances in self.stored_balances
+    self._decrease_balances(amounts)
 
     total_supply -= _burn_amount
     self.balanceOf[msg.sender] -= _burn_amount
@@ -815,7 +858,8 @@ def _exchange(
     use_eth: bool,
     receiver: address,
     callbacker: address,
-    callback_sig: bytes32
+    callback_sig: bytes32,
+    optimistic_swap: bool = False
 ) -> uint256:
 
     assert i != j  # dev: coin index out of range
@@ -828,13 +872,27 @@ def _exchange(
 
     # --------------------------- Do Transfer in -----------------------------
 
-    # `dx` that `_transfer_in` gives is whatever the pool received after ERC20
-    # transfer
-    dx: uint256 = self._transfer_in(
-        coins[i], _dx, _min_dy, mvalue,
-        callbacker, callback_sig,
-        sender, receiver, use_eth
-    )
+    dx: uint256 = 0
+
+    if optimistic_swap:
+
+        # This branch is never reached for rebasing tokens
+        pool_x_balance: uint256 = ERC20(coins[i]).balanceOf(self)
+        dx = pool_x_balance - self.stored_balances[i]
+
+        assert dx == _dx, "Pool did not receive tokens for swap"
+
+    else:
+
+        # `dx` is whatever the pool received after ERC20 transfer:
+        dx = self._transfer_in(
+            coins[i], _dx, _min_dy, mvalue,
+            callbacker, callback_sig,
+            sender, receiver, use_eth
+        )
+
+    # Update stored balances
+    self.stored_balances[i] += dx
 
     # ------------------------------------------------------------------------
 
@@ -864,6 +922,9 @@ def _exchange(
     # --------------------------- Do Transfer out ----------------------------
 
     self._transfer_out(coins[j], dy, use_eth, receiver)
+
+    # Update Stored Balances:
+    self.stored_balances[j] -= dy
 
     # ------------------------------------------------------------------------
 
@@ -1095,23 +1156,26 @@ def _calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256[3]:
 
 @internal
 def _withdraw_admin_fees():
+
     receiver: address = Factory(self.factory).get_fee_receiver(self)
+    amounts: uint256[N_COINS] = self.admin_balances
 
     for i in range(N_COINS):
-        amount: uint256 = self.admin_balances[i]
 
-        if amount > 0:
+        if amounts[i] > 0:
 
             if self.coins[i] == WETH20:
-                raw_call(receiver, b"", value=amount)
+                raw_call(receiver, b"", value=amounts[i])
             else:
                 assert ERC20(self.coins[i]).transfer(
                     receiver,
-                    amount,
+                    amounts[i],
                     default_return_value=True
                 )
 
     self.admin_balances = empty(uint256[N_COINS])
+    # Reduce stored balances:
+    self._decrease_balances(amounts)
 
 
 # -------------------------- AMM Price Methods -------------------------------
@@ -1401,7 +1465,9 @@ def ema_price() -> uint256:
 @view
 def get_p() -> uint256:
     amp: uint256 = self._A()
-    xp: uint256[N_COINS] = self._xp_mem(self._stored_rates(), self._balances())
+    xp: uint256[N_COINS] = self._xp_mem(
+        self._stored_rates(), self._balances()
+    )
     D: uint256 = self.get_D(xp, amp)
     return self._get_p(xp, amp, D)
 
