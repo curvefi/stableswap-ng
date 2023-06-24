@@ -41,20 +41,6 @@ interface ERC20:
     def totalSupply() -> uint256: view
     def approve(_spender: address, _amount: uint256): nonpayable
 
-interface CurvePlainPool:
-    def initialize(
-        _name: String[32],
-        _symbol: String[10],
-        _coins: address[4],
-        _rate_multipliers: uint256[4],
-        _A: uint256,
-        _fee: uint256,
-        _weth: address,
-        _ma_exp_time: uint256,
-        _method_ids: bytes4[4],
-        _oracles: address[4]
-    ): nonpayable
-
 interface CurvePool:
     def A() -> uint256: view
     def fee() -> uint256: view
@@ -521,6 +507,7 @@ def deploy_plain_pool(
     _oracles: address[4] = empty(address[4]),
     _asset_type: uint256 = 0,
     _implementation_idx: uint256 = 0,
+    _is_rebasing: bool = False
 ) -> address:
     """
     @notice Deploy a new plain pool
@@ -548,6 +535,7 @@ def deploy_plain_pool(
     @param _implementation_idx Index of the implementation to use. All possible
                 implementations for a pool of N_COINS can be publicly accessed
                 via `plain_implementations(N_COINS)`
+    @param _is_rebasing If any of the coins rebases, then this should be set to True.
     @return Address of the deployed pool
     """
     assert _fee <= 100000000, "Invalid fee"
@@ -591,6 +579,7 @@ def deploy_plain_pool(
         _ma_exp_time,
         _method_ids,
         _oracles,
+        _is_rebasing,
         code_offset=3
     )
 
@@ -637,7 +626,11 @@ def deploy_metapool(
     _coin: address,
     _A: uint256,
     _fee: uint256,
+    _ma_exp_time: uint256,
+    _method_ids: bytes4[4] = empty(bytes4[4]),
+    _oracles: address[4] = empty(address[4]),
     _implementation_idx: uint256 = 0,
+    _is_rebasing: bool = False
 ) -> address:
     """
     @notice Deploy a new metapool
@@ -659,6 +652,7 @@ def deploy_metapool(
     @param _implementation_idx Index of the implementation to use. All possible
                 implementations for a BASE_POOL can be publicly accessed
                 via `metapool_implementations(BASE_POOL)`
+    @param _is_rebasing If coin rebases, then this should be set to True.
     @return Address of the deployed pool
     """
     assert _fee <= 100000000, "Invalid fee"

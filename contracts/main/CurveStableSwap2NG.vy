@@ -3,23 +3,29 @@
 @title CurveStableSwap2NG
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
-@notice 2 coin pool implementation with no lending, i.e. tokens are not
-        deposited into lending markets. Supports only token pairs that are
+@notice 2 coin pool implementation with no rehypothecation, i.e. tokens are not
+        deposited into contracts. Supports only token pairs that are
         similarly priced (or the underlying is similarly priced).
 @dev ERC20 support for return True/revert, return True/False, return None
      ERC20 tokens can have arbitrary decimals (<=18).
      Additional features include:
         1. Support for rebasing tokens: but this disables
-           exchange_optimistically
+           `exchange_optimistically`
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
+           Note: Oracle precision _must_ be 10**18
         3. Support for ETH/WETH transfers
         4. Adds oracles for coin[1] w.r.t coin[0]
         5. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        6. Adds feature called exchange_with_rebase, which is inspired
+        6. Adds feature called `exchange_optimistically`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
-           prior to executing the swap. This is disabled for rebasing tokens.
+           prior to executing the swap.
+           Note: a. If pool contains rebasing tokens and `IS_REBASING` is True
+                    then calling `exchange_optimistically` will REVERT.
+                 b. If pool contains rebasing token and `IS_REBASING` is False
+                    then this is an incorrect implementation and rebases can be
+                    stolen.
 """
 
 from vyper.interfaces import ERC20
@@ -219,7 +225,7 @@ def __init__(
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
-    @param _is_rebasing
+    @param _is_rebasing If any of the coins rebases, then this should be set to True.
     """
 
     WETH20 = _weth
@@ -411,22 +417,23 @@ def _stored_rates() -> uint256[N_COINS]:
     """
 
     rates: uint256[N_COINS] = self.rate_multipliers
+    oracles: uint256[N_COINS] = self.oracles
 
     for i in range(N_COINS):
-        oracle: uint256 = self.oracles[i]
-        if oracle == 0:
+
+        if oracles[i] == 0:
             continue
 
         # NOTE: assumed that response is of precision 10**18
         response: Bytes[32] = raw_call(
-            convert(oracle % 2**160, address),
-            _abi_encode(oracle & ORACLE_BIT_MASK),
+            convert(oracles[i] % 2**160, address),
+            _abi_encode(oracles[i] & ORACLE_BIT_MASK),
             max_outsize=32,
             is_static_call=True,
         )
 
         assert len(response) != 0
-        rates[1] = rates[1] * convert(response, uint256) / PRECISION
+        rates[i] = rates[i] * convert(response, uint256) / PRECISION
 
     return rates
 
