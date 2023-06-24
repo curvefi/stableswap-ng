@@ -3,23 +3,29 @@
 @title CurveStableSwap2NG
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
-@notice 2 coin pool implementation with no lending, i.e. tokens are not
-        deposited into lending markets. Supports only token pairs that are
+@notice 2 coin pool implementation with no rehypothecation, i.e. tokens are not
+        deposited into contracts. Supports only token pairs that are
         similarly priced (or the underlying is similarly priced).
 @dev ERC20 support for return True/revert, return True/False, return None
      ERC20 tokens can have arbitrary decimals (<=18).
      Additional features include:
         1. Support for rebasing tokens: but this disables
-           exchange_optimistically
+           `exchange_with_rebase`
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
+           Note: Oracle precision _must_ be 10**18.
         3. Support for ETH/WETH transfers
-        4. Adds oracles for coin[1] w.r.t coin[0]
+        4. Adds oracles based on AMM State Price (and _not_ last traded price).
         5. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        6. Adds feature called exchange_with_rebase, which is inspired
+        6. Adds feature called `exchange_with_rebase`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
-           prior to executing the swap. This is disabled for rebasing tokens.
+           prior to executing the swap.
+           Note: a. If pool contains rebasing tokens and `IS_REBASING` is True
+                    then calling `exchange_with_rebase` will REVERT.
+                 b. If pool contains rebasing token and `IS_REBASING` is False
+                    then this is an incorrect implementation and rebases can be
+                    stolen.
 """
 
 from vyper.interfaces import ERC20
@@ -103,17 +109,18 @@ event ApplyNewFee:
     fee: uint256
 
 
-# ---------------------------- Pool Parameters -------------------------------
+# ---------------------------- Pool Variables --------------------------------
 
 WETH20: public(immutable(address))
-factory: public(address)
-
-coins: public(address[N_COINS])
 
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 IS_REBASING: immutable(bool)
+
+factory: public(address)
+coins: public(address[N_COINS])
+stored_balances: uint256[N_COINS]
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -218,7 +225,7 @@ def __init__(
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
-    @param _is_rebasing
+    @param _is_rebasing If any of the coins rebases, then this should be set to True.
     """
 
     WETH20 = _weth
@@ -233,6 +240,10 @@ def __init__(
 
         if coin == empty(address):
             break
+
+        # Enforce native token as coin[0] (makes integrators happy)
+        if coin == WETH20 and i > 0:
+            raise "ETH must be at index 0"
 
         self.coins[i] = coin
         self.rate_multipliers[i] = _rate_multipliers[i]
@@ -266,18 +277,6 @@ def __init__(
 
     # fire a transfer event so block explorers identify the contract as an ERC20
     log Transfer(empty(address), self, 0)
-
-
-@external
-def set_ma_exp_time(_ma_exp_time: uint256):
-    """
-    @notice Set the moving average window of the price oracle.
-    @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
-    """
-    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
-    assert _ma_exp_time != 0
-
-    self.ma_exp_time = _ma_exp_time
 
 
 # ------------------ Token transfers in and out of the AMM -------------------
@@ -410,22 +409,23 @@ def _stored_rates() -> uint256[N_COINS]:
     """
 
     rates: uint256[N_COINS] = self.rate_multipliers
+    oracles: uint256[N_COINS] = self.oracles
 
     for i in range(N_COINS):
-        oracle: uint256 = self.oracles[i]
-        if oracle == 0:
+
+        if oracles[i] == 0:
             continue
 
         # NOTE: assumed that response is of precision 10**18
         response: Bytes[32] = raw_call(
-            convert(oracle % 2**160, address),
-            _abi_encode(oracle & ORACLE_BIT_MASK),
+            convert(oracles[i] % 2**160, address),
+            _abi_encode(oracles[i] & ORACLE_BIT_MASK),
             max_outsize=32,
             is_static_call=True,
         )
 
         assert len(response) != 0
-        rates[1] = rates[1] * convert(response, uint256) / PRECISION
+        rates[i] = rates[i] * convert(response, uint256) / PRECISION
 
     return rates
 
@@ -434,18 +434,34 @@ def _stored_rates() -> uint256[N_COINS]:
 @internal
 def _balances() -> uint256[N_COINS]:
     """
-    @notice Calculates the pool's balances _excluding_ the admin's balances
-    @dev
+    @notice Calculates the pool's balances _excluding_ the admin's balances.
+    @dev This method ensures LPs keep all rebases and admin only claims swap fees.
     """
     result: uint256[N_COINS] = empty(uint256[N_COINS])
 
-    if IS_REBASING:
+    if not IS_REBASING:
+        return self.stored_balances  # only used for optimistic swaps
+    else:
         for i in range(N_COINS):
             result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
-        return result
-    else:
-        # TODO: add non rebasing support
-        return result
+
+    return result
+
+
+@internal
+def _increase_balances(balances: uint256[N_COINS]):
+    stored_balances: uint256[N_COINS] = self.stored_balances
+    for i in range(N_COINS):
+        stored_balances[i] += balances[i]
+    self.stored_balances = stored_balances
+
+
+@internal
+def _decrease_balances(balances: uint256[N_COINS]):
+    stored_balances: uint256[N_COINS] = self.stored_balances
+    for i in range(N_COINS):
+        stored_balances[i] -= balances[i]
+    self.stored_balances = stored_balances
 
 
 # -------------------------- AMM Main Functions ------------------------------
@@ -483,7 +499,8 @@ def exchange(
         _use_eth,
         _receiver,
         empty(address),
-        empty(bytes32)
+        empty(bytes32),
+        False
     )
 
 
@@ -500,9 +517,10 @@ def exchange_extended(
     _cb: bytes32
 ) -> uint256:
     """
-    @notice Perform an exchange between two coins
+    @notice Perform an exchange between two coins after a callback
     @dev Index values can be found via the `coins` public getter method
-         Not payable (does not accept eth)
+         Not payable (does not accept eth). Users of this method are dex aggregators,
+         arbitrageurs, or other users who do not wish to grant approvals to the contract.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -520,13 +538,14 @@ def exchange_extended(
         _use_eth,
         _receiver,
         msg.sender,  # <---------------------------- callbacker is msg.sender.
-        _cb
+        _cb,
+        False
     )
 
 
 @external
 @nonreentrant('lock')
-def exchange_optimistically(
+def exchange_with_rebase(
     i: int128,
     j: int128,
     _dx: uint256,
@@ -534,11 +553,32 @@ def exchange_optimistically(
     _use_eth: bool = False,
     _receiver: address = msg.sender,
 ) -> uint256:
-
-    if IS_REBASING:
-        raise
-
-    return 0
+    """
+    @notice Perform an exchange between two coins without transferring token in
+    @dev The contract swaps tokens based on a change in balance of coin[i]. The
+         dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
+         this method are dex aggregators, arbitrageurs, or other users who do not
+         wish to grant approvals to the contract. The method is non-payable.
+    @param i Index value for the coin to send
+    @param j Index valie of the coin to recieve
+    @param _dx Amount of `i` being exchanged
+    @param _min_dy Minimum amount of `j` to receive
+    @return Actual amount of `j` received
+    """
+    assert not IS_REBASING, "Cannot swap optimistically if pool contains rebasing token(s)"
+    return self._exchange(
+        msg.sender,
+        0,
+        i,
+        j,
+        _dx,
+        _min_dy,
+        _use_eth,
+        _receiver,
+        empty(address),
+        empty(bytes32),
+        True,  # <--------------------------------------- swap optimistically.
+    )
 
 
 @payable
@@ -603,6 +643,9 @@ def add_liquidity(
         else:
 
             assert total_supply != 0  # dev: initial deposit requires all coins
+
+    # Add incoming balance
+    self._increase_balances(new_balances)
 
     # Invariant after change
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
@@ -680,6 +723,9 @@ def remove_liquidity_one_coin(
 
     self._transfer_out(self.coins[i], dy[0], _use_eth, _receiver)
 
+    # Decrease coin[i] balance in self.stored_balances
+    self.stored_balances[i] -= dy[0]
+
     log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy[0], total_supply)
 
     self.save_p_from_price(dy[2])
@@ -710,11 +756,12 @@ def remove_liquidity_imbalance(
 
     new_balances: uint256[N_COINS] = old_balances
     for i in range(N_COINS):
-        amount: uint256 = _amounts[i]
-        if amount != 0:
-            new_balances[i] -= amount
+        if _amounts[i] != 0:
+            new_balances[i] -= _amounts[i]
+            self._transfer_out(coins[i], _amounts[i], _use_eth, _receiver)
 
-            self._transfer_out(coins[i], amount, _use_eth, _receiver)
+    # Decrease balances in self.stored_balances
+    self._decrease_balances(_amounts)
 
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
 
@@ -776,8 +823,10 @@ def remove_liquidity(
         value: uint256 = balances[i] * _burn_amount / total_supply
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
         amounts[i] = value
-
         self._transfer_out(coins[i], value, _use_eth, _receiver)
+
+    # Decrease balances in self.stored_balances
+    self._decrease_balances(amounts)
 
     total_supply -= _burn_amount
     self.balanceOf[msg.sender] -= _burn_amount
@@ -815,7 +864,8 @@ def _exchange(
     use_eth: bool,
     receiver: address,
     callbacker: address,
-    callback_sig: bytes32
+    callback_sig: bytes32,
+    optimistic_swap: bool = False
 ) -> uint256:
 
     assert i != j  # dev: coin index out of range
@@ -828,13 +878,27 @@ def _exchange(
 
     # --------------------------- Do Transfer in -----------------------------
 
-    # `dx` that `_transfer_in` gives is whatever the pool received after ERC20
-    # transfer
-    dx: uint256 = self._transfer_in(
-        coins[i], _dx, _min_dy, mvalue,
-        callbacker, callback_sig,
-        sender, receiver, use_eth
-    )
+    dx: uint256 = 0
+
+    if optimistic_swap:
+
+        # This branch is never reached for rebasing tokens
+        pool_x_balance: uint256 = ERC20(coins[i]).balanceOf(self)
+        dx = pool_x_balance - self.stored_balances[i]
+
+        assert dx == _dx, "Pool did not receive tokens for swap"
+
+    else:
+
+        # `dx` is whatever the pool received after ERC20 transfer:
+        dx = self._transfer_in(
+            coins[i], _dx, _min_dy, mvalue,
+            callbacker, callback_sig,
+            sender, receiver, use_eth
+        )
+
+    # Update stored balances
+    self.stored_balances[i] += dx
 
     # ------------------------------------------------------------------------
 
@@ -864,6 +928,9 @@ def _exchange(
     # --------------------------- Do Transfer out ----------------------------
 
     self._transfer_out(coins[j], dy, use_eth, receiver)
+
+    # Update Stored Balances:
+    self.stored_balances[j] -= dy
 
     # ------------------------------------------------------------------------
 
@@ -1095,23 +1162,26 @@ def _calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256[3]:
 
 @internal
 def _withdraw_admin_fees():
+
     receiver: address = Factory(self.factory).get_fee_receiver(self)
+    amounts: uint256[N_COINS] = self.admin_balances
 
     for i in range(N_COINS):
-        amount: uint256 = self.admin_balances[i]
 
-        if amount > 0:
+        if amounts[i] > 0:
 
             if self.coins[i] == WETH20:
-                raw_call(receiver, b"", value=amount)
+                raw_call(receiver, b"", value=amounts[i])
             else:
                 assert ERC20(self.coins[i]).transfer(
                     receiver,
-                    amount,
+                    amounts[i],
                     default_return_value=True
                 )
 
     self.admin_balances = empty(uint256[N_COINS])
+    # Reduce stored balances:
+    self._decrease_balances(amounts)
 
 
 # -------------------------- AMM Price Methods -------------------------------
@@ -1401,7 +1471,9 @@ def ema_price() -> uint256:
 @view
 def get_p() -> uint256:
     amp: uint256 = self._A()
-    xp: uint256[N_COINS] = self._xp_mem(self._stored_rates(), self._balances())
+    xp: uint256[N_COINS] = self._xp_mem(
+        self._stored_rates(), self._balances()
+    )
     D: uint256 = self.get_D(xp, amp)
     return self._get_p(xp, amp, D)
 
@@ -1643,3 +1715,15 @@ def apply_new_fee():
     self.fee = fee
     self.admin_action_deadline = 0
     log ApplyNewFee(fee)
+
+
+@external
+def set_ma_exp_time(_ma_exp_time: uint256):
+    """
+    @notice Set the moving average window of the price oracle.
+    @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
+    """
+    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
+    assert _ma_exp_time != 0
+
+    self.ma_exp_time = _ma_exp_time
