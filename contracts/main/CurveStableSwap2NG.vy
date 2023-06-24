@@ -10,7 +10,7 @@
      ERC20 tokens can have arbitrary decimals (<=18).
      Additional features include:
         1. Support for rebasing tokens: but this disables
-           `exchange_optimistically`
+           `exchange_with_rebase`
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
            Note: Oracle precision _must_ be 10**18.
         3. Support for ETH/WETH transfers
@@ -18,11 +18,11 @@
         5. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        6. Adds feature called `exchange_optimistically`, which is inspired
+        6. Adds feature called `exchange_with_rebase`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and `IS_REBASING` is True
-                    then calling `exchange_optimistically` will REVERT.
+                    then calling `exchange_with_rebase` will REVERT.
                  b. If pool contains rebasing token and `IS_REBASING` is False
                     then this is an incorrect implementation and rebases can be
                     stolen.
@@ -479,7 +479,6 @@ def exchange(
     _receiver: address = msg.sender,
 ) -> uint256:
     """
-    # TODO: Add docs
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
          Allows for native token swaps (e.g. ETH <> whatever)
@@ -518,10 +517,10 @@ def exchange_extended(
     _cb: bytes32
 ) -> uint256:
     """
-    # TODO: Add docs
-    @notice Perform an exchange between two coins
+    @notice Perform an exchange between two coins after a callback
     @dev Index values can be found via the `coins` public getter method
-         Not payable (does not accept eth)
+         Not payable (does not accept eth). Users of this method are dex aggregators,
+         arbitrageurs, or other users who do not wish to grant approvals to the contract.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -546,7 +545,7 @@ def exchange_extended(
 
 @external
 @nonreentrant('lock')
-def exchange_optimistically(
+def exchange_with_rebase(
     i: int128,
     j: int128,
     _dx: uint256,
@@ -555,8 +554,16 @@ def exchange_optimistically(
     _receiver: address = msg.sender,
 ) -> uint256:
     """
-    @notice Exchange
-    # TODO: Add docs
+    @notice Perform an exchange between two coins without transferring token in
+    @dev The contract swaps tokens based on a change in balance of coin[i]. The
+         dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
+         this method are dex aggregators, arbitrageurs, or other users who do not
+         wish to grant approvals to the contract. The method is non-payable.
+    @param i Index value for the coin to send
+    @param j Index valie of the coin to recieve
+    @param _dx Amount of `i` being exchanged
+    @param _min_dy Minimum amount of `j` to receive
+    @return Actual amount of `j` received
     """
     assert not IS_REBASING, "Cannot swap optimistically if pool contains rebasing token(s)"
     return self._exchange(
