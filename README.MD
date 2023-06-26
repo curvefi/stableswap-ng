@@ -9,6 +9,8 @@ pip install poetry==1.5.1
 poetry install
 ```
 
+### Testing parameters
+
 ```shell
-python -m pytest tests/boa -n auto
+pytest tests -n auto
 ```

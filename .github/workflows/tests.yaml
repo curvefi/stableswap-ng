@@ -1,4 +1,5 @@
-name: unit-tests-boa
+# TODO: split actions later
+name: tests
 
 on: ["push", "pull_request"]
 
@@ -6,7 +7,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  boa-tests:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -29,4 +30,4 @@ jobs:
           poetry install
 
       - name: Run Tests
-        run: python -m pytest tests/boa -n auto
+        run: pytest tests -n auto
