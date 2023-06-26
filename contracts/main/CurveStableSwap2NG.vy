@@ -438,12 +438,8 @@ def _balances() -> uint256[N_COINS]:
     @dev This method ensures LPs keep all rebases and admin only claims swap fees.
     """
     result: uint256[N_COINS] = empty(uint256[N_COINS])
-
-    if not IS_REBASING:
-        return self.stored_balances  # only used for optimistic swaps
-    else:
-        for i in range(N_COINS):
-            result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
+    for i in range(N_COINS):
+        result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
 
     return result
 
