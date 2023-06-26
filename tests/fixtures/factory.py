@@ -61,7 +61,5 @@ def factory(
 
 
 @pytest.fixture(scope="module")
-def factory_populated(
-    factory, swap_plain, swap_eth_rebasing, swap_oracle, swap_meta
-):
+def factory_populated(factory, swap_plain, swap_eth_rebasing, swap_oracle, swap_meta):
     return factory

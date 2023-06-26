@@ -5,9 +5,7 @@ from tests.utils.tokens import mint_for_testing
 
 
 @pytest.mark.parametrize("min_amount", [0, 10**18])
-def test_initial(
-    alice, swap_plain, coins, decimals, min_amount, initial_amounts
-):
+def test_initial(alice, swap_plain, coins, decimals, min_amount, initial_amounts):
 
     amounts = [10**d for d in decimals]
     for idx in range(2):
