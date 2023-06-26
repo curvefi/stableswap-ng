@@ -616,6 +616,12 @@ def add_liquidity_with_rebase(
 ) -> uint256:
     """
     @notice Deposit coins into the pool
+    @dev The contract adds liquidity based on a change in balance of coins. The
+         dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
+         this method are dex aggregators, arbitrageurs, or other users who do not
+         wish to grant approvals to the contract: they would instead send tokens
+         directly to the contract and call `add_liquidity_on_rebase`.
+         The method is non-payable: does not accept native token.
     @param _amounts List of amounts of coins to deposit
     @param _min_mint_amount Minimum amount of LP tokens to mint from the deposit
     @param _receiver Address that owns the minted LP tokens
