@@ -151,3 +151,4 @@ node_modules
 # temp
 docs/
 scripts/experiments/get_p.py
+.python-version

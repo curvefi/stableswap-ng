@@ -1,4 +1,5 @@
-name: unit-tests-boa
+# TODO: split actions later
+name: tests
 
 on: ["push", "pull_request"]
 
@@ -6,25 +7,30 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  boa-tests:
+  tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Cache Compiler Installations
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.vvm
           key: compiler-cache
 
       - name: Setup Python 3.10.4
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.10.4
 
       - name: Install Requirements
-        run: pip install -r requirements.txt
+        run: |
+          pip install poetry==1.5.1
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction
 
       - name: Run Tests
-        run: python -m pytest tests/boa -n auto
+        run: |
+          source .venv/bin/activate
+          pytest tests -n auto

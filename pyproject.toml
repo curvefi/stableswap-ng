@@ -1,0 +1,60 @@
+[tool.poetry]
+name = "stableswap-ng"
+version = "0.1.0"
+description = "Stableswap-ng environment for testing"
+authors = ["Curve.fi"]
+license = "MIT"
+readme = "README.md"
+packages = []
+
+[tool.poetry.dependencies]
+python = "^3.10"
+poetry = "1.5.1"
+titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "bd4af917754e7a66a84dee6134c8a42112224471"}
+vyper = "^0.3.9"
+
+[tool.poetry.group.dev.dependencies]
+black = "22.3.0"
+flake8 = "4.0.1"
+isort = "5.12.0"
+mamushi = "^0.0.2a1"
+
+
+[tool.poetry.group.testing.dependencies]
+eip712 = "^0.2.1"
+eth-account = "~0.8.0"
+ipython = "^8.14.0"
+hypothesis = "^6.79.3"
+pytest = "^7.4.0"
+pytest-xdist = "^3.3.1"
+pytest-forked = "^1.6.0"
+pytest-repeat = "^0.9.1"
+pdbpp = "^0.10.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+exclude = '''
+(
+  /(
+    \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | build
+    | dist
+  )/
+)
+'''
+line-length = 120
+target_version = ['py310']
+
+[tool.isort]
+profile = "black"
+py_version = 310
+known_first_party = "poetry"

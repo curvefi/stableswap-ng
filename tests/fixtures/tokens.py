@@ -24,9 +24,7 @@ def dai(deployer):
 def steth(deployer):
     with boa.env.prank(deployer):
         # TODO: turn this into a rebasing implementation
-        return boa.load(
-            "contracts/mocks/ERC20Rebasing.vy", "stETH", "stETH", 18
-        )
+        return boa.load("contracts/mocks/ERC20Rebasing.vy", "stETH", "stETH", 18)
 
 
 @pytest.fixture(scope="module")
