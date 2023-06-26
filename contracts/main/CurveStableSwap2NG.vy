@@ -212,9 +212,8 @@ def __init__(
 ):
     """
     @notice Initialize the pool contract
-    @param _name Name of the new plain pool
-    @param _symbol Symbol for the new plain pool - will be
-                   concatenated with factory symbol
+    @param _name Name of the new plain pool.
+    @param _symbol Symbol for the new plain pool.
     @param _coins List of addresses of the coins being used in the pool.
     @param _A Amplification co-efficient - a lower value here means
               less tolerance for imbalance within the pool's assets.
@@ -237,8 +236,8 @@ def __init__(
     WETH20 = _weth
     IS_REBASING = _is_rebasing
 
-    name = concat("Curve.fi Factory Plain Pool: ", _name)
-    symbol = concat(_symbol, "-f")
+    name = _name
+    symbol = _symbol
 
     for i in range(N_COINS):
 
@@ -401,6 +400,7 @@ def _transfer_out(
             receiver, _amount, default_return_value=True
         )
 
+
 # -------------------------- AMM Special Methods -----------------------------
 
 
@@ -452,6 +452,11 @@ def _balances() -> uint256[N_COINS]:
 
 @internal
 def _increase_balances(balances: uint256[N_COINS]):
+    """
+    @notice Increases self.stored_balances by `balances` amount
+    @dev This is an internal accounting method and must be called whenever there
+         is an ERC20 token transfer into the pool.
+    """
     stored_balances: uint256[N_COINS] = self.stored_balances
     for i in range(N_COINS):
         stored_balances[i] += balances[i]
@@ -460,6 +465,11 @@ def _increase_balances(balances: uint256[N_COINS]):
 
 @internal
 def _decrease_balances(balances: uint256[N_COINS]):
+    """
+    @notice Decreases self.stored_balances by `balances` amount
+    @dev This is an internal accounting method and must be called whenever there
+         is an ERC20 token transfer out of the pool.
+    """
     stored_balances: uint256[N_COINS] = self.stored_balances
     for i in range(N_COINS):
         stored_balances[i] -= balances[i]
