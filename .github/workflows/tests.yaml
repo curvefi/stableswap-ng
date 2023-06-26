@@ -27,7 +27,10 @@ jobs:
       - name: Install Requirements
         run: |
           pip install poetry==1.5.1
-          poetry install
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction
 
       - name: Run Tests
-        run: pytest tests -n auto
+        run: |
+          source .venv/bin/activate
+          pytest tests -n auto
