@@ -554,14 +554,16 @@ def exchange_with_rebase(
     @dev The contract swaps tokens based on a change in balance of coin[i]. The
          dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
          this method are dex aggregators, arbitrageurs, or other users who do not
-         wish to grant approvals to the contract. The method is non-payable.
+         wish to grant approvals to the contract: they would instead send tokens
+         directly to the contract and call `exchange_on_rebase`.
+         The method is non-payable: does not accept native token.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
-    assert not IS_REBASING, "Cannot swap optimistically if pool contains rebasing token(s)"
+    assert not IS_REBASING, "Call disabled if IS_REBASING is True"
     return self._exchange(
         msg.sender,
         0,
@@ -593,101 +595,42 @@ def add_liquidity(
     @param _receiver Address that owns the minted LP tokens
     @return Amount of LP tokens received by depositing
     """
-    amp: uint256 = self._A()
-    old_balances: uint256[N_COINS] = self._balances()
-    rates: uint256[N_COINS] = self._stored_rates()
-    coins: address[N_COINS] = self.coins
+    return self._add_liquidity(
+        msg.sender,
+        _amounts,
+        _min_mint_amount,
+        _use_eth,
+        _receiver,
+        msg.value,
+        False,  # <--------------------- Does not expect optimistic transfers.
+    )
 
-    # Initial invariant
-    D0: uint256 = self.get_D_mem(rates, old_balances, amp)
 
-    total_supply: uint256 = self.totalSupply
-    new_balances: uint256[N_COINS] = old_balances
-
-    for i in range(N_COINS):
-
-        if _amounts[i] > 0:
-
-            if coins[i] == WETH20:
-
-                new_balances[i] += self._transfer_in(
-                    coins[i],
-                    _amounts[i],
-                    0,
-                    msg.value,
-                    empty(address),
-                    empty(bytes32),
-                    msg.sender,
-                    empty(address),
-                    _use_eth
-                )
-
-            else:
-
-                new_balances[i] += self._transfer_in(
-                    coins[i],
-                    _amounts[i],
-                    0,
-                    0,
-                    empty(address),
-                    empty(bytes32),
-                    msg.sender,
-                    empty(address),
-                    False
-                )
-
-        else:
-
-            assert total_supply != 0  # dev: initial deposit requires all coins
-
-    # Add incoming balance
-    self._increase_balances(new_balances)
-
-    # Invariant after change
-    D1: uint256 = self.get_D_mem(rates, new_balances, amp)
-    assert D1 > D0
-
-    # We need to recalculate the invariant accounting for fees
-    # to calculate fair user's share
-    fees: uint256[N_COINS] = empty(uint256[N_COINS])
-    mint_amount: uint256 = 0
-
-    if total_supply > 0:
-
-        # Only account for fees if we are not the first to deposit
-        base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-        for i in range(N_COINS):
-            ideal_balance: uint256 = D1 * old_balances[i] / D0
-            difference: uint256 = 0
-            new_balance: uint256 = new_balances[i]
-            if ideal_balance > new_balance:
-                difference = ideal_balance - new_balance
-            else:
-                difference = new_balance - ideal_balance
-            fees[i] = base_fee * difference / FEE_DENOMINATOR
-            self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
-            new_balances[i] -= fees[i]
-
-        xp: uint256[N_COINS] = self._xp_mem(rates, new_balances)
-        D2: uint256 = self.get_D(xp, amp)
-        mint_amount = total_supply * (D2 - D0) / D0
-        self.save_p(xp, amp, D2)
-
-    else:
-
-        mint_amount = D1  # Take the dust if there was any
-
-    assert mint_amount >= _min_mint_amount, "Slippage screwed you"
-
-    # Mint pool tokens
-    total_supply += mint_amount
-    self.balanceOf[_receiver] += mint_amount
-    self.totalSupply = total_supply
-    log Transfer(empty(address), _receiver, mint_amount)
-
-    log AddLiquidity(msg.sender, _amounts, fees, D1, total_supply)
-
-    return mint_amount
+@external
+@nonreentrant('lock')
+def add_liquidity_with_rebase(
+    _amounts: uint256[N_COINS],
+    _min_mint_amount: uint256,
+    _use_eth: bool = False,
+    _receiver: address = msg.sender
+) -> uint256:
+    """
+    @notice Deposit coins into the pool
+    @param _amounts List of amounts of coins to deposit
+    @param _min_mint_amount Minimum amount of LP tokens to mint from the deposit
+    @param _receiver Address that owns the minted LP tokens
+    @return Amount of LP tokens received by depositing
+    """
+    assert not IS_REBASING, "Call disabled if IS_REBASING is True"
+    return self._add_liquidity(
+        msg.sender,
+        _amounts,
+        _min_mint_amount,
+        _use_eth,
+        _receiver,
+        0,
+        True,  # <------------------------------ Expects optimistic transfers.
+    )
 
 
 @external
@@ -861,7 +804,7 @@ def _exchange(
     receiver: address,
     callbacker: address,
     callback_sig: bytes32,
-    optimistic_swap: bool = False
+    expect_optimistic_transfer: bool = False
 ) -> uint256:
 
     assert i != j  # dev: coin index out of range
@@ -876,7 +819,7 @@ def _exchange(
 
     dx: uint256 = 0
 
-    if optimistic_swap:
+    if expect_optimistic_transfer:
 
         # This branch is never reached for rebasing tokens
         pool_x_balance: uint256 = ERC20(coins[i]).balanceOf(self)
@@ -935,78 +878,165 @@ def _exchange(
     return dy
 
 
-@view
 @internal
-def _A() -> uint256:
-    """
-    Handle ramping A up or down
-    """
-    t1: uint256 = self.future_A_time
-    A1: uint256 = self.future_A
+def _add_liquidity(
+    sender: address,
+    amounts: uint256[N_COINS],
+    min_mint_amount: uint256,
+    use_eth: bool,
+    receiver: address,
+    mvalue: uint256,
+    expect_optimistic_transfer: bool = False,
+) -> uint256:
 
-    if block.timestamp < t1:
-        A0: uint256 = self.initial_A
-        t0: uint256 = self.initial_A_time
-        # Expressions in uint256 cannot have negative numbers, thus "if"
-        if A1 > A0:
-            return A0 + (A1 - A0) * (block.timestamp - t0) / (t1 - t0)
-        else:
-            return A0 - (A0 - A1) * (block.timestamp - t0) / (t1 - t0)
+    amp: uint256 = self._A()
+    old_balances: uint256[N_COINS] = self._balances()
+    rates: uint256[N_COINS] = self._stored_rates()
+    coins: address[N_COINS] = self.coins
 
-    else:  # when t1 == 0 or block.timestamp >= t1
-        return A1
+    # Initial invariant
+    D0: uint256 = self.get_D_mem(rates, old_balances, amp)
+
+    total_supply: uint256 = self.totalSupply
+    new_balances: uint256[N_COINS] = old_balances
+
+    # -------------------------- Do Transfers In -----------------------------
+
+    if expect_optimistic_transfer:
+
+        dx: uint256 = 0
+
+        for i in range(N_COINS):
+
+            if amounts[i] > 0:
+
+                # This branch is never reached for rebasing tokens
+                pool_x_balance: uint256 = ERC20(coins[i]).balanceOf(self)
+                dx = pool_x_balance - self.stored_balances[i]
+
+                assert dx == amounts[i], "Pool did not receive tokens for adding liquidity"
+
+                new_balances[i] += dx
+
+            else:
+
+                assert total_supply != 0  # dev: initial deposit requires all coins
+
+    else:
+
+        for i in range(N_COINS):
+
+            if amounts[i] > 0:
+
+                if coins[i] == WETH20:
+
+                    new_balances[i] += self._transfer_in(
+                        coins[i],
+                        amounts[i],
+                        0,
+                        mvalue,
+                        empty(address),
+                        empty(bytes32),
+                        sender,
+                        empty(address),
+                        use_eth
+                    )
+
+                else:
+
+                    new_balances[i] += self._transfer_in(
+                        coins[i],
+                        amounts[i],
+                        0,
+                        0,
+                        empty(address),
+                        empty(bytes32),
+                        sender,
+                        empty(address),
+                        False
+                    )
+
+            else:
+
+                assert total_supply != 0  # dev: initial deposit requires all coins
+
+    # Add incoming balance
+    self._increase_balances(new_balances)
+
+    # ------------------------------------------------------------------------
+
+    # Invariant after change
+    D1: uint256 = self.get_D_mem(rates, new_balances, amp)
+    assert D1 > D0
+
+    # We need to recalculate the invariant accounting for fees
+    # to calculate fair user's share
+    fees: uint256[N_COINS] = empty(uint256[N_COINS])
+    mint_amount: uint256 = 0
+
+    if total_supply > 0:
+
+        # Only account for fees if we are not the first to deposit
+        base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
+        for i in range(N_COINS):
+            ideal_balance: uint256 = D1 * old_balances[i] / D0
+            difference: uint256 = 0
+            new_balance: uint256 = new_balances[i]
+            if ideal_balance > new_balance:
+                difference = ideal_balance - new_balance
+            else:
+                difference = new_balance - ideal_balance
+            fees[i] = base_fee * difference / FEE_DENOMINATOR
+            self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
+            new_balances[i] -= fees[i]
+
+        xp: uint256[N_COINS] = self._xp_mem(rates, new_balances)
+        D2: uint256 = self.get_D(xp, amp)
+        mint_amount = total_supply * (D2 - D0) / D0
+        self.save_p(xp, amp, D2)
+
+    else:
+
+        mint_amount = D1  # Take the dust if there was any
+
+    assert mint_amount >= min_mint_amount, "Slippage screwed you"
+
+    # Mint pool tokens
+    total_supply += mint_amount
+    self.balanceOf[receiver] += mint_amount
+    self.totalSupply = total_supply
+    log Transfer(empty(address), receiver, mint_amount)
+
+    log AddLiquidity(sender, amounts, fees, D1, total_supply)
+
+    return mint_amount
 
 
-@pure
 @internal
-def _xp_mem(_rates: uint256[N_COINS], _balances: uint256[N_COINS]) -> uint256[N_COINS]:
-    result: uint256[N_COINS] = empty(uint256[N_COINS])
+def _withdraw_admin_fees():
+
+    receiver: address = Factory(self.factory).get_fee_receiver(self)
+    amounts: uint256[N_COINS] = self.admin_balances
+
     for i in range(N_COINS):
-        result[i] = _rates[i] * _balances[i] / PRECISION
-    return result
+
+        if amounts[i] > 0:
+
+            if self.coins[i] == WETH20:
+                raw_call(receiver, b"", value=amounts[i])
+            else:
+                assert ERC20(self.coins[i]).transfer(
+                    receiver,
+                    amounts[i],
+                    default_return_value=True
+                )
+
+    self.admin_balances = empty(uint256[N_COINS])
+    # Reduce stored balances:
+    self._decrease_balances(amounts)
 
 
-@pure
-@internal
-def get_D(_xp: uint256[N_COINS], _amp: uint256) -> uint256:
-    """
-    D invariant calculation in non-overflowing integer operations
-    iteratively
-
-    A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
-
-    Converging solution:
-    D[j+1] = (A * n**n * sum(x_i) - D[j]**(n+1) / (n**n prod(x_i))) / (A * n**n - 1)
-    """
-    S: uint256 = 0
-    for x in _xp:
-        S += x
-    if S == 0:
-        return 0
-
-    D: uint256 = S
-    Ann: uint256 = _amp * N_COINS
-    for i in range(255):
-        D_P: uint256 = D * D / _xp[0] * D / _xp[1] / N_COINS**N_COINS
-        Dprev: uint256 = D
-        D = (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
-        # Equality with the precision of 1
-        if D > Dprev:
-            if D - Dprev <= 1:
-                return D
-        else:
-            if Dprev - D <= 1:
-                return D
-    # convergence typically occurs in 4 rounds or less, this should be unreachable!
-    # if it does happen the pool is borked and LPs can withdraw via `remove_liquidity`
-    raise
-
-
-@view
-@internal
-def get_D_mem(_rates: uint256[N_COINS], _balances: uint256[N_COINS], _amp: uint256) -> uint256:
-    xp: uint256[N_COINS] = self._xp_mem(_rates, _balances)
-    return self.get_D(xp, _amp)
+# --------------------------- AMM Math Functions -----------------------------
 
 
 @view
@@ -1071,6 +1101,42 @@ def get_y(i: int128, j: int128, x: uint256, xp: uint256[N_COINS], _amp: uint256,
 
 @pure
 @internal
+def get_D(_xp: uint256[N_COINS], _amp: uint256) -> uint256:
+    """
+    D invariant calculation in non-overflowing integer operations
+    iteratively
+
+    A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
+
+    Converging solution:
+    D[j+1] = (A * n**n * sum(x_i) - D[j]**(n+1) / (n**n prod(x_i))) / (A * n**n - 1)
+    """
+    S: uint256 = 0
+    for x in _xp:
+        S += x
+    if S == 0:
+        return 0
+
+    D: uint256 = S
+    Ann: uint256 = _amp * N_COINS
+    for i in range(255):
+        D_P: uint256 = D * D / _xp[0] * D / _xp[1] / N_COINS**N_COINS
+        Dprev: uint256 = D
+        D = (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
+        # Equality with the precision of 1
+        if D > Dprev:
+            if D - Dprev <= 1:
+                return D
+        else:
+            if Dprev - D <= 1:
+                return D
+    # convergence typically occurs in 4 rounds or less, this should be unreachable!
+    # if it does happen the pool is borked and LPs can withdraw via `remove_liquidity`
+    raise
+
+
+@pure
+@internal
 def get_y_D(A: uint256, i: int128, xp: uint256[N_COINS], D: uint256) -> uint256:
     """
     Calculate x[i] if one reduces D from being calculated for xp to D
@@ -1119,6 +1185,44 @@ def get_y_D(A: uint256, i: int128, xp: uint256[N_COINS], D: uint256) -> uint256:
 
 @view
 @internal
+def _A() -> uint256:
+    """
+    Handle ramping A up or down
+    """
+    t1: uint256 = self.future_A_time
+    A1: uint256 = self.future_A
+
+    if block.timestamp < t1:
+        A0: uint256 = self.initial_A
+        t0: uint256 = self.initial_A_time
+        # Expressions in uint256 cannot have negative numbers, thus "if"
+        if A1 > A0:
+            return A0 + (A1 - A0) * (block.timestamp - t0) / (t1 - t0)
+        else:
+            return A0 - (A0 - A1) * (block.timestamp - t0) / (t1 - t0)
+
+    else:  # when t1 == 0 or block.timestamp >= t1
+        return A1
+
+
+@pure
+@internal
+def _xp_mem(_rates: uint256[N_COINS], _balances: uint256[N_COINS]) -> uint256[N_COINS]:
+    result: uint256[N_COINS] = empty(uint256[N_COINS])
+    for i in range(N_COINS):
+        result[i] = _rates[i] * _balances[i] / PRECISION
+    return result
+
+
+@view
+@internal
+def get_D_mem(_rates: uint256[N_COINS], _balances: uint256[N_COINS], _amp: uint256) -> uint256:
+    xp: uint256[N_COINS] = self._xp_mem(_rates, _balances)
+    return self.get_D(xp, _amp)
+
+
+@view
+@internal
 def _calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256[3]:
     # First, need to calculate
     # * Get current D
@@ -1154,30 +1258,6 @@ def _calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256[3]:
         last_p = self._get_p(xp, amp, D1)
 
     return [dy, dy_0 - dy, last_p]
-
-
-@internal
-def _withdraw_admin_fees():
-
-    receiver: address = Factory(self.factory).get_fee_receiver(self)
-    amounts: uint256[N_COINS] = self.admin_balances
-
-    for i in range(N_COINS):
-
-        if amounts[i] > 0:
-
-            if self.coins[i] == WETH20:
-                raw_call(receiver, b"", value=amounts[i])
-            else:
-                assert ERC20(self.coins[i]).transfer(
-                    receiver,
-                    amounts[i],
-                    default_return_value=True
-                )
-
-    self.admin_balances = empty(uint256[N_COINS])
-    # Reduce stored balances:
-    self._decrease_balances(amounts)
 
 
 # -------------------------- AMM Price Methods -------------------------------
