@@ -4,13 +4,13 @@
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
 @notice 2 coin pool implementation with no rehypothecation, i.e. tokens are not
-        deposited into contracts. Supports only token pairs that are
+        deposited into other contracts. Supports only token pairs that are
         similarly priced (or the underlying is similarly priced).
 @dev ERC20 support for return True/revert, return True/False, return None
      ERC20 tokens can have arbitrary decimals (<=18).
      Additional features include:
         1. Support for rebasing tokens: but this disables
-           `exchange_with_rebase`
+           `exchange_with_rebase` and `add_liquidity_with_rebase`
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
            Note: Oracle precision _must_ be 10**18.
         3. Support for ETH/WETH transfers
@@ -18,7 +18,7 @@
         5. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        6. Adds feature called `exchange_with_rebase`, which is inspired
+        6. Adds feature: `exchange_with_rebase`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and `IS_REBASING` is True
@@ -26,6 +26,12 @@
                  b. If pool contains rebasing token and `IS_REBASING` is False
                     then this is an incorrect implementation and rebases can be
                     stolen.
+        7. Adds feature: `add_liquidity_with_rebase`. This is a version of
+           `add_liquidity` with optimistic ERC20 token transfers. As with
+           `exchange_with_rebase`, `IS_REBASING = True` disables this method.
+        8. Adds `get_dx`: Similar to `get_dy` which returns an expected output
+           of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
+           input of coin[i] for an output amount of coin[j].
 """
 
 from vyper.interfaces import ERC20
