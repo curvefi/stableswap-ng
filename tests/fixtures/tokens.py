@@ -11,7 +11,7 @@ def weth(deployer):
 @pytest.fixture(scope="module")
 def usdc(deployer):
     with boa.env.prank(deployer):
-        return boa.load("contracts/mocks/ERC20.vy", "USDT", "USDT", 6)
+        return boa.load("contracts/mocks/ERC20.vy", "USDC", "USDC", 6)
 
 
 @pytest.fixture(scope="module")
@@ -44,9 +44,9 @@ def oracle_token_b(deployer):
     with boa.env.prank(deployer):
         return boa.load(
             "contracts/mocks/ERC20Oracle.vy",
-            "OTB",
-            "OTB",
-            8,
+            "toETH",
+            "toETH",
+            18,
             1007580460035000000,
         )
 

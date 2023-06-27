@@ -1,72 +1,29 @@
 import boa
 import pytest
-from eth_account.account import Account
-
-from tests.utils.tokens import mint_for_testing
+from boa.environment import AddressType
+from eth_account.account import Account, LocalAccount
 
 
 @pytest.fixture(scope="module")
-def deployer():
+def deployer() -> AddressType:
     return boa.env.generate_address()
 
 
 @pytest.fixture(scope="module")
-def owner():
+def owner() -> AddressType:
     return boa.env.generate_address()
 
 
 @pytest.fixture(scope="module")
-def factory_admin(factory):
+def factory_admin(factory) -> AddressType:
     return factory.admin()
 
 
 @pytest.fixture(scope="module")
-def fee_receiver():
+def fee_receiver() -> AddressType:
     return boa.env.generate_address()
 
 
 @pytest.fixture(scope="module")
-def user():
-    acc = boa.env.generate_address()
-    boa.env.set_balance(acc, 10**25)
-    return acc
-
-
-@pytest.fixture(scope="module")
-def users():
-    accs = [i() for i in [boa.env.generate_address] * 10]
-    for acc in accs:
-        boa.env.set_balance(acc, 10**25)
-    return accs
-
-
-@pytest.fixture(scope="module")
-def eth_acc():
+def eth_acc() -> LocalAccount:
     return Account.create()
-
-
-@pytest.fixture(scope="module")
-def alice():
-    acc = boa.env.generate_address()
-    boa.env.set_balance(acc, 10**25)
-    return acc
-
-
-@pytest.fixture(scope="module")
-def loaded_alice(swap, alice):
-    mint_for_testing(swap, alice, 10**21)
-    return alice
-
-
-@pytest.fixture(scope="module")
-def bob():
-    acc = boa.env.generate_address()
-    boa.env.set_balance(acc, 10**25)
-    return acc
-
-
-@pytest.fixture(scope="module")
-def charlie():
-    acc = boa.env.generate_address()
-    boa.env.set_balance(acc, 10**25)
-    return acc

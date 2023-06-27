@@ -1,7 +1,8 @@
 # @version ^0.3.7
 
 """
-@notice Mock ERC20 for testing
+@notice Mock ERC20 with oracle
+@dev This is for testing only, it is NOT safe for use
 """
 
 
@@ -24,7 +25,7 @@ balanceOf: public(HashMap[address, uint256])
 allowances: HashMap[address, HashMap[address, uint256]]
 totalSupply: public(uint256)
 
-exchange_rate: immutable(uint256)
+exchange_rate: public(uint256)
 
 
 @external
@@ -40,8 +41,7 @@ def __init__(
 
     assert _decimals == 18, "Decimals must be 18"
     self.decimals = _decimals
-
-    exchange_rate = _exchange_rate
+    self.exchange_rate = _exchange_rate
 
 
 @external
@@ -77,5 +77,11 @@ def approve(_spender: address, _value: uint256) -> bool:
 @external
 @view
 def exchangeRate() -> uint256:
-    # some arbitrary exchange rate:
-    return exchange_rate
+    rate: uint256 = self.exchange_rate
+    return rate
+
+
+@external
+def set_exchange_rate(rate: uint256) -> bool:
+    self.exchange_rate = rate
+    return True
