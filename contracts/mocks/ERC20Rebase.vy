@@ -1,7 +1,7 @@
 # @version ^0.3.7
 
 """
-@notice Rebase ERC20 mock
+@notice Rebase ERC20 mock with pseudo-randomly rebase by 1% on every transfer
 @dev This is for testing only, it is NOT safe for use
 @dev Based on stEth implementation
 """
@@ -34,13 +34,15 @@ allowances: HashMap[address, HashMap[address, uint256]]
 totalCoin: public(uint256)
 totalShares: public(uint256)
 shares: public(HashMap[address, uint256])
+IS_UP: immutable(bool)
 
 
 @external
-def __init__(_name: String[64], _symbol: String[32], _decimals: uint256):
+def __init__(_name: String[64], _symbol: String[32], _decimals: uint256, is_up: bool):
     self.name = _name
     self.symbol = _symbol
     self.decimals = _decimals
+    IS_UP = is_up
 
 
 @external
@@ -64,6 +66,7 @@ def allowance(_owner: address, _spender: address) -> uint256:
 
 @external
 def transfer(_to: address, _value: uint256) -> bool:
+    self._rebase()
     _shares: uint256 = self._get_shares_by_coins(_value)
 
     self.shares[msg.sender] -= _shares
@@ -75,6 +78,7 @@ def transfer(_to: address, _value: uint256) -> bool:
 
 @external
 def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
+    self._rebase()
     _shares: uint256 = self._get_shares_by_coins(_value)
 
     self.shares[_from] -= _shares
@@ -117,6 +121,14 @@ def _get_shares_by_coins(_coins: uint256) -> uint256:
 @view
 def share_price() -> uint256:
     return self._share_price()
+
+
+@internal
+def _rebase():
+    if IS_UP:
+        self.totalCoin = self.totalCoin * 101 / 100
+    else:
+        self.totalCoin = self.totalCoin * 99 / 100
 
 
 @external
