@@ -1,4 +1,4 @@
-# @version ^0.3.7
+# @version ^0.3.9
 
 """
 @notice Mock ERC20 with oracle
@@ -84,4 +84,13 @@ def exchangeRate() -> uint256:
 @external
 def set_exchange_rate(rate: uint256) -> bool:
     self.exchange_rate = rate
+    return True
+
+
+@external
+def _mint_for_testing(_target: address, _value: uint256) -> bool:
+    self.totalSupply += _value
+    self.balanceOf[_target] += _value
+    log Transfer(empty(address), _target, _value)
+
     return True

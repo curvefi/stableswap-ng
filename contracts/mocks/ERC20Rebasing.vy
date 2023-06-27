@@ -1,7 +1,7 @@
-# @version ^0.3.7
+# @version ^0.3.9
 
 """
-@notice Rebase ERC20 mock with pseudo-randomly rebase by 1% on every transfer
+@notice Rebasing ERC20 mock with rebase by 1% on every transfer
 @dev This is for testing only, it is NOT safe for use
 @dev Based on stEth implementation
 """
@@ -136,4 +136,18 @@ def set_total_coin(total_coin: uint256) -> bool:
     assert self.totalShares != 0, "no shares"
 
     self.totalCoin = total_coin
+    return True
+
+
+@external
+def _mint_for_testing(_target: address, _value: uint256) -> bool:
+    self.totalCoin += _value
+
+    _shares: uint256 = self._get_shares_by_coins(_value)
+    self.totalShares += _shares
+    self.shares[_target] += _shares
+
+    log Transfer(empty(address), _target, _value)
+    log TransferShares(empty(address), _target, _shares)
+
     return True

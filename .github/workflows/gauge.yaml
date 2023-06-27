@@ -1,10 +1,18 @@
-# TODO: split actions later
-name: tests
+name: gauge
 
-on: ["push", "pull_request"]
+on:
+  pull_request:
+    paths:
+      - "tests/gauge/*.py"
+      - "contracts/LiquidityGauge.vy"
+  push:
+    paths:
+      - "tests/gauge/*.py"
+      - "contracts/LiquidityGauge.vy"
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  WEB3_PROVIDER_URL: https://eth-mainnet.g.alchemy.com/v2/IR9-_e7eMsqvFsvGIjC4BimpaamH70XL
 
 jobs:
   tests:
@@ -33,4 +41,4 @@ jobs:
       - name: Run Tests
         run: |
           source .venv/bin/activate
-          pytest tests -n auto
+          pytest tests/gauge/ --pool-size=2 --pool-type=basic --token-types=plain --decimals=18,18 -n auto
