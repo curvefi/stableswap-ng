@@ -7,7 +7,7 @@ from eth_utils import function_signature_to_4byte_selector
 
 @pytest.fixture(scope="module")
 def swap(
-    alice,
+    owner,
     mint_owner,
     factory,
     pool_token_types,
@@ -47,7 +47,7 @@ def swap(
             asset_type = 1
             is_rebasing = True
 
-    with boa.env.prank(alice):
+    with boa.env.prank(owner):
         pool = factory.deploy_plain_pool(
             "test",
             "test",
