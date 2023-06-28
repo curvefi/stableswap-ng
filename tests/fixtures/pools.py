@@ -10,6 +10,7 @@ def swap(
     owner,
     mint_owner,
     factory,
+    weth,
     pool_token_types,
     pool_tokens,
     amm_interface_plain,
@@ -70,4 +71,10 @@ def swap(
 @pytest.fixture
 def add_initial_liquidity(owner, approve_owner, mint_owner, deposit_amounts, swap):
     with boa.env.prank(owner):
+        swap.add_liquidity(deposit_amounts, 0)
+
+
+@pytest.fixture
+def add_initial_liquidity_alice(alice, approve_alice, mint_alice, deposit_amounts, swap):
+    with boa.env.prank(alice):
         swap.add_liquidity(deposit_amounts, 0)

@@ -1,4 +1,4 @@
-name: gauge
+name: test_gauge
 
 on:
   pull_request:

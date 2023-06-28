@@ -58,7 +58,8 @@ def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_toke
         if t == 0:
             pool_tokens.append(plain_tokens[i])
         elif t == 1:
-            pool_tokens.append(weth)
+            # Enforce eth as 0th token
+            pool_tokens = [weth] + pool_tokens
         elif t == 2:
             pool_tokens.append(oracle_tokens[i])
         elif t == 3:

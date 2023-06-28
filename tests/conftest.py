@@ -22,7 +22,7 @@ def pytest_addoption(parser):
         "--pool-size",
         action="store",
         default="2",
-        help="comma-separated list of plain pool sizes to test against",
+        help="pool size to test against",
     )
     # TODO: add meta implementation
     parser.addoption(
@@ -52,18 +52,16 @@ def pytest_addoption(parser):
 
 
 def pytest_generate_tests(metafunc):
+    pool_size = int(metafunc.config.getoption("pool_size"))
     if "pool_size" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("pool_size").split(",")
-        pool_sizes = [int(v) for v in cli_options]
-
         # TODO: remove after adding implementations
-        assert pool_sizes == [2], "Only 2-coin pools supported"
+        assert pool_size == 2, "Only 2-coin pools supported"
 
         metafunc.parametrize(
             "pool_size",
-            pool_sizes,
+            [pool_size],
             indirect=True,
-            ids=[f"(PoolSize={i})" for i in cli_options],
+            ids=[f"(PoolSize={pool_size})"],
         )
 
     if "pool_type" in metafunc.fixturenames:
@@ -79,12 +77,12 @@ def pytest_generate_tests(metafunc):
     if "pool_token_types" in metafunc.fixturenames:
         cli_options = metafunc.config.getoption("token_types").split(",")
 
-        # TODO: only 2-coin pools are supported
-        combs = list(combinations(cli_options, 2))
-        # do not include (eth,eth) pair
-        for t in cli_options:
-            if t != "eth":
-                combs.append((t, t))
+        combs = list(combinations(cli_options, pool_size))
+        if pool_size == 2:
+            # do not include (eth,eth) pair
+            for t in cli_options:
+                if t != "eth":
+                    combs.append((t, t))
 
         metafunc.parametrize(
             "pool_token_types",
