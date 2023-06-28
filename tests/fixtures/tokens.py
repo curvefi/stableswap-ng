@@ -26,7 +26,7 @@ def oracle_tokens(deployer, decimals):
                 "contracts/mocks/ERC20Oracle.vy",
                 "OTA",
                 "OTA",
-                decimals[0],
+                18,
                 1006470359024000000,
             )
         )
@@ -35,7 +35,7 @@ def oracle_tokens(deployer, decimals):
                 "contracts/mocks/ERC20Oracle.vy",
                 "OTB",
                 "OTB",
-                decimals[0],
+                18,
                 1007580460035000000,
             )
         )
@@ -47,7 +47,7 @@ def rebase_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
         tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", "downETH", "downETH", decimals[0], False))
-        tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", "stETH", "stETH", decimals[0], True))
+        tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", "stETH", "stETH", decimals[1], True))
     return tokens
 
 

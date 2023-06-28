@@ -91,10 +91,10 @@ def pytest_generate_tests(metafunc):
             ids=[f"(PoolTokenTypes={c})" for c in combs],
         )
 
-    if "decimals" in metafunc.fixturenames:
+    if "initial_decimals" in metafunc.fixturenames:
         cli_options = metafunc.config.getoption("decimals")
         metafunc.parametrize(
-            "decimals",
+            "initial_decimals",
             [[int(i) for i in cli_options.split(",")]],
             indirect=True,
             ids=[f"(Decimals={cli_options})"],
@@ -133,8 +133,14 @@ def return_type(request):
 
 
 @pytest.fixture(scope="session")
-def decimals(request):
+def initial_decimals(request):
     return request.param
+
+
+@pytest.fixture(scope="session")
+def decimals(initial_decimals, pool_token_types):
+    # eth and oracle pools are always 18
+    return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
 
 
 @pytest.fixture(scope="module")

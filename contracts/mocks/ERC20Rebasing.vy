@@ -80,13 +80,16 @@ def transfer(_to: address, _value: uint256) -> bool:
 def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     self._rebase()
     _shares: uint256 = self._get_shares_by_coins(_value)
+    _shares = min(self.shares[_from], _shares)
+    # Value can be less than expected even if self.shares[_from] > _shares
+    _new_value: uint256 = self._get_coins_by_shares(_shares)
 
     self.shares[_from] -= _shares
     self.shares[_to] += _shares
-    self.allowances[_from][msg.sender] -= _value
+    self.allowances[_from][msg.sender] -= _new_value
 
-    log Transfer(_from, _to, _value)
-    log TransferShares(_from, _to, _shares)
+    log Transfer(_from, _to, _new_value)
+    log TransferShares(_from, _to, _new_value)
     return True
 
 
@@ -141,9 +144,9 @@ def set_total_coin(total_coin: uint256) -> bool:
 
 @external
 def _mint_for_testing(_target: address, _value: uint256) -> bool:
-    self.totalCoin += _value
-
     _shares: uint256 = self._get_shares_by_coins(_value)
+
+    self.totalCoin += _value
     self.totalShares += _shares
     self.shares[_target] += _shares
 

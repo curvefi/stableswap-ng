@@ -4,7 +4,6 @@ import pytest
 # from eip712.messages import EIP712Message
 
 
-@pytest.mark.usefixtures("add_initial_liquidity_alice")
 class TestPoolToken:
     class TestTokenApprove:
         @pytest.mark.parametrize("idx", range(4))
@@ -52,6 +51,7 @@ class TestPoolToken:
         #     assert len(tx.events) == 1
         #     assert tx.events["Approval"].values() == [alice, bob, 10 ** 19]
 
+        @pytest.mark.usefixtures("add_initial_liquidity_alice")
         def test_infinite_approval(self, swap, alice, bob):
             swap.approve(bob, 2**256 - 1, sender=alice)
             swap.transferFrom(alice, bob, 10**18, sender=bob)
