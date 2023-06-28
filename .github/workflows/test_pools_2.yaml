@@ -1,4 +1,4 @@
-name: test_gauge
+name: test_pools_2
 
 on: [pull_request, push]
 
