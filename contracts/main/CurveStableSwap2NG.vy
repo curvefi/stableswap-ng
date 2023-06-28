@@ -108,9 +108,6 @@ event StopRampA:
     A: uint256
     t: uint256
 
-event CommitNewFee:
-    new_fee: uint256
-
 event ApplyNewFee:
     fee: uint256
 
@@ -127,6 +124,8 @@ IS_REBASING: public(immutable(bool))
 factory: public(address)
 coins: public(address[N_COINS])
 stored_balances: uint256[N_COINS]
+fee: public(uint256)  # fee * 1e10
+FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -139,21 +138,11 @@ future_A: public(uint256)
 initial_A_time: public(uint256)
 future_A_time: public(uint256)
 
-# ---------------------------- Fee Variables ---------------------------------
-
-ADMIN_FEE: constant(uint256) = 5000000000
-
-FEE_DENOMINATOR: constant(uint256) = 10 ** 10
-MAX_FEE: constant(uint256) = 5 * 10 ** 9
-fee: public(uint256)  # fee * 1e10
-future_fee: public(uint256)
-
 # ---------------------------- Admin Variables -------------------------------
 
+ADMIN_FEE: constant(uint256) = 5000000000
+MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
-ADMIN_ACTIONS_DEADLINE_DT: constant(uint256) = 86400 * 3
-admin_action_deadline: public(uint256)
-
 admin_balances: public(uint256[N_COINS])
 
 # ----------------------- Oracle Specific vars -------------------------------
@@ -1793,26 +1782,13 @@ def stop_ramp_A():
 
 
 @external
-def commit_new_fee(_new_fee: uint256):
+def apply_new_fee(_new_fee: uint256):
+
     assert msg.sender == Factory(self.factory).admin()
     assert _new_fee <= MAX_FEE
-    assert self.admin_action_deadline == 0
+    self.fee = _new_fee
 
-    self.future_fee = _new_fee
-    self.admin_action_deadline = block.timestamp + ADMIN_ACTIONS_DEADLINE_DT
-    log CommitNewFee(_new_fee)
-
-
-@external
-def apply_new_fee():
-    assert msg.sender == Factory(self.factory).admin()
-    deadline: uint256 = self.admin_action_deadline
-    assert deadline != 0 and block.timestamp >= deadline
-
-    fee: uint256 = self.future_fee
-    self.fee = fee
-    self.admin_action_deadline = 0
-    log ApplyNewFee(fee)
+    log ApplyNewFee(_new_fee)
 
 
 @external
