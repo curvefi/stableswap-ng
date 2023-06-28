@@ -122,7 +122,7 @@ WETH20: public(immutable(address))
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
-IS_REBASING: immutable(bool)
+IS_REBASING: public(immutable(bool))
 
 factory: public(address)
 coins: public(address[N_COINS])
