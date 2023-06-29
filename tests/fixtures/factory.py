@@ -14,8 +14,9 @@ def gauge_implementation(deployer, gauge_interface):
 
 
 @pytest.fixture(scope="module")
-def amm_interface_plain():
-    return boa.load_partial("contracts/main/CurveStableSwap2NG.vy")
+def amm_interface_plain(pool_size):
+    if pool_size == 2:
+        return boa.load_partial("contracts/main/CurveStableSwap2NG.vy")
 
 
 @pytest.fixture(scope="module")
@@ -51,15 +52,25 @@ def factory(
             owner,
             weth,
         )
-
-    with boa.env.prank(owner):
-        _factory.set_plain_implementations(2, 0, amm_implementation_plain)
-        _factory.set_gauge_implementation(gauge_implementation)
-        # TODO: add Factory Meta Implementation
-
     return _factory
 
 
+# <---------------------   Functions   --------------------->
+# TODO: add Factory Meta Implementation
 @pytest.fixture(scope="module")
-def factory_populated(factory, swap_plain, swap_eth_rebasing, swap_oracle, swap_meta):
-    return factory
+def set_plain_implementations(owner, factory, pool_size, pool_type, amm_implementation_plain):
+    with boa.env.prank(owner):
+        factory.set_plain_implementations(pool_size, pool_type, amm_implementation_plain.address)
+
+
+@pytest.fixture(scope="module")
+def set_gauge_implementation(owner, factory, gauge_implementation):
+    with boa.env.prank(owner):
+        factory.set_gauge_implementation(gauge_implementation.address)
+
+
+@pytest.fixture(scope="module")
+def gauge(owner, factory, swap, gauge_interface, set_gauge_implementation):
+    with boa.env.prank(owner):
+        gauge_address = factory.deploy_gauge(swap.address)
+    return gauge_interface.at(gauge_address)

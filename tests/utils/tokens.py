@@ -1,17 +1,20 @@
 import boa
+from boa.vyper.contract import VyperContract
 from eth_utils import to_checksum_address
 
 
-def mint_for_testing(token_contract, addr, amount, mint_eth=False):
+def mint_for_testing(user: str, amount, token_contract: VyperContract | None, mint_eth: bool = False) -> None:
+    assert token_contract is not None or mint_eth
 
-    addr = to_checksum_address(addr)
+    user = to_checksum_address(user)
 
-    if token_contract.symbol() == "WETH":
-        boa.env.set_balance(addr, boa.env.get_balance(addr) + amount)
-        if not mint_eth:
-            with boa.env.prank(addr):
-                token_contract.deposit(value=amount)
+    if mint_eth:
+        boa.env.set_balance(user, boa.env.get_balance(user) + amount)
     else:
-        token_contract.eval(f"self.totalSupply += {amount}")
-        token_contract.eval(f"self.balanceOf[{addr}] += {amount}")
-        token_contract.eval(f"log Transfer(empty(address), {addr}, {amount})")
+        if token_contract.symbol() == "WETH":
+            boa.env.set_balance(user, boa.env.get_balance(user) + amount)
+            with boa.env.prank(user):
+                token_contract.deposit(value=amount)
+        else:
+            with boa.env.prank(user):
+                token_contract._mint_for_testing(user, amount)

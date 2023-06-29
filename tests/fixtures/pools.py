@@ -2,102 +2,79 @@ import boa
 import pytest
 from eth_utils import function_signature_to_4byte_selector
 
-# TODO: rebasing pool, meta pool
-
-ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
+# TODO: meta pool
 
 
 @pytest.fixture(scope="module")
-def swap_plain(
-    factory,
-    dai,
-    usdc,
-    bob,
-    amm_implementation_plain,
-):
-
-    with boa.env.prank(bob):
-
-        pool = factory.deploy_plain_pool(
-            "test",
-            "test",
-            [dai, usdc, ZERO_ADDRESS, ZERO_ADDRESS],
-            2000,
-            1000000,
-            866,
-            [bytes(b"")] * 4,
-            [ZERO_ADDRESS] * 4,
-            0,
-            0,
-        )
-
-    return amm_implementation_plain.at(pool)
-
-
-@pytest.fixture(scope="module")
-def swap_eth_rebasing(
+def swap(
+    owner,
+    mint_owner,
     factory,
     weth,
-    steth,
-    charlie,
+    pool_token_types,
+    pool_tokens,
+    amm_interface_plain,
     amm_implementation_plain,
-):
-
-    # TODO: make steth rebasing
-
-    with boa.env.prank(charlie):
-
-        pool = factory.deploy_plain_pool(
-            "test",
-            "test",
-            [weth, steth],
-            1000,
-            3000000,
-            866,
-            [b""] * 4,
-            [ZERO_ADDRESS] * 4,
-            0,
-            0,
-        )
-
-    return amm_implementation_plain.at(pool)
-
-
-@pytest.fixture(scope="module")
-def swap_oracle(
-    factory,
-    oracle_token_a,
-    oracle_token_b,
-    charlie,
-    amm_implementation_plain,
+    set_plain_implementations,
+    zero_address,
 ):
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
 
-    with boa.env.prank(charlie):
+    A = 2000
+    fee = 1000000
+    method_ids = [bytes(b"")] * 4
+    oracles = [zero_address] * 4
+    asset_type = 0  # 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
+    is_rebasing = False
 
+    for i, t in enumerate(pool_token_types):
+        if t == 0:
+            A = 2000
+            fee = 1000000
+            asset_type = 0
+        elif t == 1:
+            A = 1000
+            fee = 3000000
+            asset_type = 1
+        elif t == 2:
+            A = 1000
+            fee = 3000000
+            asset_type = 1
+            method_ids[i] = oracle_method_id
+            oracles[i] = pool_tokens[i].address
+        elif t == 3:
+            A = 500
+            fee = 4000000
+            asset_type = 1
+            is_rebasing = True
+
+    with boa.env.prank(owner):
         pool = factory.deploy_plain_pool(
             "test",
             "test",
-            [oracle_token_a, oracle_token_b],
-            500,
-            4000000,
+            [pool_tokens[0].address, pool_tokens[1].address, zero_address, zero_address],
+            A,
+            fee,
             866,
-            [oracle_method_id, oracle_method_id, b"", b""],
-            [ZERO_ADDRESS] * 4,
+            method_ids,
+            oracles,
+            asset_type,
             0,
-            0,
+            is_rebasing,
         )
 
-    return amm_implementation_plain.at(pool)
+    return amm_interface_plain.at(pool)
 
 
-@pytest.fixture(scope="module")
-def swap_meta(
-    factory,
-    dai,
-    base_pool_token,  # TODO: implement base pool token
-    charlie,
-    amm_implementation_meta,
-):
-    # TODO: implement metapools
-    pass
+# <---------------------   Functions   --------------------->
+# TODO: add Factory Meta Implementation
+@pytest.fixture
+def add_initial_liquidity(owner, approve_owner, mint_owner, deposit_amounts, swap):
+    with boa.env.prank(owner):
+        swap.add_liquidity(deposit_amounts, 0)
+
+
+@pytest.fixture
+def add_initial_liquidity_alice(alice, approve_alice, mint_alice, deposit_amounts, swap):
+    with boa.env.prank(alice):
+        swap.add_liquidity(deposit_amounts, 0)

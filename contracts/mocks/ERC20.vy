@@ -1,4 +1,4 @@
-# @version ^0.3.7
+# @version ^0.3.9
 
 """
 @notice Mock ERC20 for testing
@@ -59,4 +59,13 @@ def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
 def approve(_spender: address, _value: uint256) -> bool:
     self.allowances[msg.sender][_spender] = _value
     log Approval(msg.sender, _spender, _value)
+    return True
+
+
+@external
+def _mint_for_testing(_target: address, _value: uint256) -> bool:
+    self.totalSupply += _value
+    self.balanceOf[_target] += _value
+    log Transfer(empty(address), _target, _value)
+
     return True
