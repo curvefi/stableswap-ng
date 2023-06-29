@@ -1,7 +1,10 @@
 import boa
 import pytest
+from eip712.messages import EIP712Message
 
-# from eip712.messages import EIP712Message
+from tests.utils.transactions import call_returning_result_and_logs
+
+# from eth_account._utils.signing import to_bytes32
 
 
 class TestPoolToken:
@@ -41,15 +44,13 @@ class TestPoolToken:
             tx = swap.approve(bob, 10**19, sender=alice)
             assert tx is True
 
-        # TODO: add event processing
-        # def test_approval_event_fires(self, alice, bob, swap):
-        #     tx = swap.approve(bob, 10 ** 19, sender=alice)
-        #
-        #     events = swap.get_logs()
-        #     print(events, type(events[0]))
-        #
-        #     assert len(tx.events) == 1
-        #     assert tx.events["Approval"].values() == [alice, bob, 10 ** 19]
+        def test_approval_event_fires(self, alice, bob, swap):
+            value = 10**19
+            res, events = call_returning_result_and_logs(swap, "approve", bob, value, sender=alice)
+
+            assert res is True
+            assert len(events) == 1
+            assert repr(events[0]) == f"Approval(owner={alice}, spender={bob}, value={value})"
 
         @pytest.mark.usefixtures("add_initial_liquidity_alice")
         def test_infinite_approval(self, swap, alice, bob):
@@ -58,63 +59,78 @@ class TestPoolToken:
 
             assert swap.allowance(alice, bob) == 2**256 - 1
 
+        @staticmethod
+        def permit_class(swap) -> type[EIP712Message]:
+            class Permit(EIP712Message):
+                # EIP-712 Domain Fields
+                _name_: "string" = swap.name()  # noqa: F821
+                _version_: "string" = swap.version()  # noqa: F821
+                _chainId_: "uint256" = boa.env.chain.chain_id  # noqa: F821
+                _verifyingContract_: "address" = swap.address  # noqa: F821
+
+                # EIP-2612 Data Fields
+                owner: "address"  # noqa: F821
+                spender: "address"  # noqa: F821
+                value: "uint256"  # noqa: F821
+                nonce: "uint256"  # noqa: F821
+                deadline: "uint256" = 2**256 - 1  # noqa: F821
+
+            return Permit
+
         # def test_permit(self, eth_acc, bob, swap):
-        #     class Permit(EIP712Message):
-        #         # EIP-712 Domain Fields
-        #         _name_: "string" = swap.name()  # noqa: F821
-        #         _version_: "string" = swap.version()  # noqa: F821
-        #         _chainId_: "uint256" = boa.env.chain.chain_id  # noqa: F821
-        #         _verifyingContract_: "address" = swap.address  # noqa: F821
-        #
-        #         # EIP-2612 Data Fields
-        #         owner: "address"  # noqa: F821
-        #         spender: "address"  # noqa: F821
-        #         value: "uint256"  # noqa: F821
-        #         nonce: "uint256"  # noqa: F821
-        #         deadline: "uint256" = 2 ** 256 - 1  # noqa: F821
-        #
-        #     permit = Permit(owner=eth_acc.address, spender=bob, value=2 ** 256 - 1, nonce=0)
+        #     value = 2**256 - 1
+        #     permit = self.permit_class(swap)(owner=eth_acc.address, spender=bob, value=value, nonce=0)
         #     sig = eth_acc.sign_message(permit.signable_message)
         #
-        #     with boa.env.prank(bob):
-        #         tx = swap.permit(eth_acc.address, bob, 2 ** 256 - 1, 2 ** 256 - 1, sig.v, sig.r, sig.s)
+        #     from eth_account import Account
         #
-        #     assert swap.allowance(eth_acc.address, bob) == 2 ** 256 - 1
-        #     assert tx is True
-        #     assert len(swap.get_logs()) == 1
-        #     assert swap.get_logs().events["Approval"].values() == [eth_acc.address.address, bob, 2 ** 256 - 1]
+        #     print(Account.recover_message(permit.signable_message, vrs=(sig.v, sig.r, sig.s)))
+        #
+        #     swap.permit(
+        #         eth_acc.address,
+        #         bob,
+        #         2**256 - 1,
+        #         2**256 - 1,
+        #         sig.v,
+        #         to_bytes32(sig.r),
+        #         to_bytes32(sig.s),
+        #         sender=bob,
+        #     )
+        #
+        #     res, events = call_returning_result_and_logs(
+        #         swap,
+        #         "permit",
+        #         eth_acc.address,
+        #         bob,
+        #         2**256 - 1,
+        #         2**256 - 1,
+        #         sig.v,
+        #         to_bytes32(sig.r),
+        #         to_bytes32(sig.s),
+        #         sender=bob,
+        #     )
+        #
+        #     assert swap.allowance(eth_acc.address, bob) == 2**256 - 1
+        #     assert res is True
+        #     assert len(events) == 1
+        #     assert repr(events[0]) == f"Approval(owner={eth_acc.address}, spender={bob}, value={value})"
         #     assert swap.nonces(eth_acc.address) == 1
         #
-        # def test_permit_contract(accounts, bob, chain, swap, web3):
+        # def test_permit_contract(self, accounts, eth_acc, bob, swap):
         #     src = """
         #         @view
         #         @external
         #         def isValidSignature(_hash: bytes32, _sig: Bytes[65]) -> bytes32:
         #     return 0x1626ba7e00000000000000000000000000000000000000000000000000000000
         #     """
-        #     mock_contract = brownie.compile_source(src, vyper_version="0.3.1").Vyper.deploy({"from": bob})
-        #     alice = accounts.add("0x416b8a7d9290502f5661da81f0cf43893e3d19cb9aea3c426cfb36e8186e9c09")
+        #     mock_contract = boa.vyper.deploy(src, sender=bob)
         #
-        #     class Permit(EIP712Message):
-        #         # EIP-712 Domain Fields
-        #         _name_: "string" = swap.name()  # noqa: F821
-        #         _version_: "string" = swap.version()  # noqa: F821
-        #         _chainId_: "uint256" = chain.id  # noqa: F821
-        #         _verifyingContract_: "address" = swap.address  # noqa: F821
+        #     permit = self.permit_class(swap)(owner=eth_acc.address, spender=bob, value=2**256 - 1, nonce=0)
+        #     sig = eth_acc.sign_message(permit.signable_message)
         #
-        #         # EIP-2612 Data Fields
-        #         owner: "address"  # noqa: F821
-        #         spender: "address"  # noqa: F821
-        #         value: "uint256"  # noqa: F821
-        #         nonce: "uint256"  # noqa: F821
-        #         deadline: "uint256" = 2 ** 256 - 1  # noqa: F821
-        #
-        #     permit = Permit(owner=alice.address, spender=bob.address, value=2 ** 256 - 1, nonce=0)
-        #     sig = alice.sign_message(permit)
-        #
-        #     tx = swap.permit(
-        #         mock_contract, bob, 2 ** 256 - 1, 2 ** 256 - 1, sig.v, sig.r, sig.s, {"from": bob}
+        #     res, events = call_returning_result_and_logs(
+        #         swap, "permit", mock_contract.address, bob, 2**256 - 1, 2**256 - 1, sig.v, sig.r, sig.s, sender=bob
         #     )
-        #
-        #     # make sure this is hit when owner is a contract
-        #     assert tx.subcalls[-1]["function"] == "isValidSignature(bytes32,bytes)"
+        #     assert swap.allowance(eth_acc.address, bob) == 2**256 - 1
+        #     assert res is True
+        #     assert len(events) == 1
