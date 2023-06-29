@@ -5,6 +5,8 @@ from eth_account._utils.signing import to_bytes32
 
 from tests.utils.transactions import call_returning_result_and_logs
 
+added_liquidity = pytest.mark.usefixtures("add_initial_liquidity_alice")
+
 
 class TestPoolToken:
     class TestTokenApprove:
@@ -51,7 +53,7 @@ class TestPoolToken:
             assert len(events) == 1
             assert repr(events[0]) == f"Approval(owner={alice}, spender={bob}, value={value})"
 
-        @pytest.mark.usefixtures("add_initial_liquidity_alice")
+        @added_liquidity
         def test_infinite_approval(self, swap, alice, bob):
             swap.approve(bob, 2**256 - 1, sender=alice)
             swap.transferFrom(alice, bob, 10**18, sender=bob)
@@ -148,3 +150,245 @@ class TestPoolToken:
             assert swap.allowance(mock_contract.address, bob) == 2**256 - 1
             assert res is True
             assert len(events) == 1
+
+    class TestTokenTransfer:
+        @added_liquidity
+        def test_sender_balance_decreases(self, alice, bob, swap):
+            sender_balance = swap.balanceOf(alice)
+            amount = sender_balance // 4
+
+            swap.transfer(bob, amount, sender=alice)
+
+            assert swap.balanceOf(alice) == sender_balance - amount
+
+        @added_liquidity
+        def test_receiver_balance_increases(self, alice, bob, swap):
+            receiver_balance = swap.balanceOf(bob)
+            amount = swap.balanceOf(alice) // 4
+
+            swap.transfer(bob, amount, sender=alice)
+
+            assert swap.balanceOf(bob) == receiver_balance + amount
+
+        @added_liquidity
+        def test_total_supply_not_affected(self, alice, bob, swap):
+            total_supply = swap.totalSupply()
+            amount = swap.balanceOf(alice)
+
+            swap.transfer(bob, amount, sender=alice)
+
+            assert swap.totalSupply() == total_supply
+
+        @added_liquidity
+        def test_returns_true(self, alice, bob, swap):
+            amount = swap.balanceOf(alice)
+            res = swap.transfer(bob, amount, sender=alice)
+
+            assert res is True
+
+        @added_liquidity
+        def test_transfer_full_balance(self, alice, bob, swap):
+            amount = swap.balanceOf(alice)
+            receiver_balance = swap.balanceOf(bob)
+
+            swap.transfer(bob, amount, sender=alice)
+
+            assert swap.balanceOf(alice) == 0
+            assert swap.balanceOf(bob) == receiver_balance + amount
+
+        @added_liquidity
+        def test_transfer_zero_tokens(self, alice, bob, swap):
+            sender_balance = swap.balanceOf(alice)
+            receiver_balance = swap.balanceOf(bob)
+
+            swap.transfer(bob, 0, sender=alice)
+
+            assert swap.balanceOf(alice) == sender_balance
+            assert swap.balanceOf(bob) == receiver_balance
+
+        @added_liquidity
+        def test_transfer_to_self(self, alice, bob, swap):
+            sender_balance = swap.balanceOf(alice)
+            amount = sender_balance // 4
+
+            swap.transfer(alice, amount, sender=alice)
+
+            assert swap.balanceOf(alice) == sender_balance
+
+        @added_liquidity
+        def test_insufficient_balance(self, alice, bob, swap):
+            balance = swap.balanceOf(alice)
+
+            with boa.reverts():
+                swap.transfer(bob, balance + 1, sender=alice)
+
+        @added_liquidity
+        def test_transfer_event_fires(self, alice, bob, swap):
+            amount = swap.balanceOf(alice)
+            _, events = call_returning_result_and_logs(swap, "transfer", bob, amount, sender=alice)
+
+            assert len(events) == 1
+            assert repr(events[0]) == f"Transfer(sender={alice}, receiver={bob}, value={amount})"
+
+    class TestTokenTransferFrom:
+        @added_liquidity
+        def test_sender_balance_decreases(self, alice, bob, charlie, swap):
+            sender_balance = swap.balanceOf(alice)
+            amount = sender_balance // 4
+
+            swap.approve(bob, amount, sender=alice)
+            swap.transferFrom(alice, charlie, amount, sender=bob)
+
+            assert swap.balanceOf(alice) == sender_balance - amount
+
+        @added_liquidity
+        def test_receiver_balance_increases(self, alice, bob, charlie, swap):
+            receiver_balance = swap.balanceOf(charlie)
+            amount = swap.balanceOf(alice) // 4
+
+            swap.approve(bob, amount, sender=alice)
+            swap.transferFrom(alice, charlie, amount, sender=bob)
+
+            assert swap.balanceOf(charlie) == receiver_balance + amount
+
+        @added_liquidity
+        def test_caller_balance_not_affected(self, alice, bob, charlie, swap):
+            caller_balance = swap.balanceOf(bob)
+            amount = swap.balanceOf(alice)
+
+            swap.approve(bob, amount, sender=alice)
+            swap.transferFrom(alice, charlie, amount, sender=bob)
+
+            assert swap.balanceOf(bob) == caller_balance
+
+        @added_liquidity
+        def test_caller_approval_affected(self, alice, bob, charlie, swap):
+            approval_amount = swap.balanceOf(alice)
+            transfer_amount = approval_amount // 4
+
+            swap.approve(bob, approval_amount, sender=alice)
+            swap.transferFrom(alice, charlie, transfer_amount, sender=bob)
+
+            assert swap.allowance(alice, bob) == approval_amount - transfer_amount
+
+        @added_liquidity
+        def test_receiver_approval_not_affected(self, alice, bob, charlie, swap):
+            approval_amount = swap.balanceOf(alice)
+            transfer_amount = approval_amount // 4
+
+            swap.approve(bob, approval_amount, sender=alice)
+            swap.approve(charlie, approval_amount, sender=alice)
+            swap.transferFrom(alice, charlie, transfer_amount, sender=bob)
+
+            assert swap.allowance(alice, charlie) == approval_amount
+
+        @added_liquidity
+        def test_total_supply_not_affected(self, alice, bob, charlie, swap):
+            total_supply = swap.totalSupply()
+            amount = swap.balanceOf(alice)
+
+            swap.approve(bob, amount, sender=alice)
+            swap.transferFrom(alice, charlie, amount, sender=bob)
+
+            assert swap.totalSupply() == total_supply
+
+        @added_liquidity
+        def test_returns_true(self, alice, bob, charlie, swap):
+            amount = swap.balanceOf(alice)
+            swap.approve(bob, amount, sender=alice)
+            res = swap.transferFrom(alice, charlie, amount, sender=bob)
+
+            assert res is True
+
+        @added_liquidity
+        def test_transfer_full_balance(self, alice, bob, charlie, swap):
+            amount = swap.balanceOf(alice)
+            receiver_balance = swap.balanceOf(charlie)
+
+            swap.approve(bob, amount, sender=alice)
+            swap.transferFrom(alice, charlie, amount, sender=bob)
+
+            assert swap.balanceOf(alice) == 0
+            assert swap.balanceOf(charlie) == receiver_balance + amount
+
+        @added_liquidity
+        def test_transfer_zero_tokens(self, alice, bob, charlie, swap):
+            sender_balance = swap.balanceOf(alice)
+            receiver_balance = swap.balanceOf(charlie)
+
+            swap.approve(bob, sender_balance, sender=alice)
+            swap.transferFrom(alice, charlie, 0, sender=bob)
+
+            assert swap.balanceOf(alice) == sender_balance
+            assert swap.balanceOf(charlie) == receiver_balance
+
+        @added_liquidity
+        def test_transfer_zero_tokens_without_approval(self, alice, bob, charlie, swap):
+            sender_balance = swap.balanceOf(alice)
+            receiver_balance = swap.balanceOf(charlie)
+
+            swap.transferFrom(alice, charlie, 0, sender=bob)
+
+            assert swap.balanceOf(alice) == sender_balance
+            assert swap.balanceOf(charlie) == receiver_balance
+
+        @added_liquidity
+        def test_insufficient_balance(self, alice, bob, charlie, swap):
+            balance = swap.balanceOf(alice)
+
+            swap.approve(bob, balance + 1, sender=alice)
+            with boa.reverts():
+                swap.transferFrom(alice, charlie, balance + 1, sender=bob)
+
+        @added_liquidity
+        def test_insufficient_approval(self, alice, bob, charlie, swap):
+            balance = swap.balanceOf(alice)
+
+            swap.approve(bob, balance - 1, sender=alice)
+            with boa.reverts():
+                swap.transferFrom(alice, charlie, balance, sender=bob)
+
+        @added_liquidity
+        def test_no_approval(self, alice, bob, charlie, swap):
+            balance = swap.balanceOf(alice)
+
+            with boa.reverts():
+                swap.transferFrom(alice, charlie, balance, sender=bob)
+
+        @added_liquidity
+        def test_revoked_approval(self, alice, bob, charlie, swap):
+            balance = swap.balanceOf(alice)
+
+            swap.approve(bob, balance, sender=alice)
+            swap.approve(bob, 0, sender=alice)
+
+            with boa.reverts():
+                swap.transferFrom(alice, charlie, balance, sender=bob)
+
+        @added_liquidity
+        def test_transfer_to_self(self, alice, bob, swap):
+            sender_balance = swap.balanceOf(alice)
+            amount = sender_balance // 4
+
+            swap.approve(alice, sender_balance, sender=alice)
+            swap.transferFrom(alice, alice, amount, sender=alice)
+
+            assert swap.balanceOf(alice) == sender_balance
+            assert swap.allowance(alice, alice) == sender_balance - amount
+
+        @added_liquidity
+        def test_transfer_to_self_no_approval(self, alice, bob, swap):
+            amount = swap.balanceOf(alice)
+
+            with boa.reverts():
+                swap.transferFrom(alice, alice, amount, sender=alice)
+
+        @added_liquidity
+        def test_transfer_event_fires(self, alice, bob, charlie, swap):
+            amount = swap.balanceOf(alice)
+
+            swap.approve(bob, amount, sender=alice)
+            _, events = call_returning_result_and_logs(swap, "transferFrom", alice, charlie, amount, sender=bob)
+
+            assert len(events) == 1
+            assert repr(events[0]) == f"Transfer(sender={alice}, receiver={charlie}, value={amount})"

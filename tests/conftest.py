@@ -53,10 +53,11 @@ def pytest_addoption(parser):
 
 def pytest_generate_tests(metafunc):
     pool_size = int(metafunc.config.getoption("pool_size"))
-    if "pool_size" in metafunc.fixturenames:
-        # TODO: remove after adding implementations
-        assert pool_size == 2, "Only 2-coin pools supported"
 
+    # TODO: remove after adding implementations
+    assert pool_size == 2, "Only 2-coin pools supported"
+
+    if "pool_size" in metafunc.fixturenames:
         metafunc.parametrize(
             "pool_size",
             [pool_size],
@@ -86,7 +87,7 @@ def pytest_generate_tests(metafunc):
 
         metafunc.parametrize(
             "pool_token_types",
-            [(token_types[v[0]], token_types[v[1]]) for v in combs],
+            [(token_types[c[0]], token_types[c[1]]) for c in combs],
             indirect=True,
             ids=[f"(PoolTokenTypes={c})" for c in combs],
         )
@@ -139,7 +140,7 @@ def initial_decimals(request):
 
 @pytest.fixture(scope="session")
 def decimals(initial_decimals, pool_token_types):
-    # eth and oracle pools are always 18
+    # eth and oracle tokens are always 18 decimals
     return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
 
 
