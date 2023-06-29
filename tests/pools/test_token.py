@@ -1,10 +1,9 @@
 import boa
 import pytest
 from eip712.messages import EIP712Message
+from eth_account._utils.signing import to_bytes32
 
 from tests.utils.transactions import call_returning_result_and_logs
-
-# from eth_account._utils.signing import to_bytes32
 
 
 class TestPoolToken:
@@ -67,6 +66,7 @@ class TestPoolToken:
                 _version_: "string" = swap.version()  # noqa: F821
                 _chainId_: "uint256" = boa.env.chain.chain_id  # noqa: F821
                 _verifyingContract_: "address" = swap.address  # noqa: F821
+                _salt_: "bytes32" = swap.salt()  # noqa: F821
 
                 # EIP-2612 Data Fields
                 owner: "address"  # noqa: F821
@@ -77,60 +77,74 @@ class TestPoolToken:
 
             return Permit
 
-        # def test_permit(self, eth_acc, bob, swap):
-        #     value = 2**256 - 1
-        #     permit = self.permit_class(swap)(owner=eth_acc.address, spender=bob, value=value, nonce=0)
-        #     sig = eth_acc.sign_message(permit.signable_message)
-        #
-        #     from eth_account import Account
-        #
-        #     print(Account.recover_message(permit.signable_message, vrs=(sig.v, sig.r, sig.s)))
-        #
-        #     swap.permit(
-        #         eth_acc.address,
-        #         bob,
-        #         2**256 - 1,
-        #         2**256 - 1,
-        #         sig.v,
-        #         to_bytes32(sig.r),
-        #         to_bytes32(sig.s),
-        #         sender=bob,
-        #     )
-        #
-        #     res, events = call_returning_result_and_logs(
-        #         swap,
-        #         "permit",
-        #         eth_acc.address,
-        #         bob,
-        #         2**256 - 1,
-        #         2**256 - 1,
-        #         sig.v,
-        #         to_bytes32(sig.r),
-        #         to_bytes32(sig.s),
-        #         sender=bob,
-        #     )
-        #
-        #     assert swap.allowance(eth_acc.address, bob) == 2**256 - 1
-        #     assert res is True
-        #     assert len(events) == 1
-        #     assert repr(events[0]) == f"Approval(owner={eth_acc.address}, spender={bob}, value={value})"
-        #     assert swap.nonces(eth_acc.address) == 1
-        #
-        # def test_permit_contract(self, accounts, eth_acc, bob, swap):
-        #     src = """
-        #         @view
-        #         @external
-        #         def isValidSignature(_hash: bytes32, _sig: Bytes[65]) -> bytes32:
-        #     return 0x1626ba7e00000000000000000000000000000000000000000000000000000000
-        #     """
-        #     mock_contract = boa.vyper.deploy(src, sender=bob)
-        #
-        #     permit = self.permit_class(swap)(owner=eth_acc.address, spender=bob, value=2**256 - 1, nonce=0)
-        #     sig = eth_acc.sign_message(permit.signable_message)
-        #
-        #     res, events = call_returning_result_and_logs(
-        #         swap, "permit", mock_contract.address, bob, 2**256 - 1, 2**256 - 1, sig.v, sig.r, sig.s, sender=bob
-        #     )
-        #     assert swap.allowance(eth_acc.address, bob) == 2**256 - 1
-        #     assert res is True
-        #     assert len(events) == 1
+        def test_permit(self, eth_acc, bob, swap):
+            value = 2**256 - 1
+            permit = self.permit_class(swap)(owner=eth_acc.address, spender=bob, value=value, nonce=0)
+            sig = eth_acc.sign_message(permit.signable_message)
+
+            res, events = call_returning_result_and_logs(
+                swap,
+                "permit",
+                eth_acc.address,
+                bob,
+                2**256 - 1,
+                2**256 - 1,
+                sig.v,
+                to_bytes32(sig.r),
+                to_bytes32(sig.s),
+                sender=bob,
+            )
+
+            assert swap.allowance(eth_acc.address, bob) == 2**256 - 1
+            assert res is True
+            assert len(events) == 1
+            assert repr(events[0]) == f"Approval(owner={eth_acc.address}, spender={bob}, value={value})"
+            assert swap.nonces(eth_acc.address) == 1
+
+        def test_permit_contract(self, eth_acc, bob, swap):
+            # based on https://eips.ethereum.org/EIPS/eip-1271
+            src = """
+                # @version 0.3.9
+                OWNER: public(immutable(address))
+
+                @external
+                def __init__():
+                    OWNER = msg.sender
+
+                @view
+                @external
+                def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32:
+                    signer: address = self._recover_signer(_hash, _signature)
+                    if signer == OWNER:
+                        return 0x1626ba7e00000000000000000000000000000000000000000000000000000000
+                    return 0xffffffff00000000000000000000000000000000000000000000000000000000
+
+                @view
+                @internal
+                def _recover_signer(_hash: bytes32, _signature: Bytes[65]) -> address:
+                    v: uint256 = convert(slice(_signature, 64, 1), uint256)
+                    r: uint256 = convert(slice(_signature, 0, 32), uint256)
+                    s: uint256 = convert(slice(_signature, 32, 32), uint256)
+                    return ecrecover(_hash, v, r, s)
+            """
+            with boa.env.prank(eth_acc.address):
+                mock_contract = boa.loads(src)
+
+            permit = self.permit_class(swap)(owner=mock_contract.address, spender=bob, value=2**256 - 1, nonce=0)
+            sig = eth_acc.sign_message(permit.signable_message)
+
+            res, events = call_returning_result_and_logs(
+                swap,
+                "permit",
+                mock_contract.address,
+                bob,
+                2**256 - 1,
+                2**256 - 1,
+                sig.v,
+                to_bytes32(sig.r),
+                to_bytes32(sig.s),
+                sender=bob,
+            )
+            assert swap.allowance(mock_contract.address, bob) == 2**256 - 1
+            assert res is True
+            assert len(events) == 1
