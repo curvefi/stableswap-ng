@@ -16,9 +16,8 @@
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
         4. Adds `get_dx_underlying`.
-        5. Adds `exchange_with_rebase` (expects ERC20 token transferred in and just swaps.)
+        5. Adds `exchange_received` (expects ERC20 token transferred in and just swaps.)
         6. Adds `exchange_extended` (swap with callback)
-        6. Adds `add_liquidity_with_rebase`
 """
 
 from vyper.interfaces import ERC20
@@ -125,15 +124,13 @@ event ApplyNewFee:
 
 # ---------------------------- Pool Variables --------------------------------
 
-WETH20: public(immutable(address))
-
 MAX_POOL_COINS: constant(uint256) = 4
 
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 MAX_COIN: constant(int128) = N_COINS - 1
 PRECISION: constant(uint256) = 10 ** 18
-IS_REBASING: public(immutable(bool))
+IS_REBASING: immutable(bool)
 
 BASE_POOL: immutable(address)
 BASE_N_COINS: immutable(uint256)
@@ -211,7 +208,6 @@ def __init__(
     _rate_multiplier: uint256,
     _A: uint256,
     _fee: uint256,
-    _weth: address,
     _ma_exp_time: uint256,
     _method_id: bytes4,
     _oracle: address,
@@ -245,8 +241,6 @@ def __init__(
     @param _base_lp_token Address of the basepool's lp token.
     @param _base_coins Addresses of coins in the base pool.
     """
-
-    WETH20 = _weth
     IS_REBASING = _is_rebasing
 
     name = _name
@@ -522,7 +516,7 @@ def exchange_extended(
 
 @external
 @nonreentrant('lock')
-def exchange_with_rebase(
+def exchange_received(
     i: int128,
     j: int128,
     _dx: uint256,
@@ -536,7 +530,7 @@ def exchange_with_rebase(
          dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
          this method are dex aggregators, arbitrageurs, or other users who do not
          wish to grant approvals to the contract: they would instead send tokens
-         directly to the contract and call `exchange_on_rebase`.
+         directly to the contract and call `exchane_received`.
          The method is non-payable: does not accept native token.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
@@ -631,7 +625,7 @@ def exchange_underlying_extended(
 
 @external
 @nonreentrant('lock')
-def exchange_underlying_with_rebase(
+def exchange_underlying_received(
     i: int128,
     j: int128,
     _dx: uint256,
@@ -696,29 +690,15 @@ def add_liquidity(
 
         if _amounts[i] > 0:
 
-            if coins[i] == WETH20:
-
-                new_balances[i] += self._transfer_in(
-                    coins[i],
-                    _amounts[i],
-                    0,
-                    empty(address),
-                    empty(bytes32),
-                    msg.sender,
-                    empty(address),
-                )
-
-            else:
-
-                new_balances[i] += self._transfer_in(
-                    coins[i],
-                    _amounts[i],
-                    0,
-                    empty(address),
-                    empty(bytes32),
-                    msg.sender,
-                    empty(address),
-                )
+            new_balances[i] += self._transfer_in(
+                coins[i],
+                _amounts[i],
+                0,
+                empty(address),
+                empty(bytes32),
+                msg.sender,
+                empty(address),
+            )
 
         else:
 
@@ -1094,10 +1074,12 @@ def _exchange_underlying(
 
     # ------------------------------------------------------------------------
 
-    if i == 0 or j == 0:
+    if i == 0 or j == 0:  # meta swap
 
         if i == 0:
+
             x = xp[i] + dx_w_fee * rates[i] / PRECISION
+
         else:
 
             dx_w_fee = self._meta_add_liquidity(dx_w_fee, base_i)
@@ -1136,7 +1118,7 @@ def _exchange_underlying(
         # D is not changed because we did not apply a fee
         self.save_p(xp, amp, D)
 
-    else:  # Swap only involves base pool (user should swap at base pool for better gas)
+    else:  # base pool swap (user should swap at base pool for better gas)
 
         dy = ERC20(output_coin).balanceOf(self)
         Curve(BASE_POOL).exchange(base_i, base_j, dx_w_fee, _min_dy)

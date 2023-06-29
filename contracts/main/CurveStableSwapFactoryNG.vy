@@ -627,8 +627,8 @@ def deploy_metapool(
     _A: uint256,
     _fee: uint256,
     _ma_exp_time: uint256,
-    _method_ids: bytes4[4] = empty(bytes4[4]),
-    _oracles: address[4] = empty(address[4]),
+    _method_id: bytes4 = empty(bytes4),
+    _oracle: address = empty(address),
     _implementation_idx: uint256 = 0,
     _is_rebasing: bool = False
 ) -> address:
@@ -652,7 +652,7 @@ def deploy_metapool(
     @param _implementation_idx Index of the implementation to use. All possible
                 implementations for a BASE_POOL can be publicly accessed
                 via `metapool_implementations(BASE_POOL)`
-    @param _is_rebasing If coin rebases, then this should be set to True.
+    @param _is_rebasing If _coin rebases, then this should be set to True.
     @return Address of the deployed pool
     """
     assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
@@ -665,9 +665,20 @@ def deploy_metapool(
     decimals: uint256 = ERC20(_coin).decimals()
     assert decimals < 19, "Max 18 decimals for coins"
 
-    # TODO: the following needs an implementaiton contract AND create_from_blueprint
-    pool: address = create_minimal_proxy_to(implementation)
-    CurvePool(pool).initialize(_name, _symbol, _coin, 10 ** (36 - decimals), _A, _fee)
+    pool: address = create_from_blueprint(
+        implementation,
+        _name,
+        _symbol,
+        _coin,
+        10 ** (36 - decimals),  # rate multiplier for _coin
+        _A,
+        _fee,
+        _ma_exp_time,
+        _method_id,
+        _oracle,
+        _is_rebasing,
+        code_offset=3
+    )
 
     ERC20(_coin).approve(pool, max_value(uint256))
 

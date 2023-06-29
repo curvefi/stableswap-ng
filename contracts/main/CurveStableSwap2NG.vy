@@ -10,7 +10,7 @@
      ERC20 tokens can have arbitrary decimals (<=18).
      Additional features include:
         1. Support for rebasing tokens: but this disables
-           `exchange_with_rebase` and `add_liquidity_with_rebase`
+           `exchange_received`.
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
            Note: Oracle precision _must_ be 10**18.
         3. Support for ETH/WETH transfers
@@ -18,11 +18,11 @@
         5. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        6. Adds feature: `exchange_with_rebase`, which is inspired
+        6. Adds feature: `exchange_received`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and `IS_REBASING` is True
-                    then calling `exchange_with_rebase` will REVERT.
+                    then calling `exchange_received` will REVERT.
                  b. If pool contains rebasing token and `IS_REBASING` is False
                     then this is an incorrect implementation and rebases can be
                     stolen.
@@ -111,7 +111,7 @@ event ApplyNewFee:
 
 # ---------------------------- Pool Variables --------------------------------
 
-WETH20: public(immutable(address))
+WETH20: immutable(address)
 MAX_POOL_COINS: constant(uint256) = 4
 
 N_COINS: constant(uint256) = 2
@@ -545,7 +545,7 @@ def exchange_extended(
 
 @external
 @nonreentrant('lock')
-def exchange_with_rebase(
+def exchange_received(
     i: int128,
     j: int128,
     _dx: uint256,
@@ -559,7 +559,7 @@ def exchange_with_rebase(
          dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
          this method are dex aggregators, arbitrageurs, or other users who do not
          wish to grant approvals to the contract: they would instead send tokens
-         directly to the contract and call `exchange_on_rebase`.
+         directly to the contract and call `exchange_received`.
          The method is non-payable: does not accept native token.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
