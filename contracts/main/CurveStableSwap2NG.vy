@@ -26,10 +26,7 @@
                  b. If pool contains rebasing token and `IS_REBASING` is False
                     then this is an incorrect implementation and rebases can be
                     stolen.
-        7. Adds feature: `add_liquidity_with_rebase`. This is a version of
-           `add_liquidity` with optimistic ERC20 token transfers. As with
-           `exchange_with_rebase`, `IS_REBASING = True` disables this method.
-        8. Adds `get_dx`: Similar to `get_dy` which returns an expected output
+        7. Adds `get_dx`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
 """
@@ -115,11 +112,12 @@ event ApplyNewFee:
 # ---------------------------- Pool Variables --------------------------------
 
 WETH20: public(immutable(address))
+MAX_POOL_COINS: constant(uint256) = 4
 
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
-IS_REBASING: public(immutable(bool))
+IS_REBASING: immutable(bool[MAX_POOL_COINS])
 
 factory: public(address)
 coins: public(address[N_COINS])
@@ -189,15 +187,15 @@ CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 def __init__(
     _name: String[32],
     _symbol: String[10],
-    _coins: address[4],
-    _rate_multipliers: uint256[4],
+    _coins: address[MAX_POOL_COINS],
+    _rate_multipliers: uint256[MAX_POOL_COINS],
     _A: uint256,
     _fee: uint256,
     _weth: address,
     _ma_exp_time: uint256,
-    _method_ids: bytes4[4],
-    _oracles: address[4],
-    _is_rebasing: bool
+    _method_ids: bytes4[MAX_POOL_COINS],
+    _oracles: address[MAX_POOL_COINS],
+    _is_rebasing: bool[MAX_POOL_COINS]
 ):
     """
     @notice Initialize the pool contract
@@ -219,7 +217,8 @@ def __init__(
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
-    @param _is_rebasing If any of the coins rebases, then this should be set to True.
+    @param _is_rebasing Array of booleans where _is_rebasing[i] is True if _coins[i] is
+           a rebasing token: fee-on-transfer, tokens with slashing, positive rebasing, etc.
     """
 
     WETH20 = _weth
@@ -568,7 +567,7 @@ def exchange_with_rebase(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
-    assert not IS_REBASING, "Call disabled if IS_REBASING is True"
+    assert not IS_REBASING[i], "Call disabled if IS_REBASING[i] is True"
     return self._exchange(
         msg.sender,
         0,
@@ -608,39 +607,6 @@ def add_liquidity(
         _receiver,
         msg.value,
         False,  # <--------------------- Does not expect optimistic transfers.
-    )
-
-
-@external
-@nonreentrant('lock')
-def add_liquidity_with_rebase(
-    _amounts: uint256[N_COINS],
-    _min_mint_amount: uint256,
-    _use_eth: bool = False,
-    _receiver: address = msg.sender
-) -> uint256:
-    """
-    @notice Deposit coins into the pool
-    @dev The contract adds liquidity based on a change in balance of coins. The
-         dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
-         this method are dex aggregators, arbitrageurs, or other users who do not
-         wish to grant approvals to the contract: they would instead send tokens
-         directly to the contract and call `add_liquidity_on_rebase`.
-         The method is non-payable: does not accept native token.
-    @param _amounts List of amounts of coins to deposit
-    @param _min_mint_amount Minimum amount of LP tokens to mint from the deposit
-    @param _receiver Address that owns the minted LP tokens
-    @return Amount of LP tokens received by depositing
-    """
-    assert not IS_REBASING, "Call disabled if IS_REBASING is True"
-    return self._add_liquidity(
-        msg.sender,
-        _amounts,
-        _min_mint_amount,
-        _use_eth,
-        _receiver,
-        0,
-        True,  # <------------------------------ Expects optimistic transfers.
     )
 
 
@@ -833,9 +799,7 @@ def _exchange(
     if expect_optimistic_transfer:
 
         # This branch is never reached for rebasing tokens
-        pool_x_balance: uint256 = ERC20(coins[i]).balanceOf(self)
-        dx = pool_x_balance - self.stored_balances[i]
-
+        dx = ERC20(coins[i]).balanceOf(self) - self.stored_balances[i]
         assert dx == _dx, "Pool did not receive tokens for swap"
 
     else:

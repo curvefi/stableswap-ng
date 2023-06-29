@@ -655,6 +655,7 @@ def deploy_metapool(
     @param _is_rebasing If coin rebases, then this should be set to True.
     @return Address of the deployed pool
     """
+    assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
     assert _fee <= 100000000, "Invalid fee"
 
     implementation: address = self.base_pool_data[_base_pool].implementations[_implementation_idx]
