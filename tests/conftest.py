@@ -144,6 +144,33 @@ def decimals(initial_decimals, pool_token_types):
     return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
 
 
+# Usage
+# @pytest.mark.only_for_token_types(1,2)
+#
+# will not be skipped only if at least one of tokens in pool is eth or oracle
+# can be applied to classes
+#
+# @pytest.mark.only_for_token_types(2)
+# class TestPoolsWithOracleToken:
+@pytest.fixture(autouse=True)
+def skip_by_token_type(request, pool_token_types):
+    only_for_token_types = request.node.get_closest_marker("only_for_token_types")
+    if only_for_token_types:
+        if not any(pool_token_type in only_for_token_types.args for pool_token_type in pool_token_types):
+            pytest.skip("skipped because no tokens for these types")
+
+
+# Usage
+# @pytest.mark.only_for_pool_type(1)
+# class TestMetaPool...
+@pytest.fixture(autouse=True)
+def skip_by_pool_type(request, pool_type):
+    only_for_pool_type = request.node.get_closest_marker("only_for_pool_type")
+    if only_for_pool_type:
+        if pool_type not in only_for_pool_type.args:
+            pytest.skip("skipped because another pool type")
+
+
 @pytest.fixture(scope="module")
 def forked_chain():
     rpc_url = os.getenv("WEB3_PROVIDER_URL")
