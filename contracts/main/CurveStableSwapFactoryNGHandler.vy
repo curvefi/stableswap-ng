@@ -9,13 +9,13 @@
 # ---- interfaces ---- #
 interface BaseRegistry:
     def find_pool_for_coins(_from: address, _to: address, i: uint256 = 0) -> address: view
-    def get_admin_balances(_pool: address) -> uint256[MAX_COINS]: view
+    def get_admin_balances(_pool: address) -> uint256[MAX_METAREGISTRY_COINS]: view
     def get_A(_pool: address) -> uint256: view
-    def get_balances(_pool: address) -> uint256[MAX_COINS]: view
+    def get_balances(_pool: address) -> uint256[MAX_METAREGISTRY_COINS]: view
     def get_base_pool(_pool: address) -> address: view
-    def get_coins(_pool: address) -> address[MAX_COINS]: view
+    def get_coins(_pool: address) -> address[MAX_METAREGISTRY_COINS]: view
     def get_coin_indices(_pool: address, _from: address, _to: address) -> (int128, int128): view
-    def get_decimals(_pool: address) -> uint256[MAX_COINS]: view
+    def get_decimals(_pool: address) -> uint256[MAX_METAREGISTRY_COINS]: view
     def get_fees(_pool: address) -> uint256[2]: view
     def get_gauge(_pool: address) -> address: view
     def get_lp_token(_pool: address) -> address: view
@@ -23,7 +23,7 @@ interface BaseRegistry:
     def get_n_coins(_pool: address) -> uint256: view
     def get_pool_asset_type(_pool: address) -> uint256: view
     def get_underlying_balances(_pool: address) -> uint256[MAX_METAREGISTRY_COINS]: view
-    def get_underlying_coins(_pool: address) -> address[MAX_COINS]: view
+    def get_underlying_coins(_pool: address) -> address[MAX_METAREGISTRY_COINS]: view
     def get_underlying_decimals(_pool: address) -> uint256[MAX_METAREGISTRY_COINS]: view
     def is_meta(_pool: address) -> bool: view
     def pool_count() -> uint256: view
@@ -71,7 +71,6 @@ interface MetaRegistry:
 
 # ---- constants ---- #
 GAUGE_CONTROLLER: constant(address) = 0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB
-MAX_COINS: constant(uint256) = 4
 MAX_METAREGISTRY_COINS: constant(uint256) = 8
 
 
@@ -97,9 +96,9 @@ def _is_meta(_pool: address) -> bool:
 @internal
 @view
 def _get_coins(_pool: address) -> address[MAX_METAREGISTRY_COINS]:
-    _coins: address[MAX_COINS] = self.base_registry.get_coins(_pool)
+    _coins: address[MAX_METAREGISTRY_COINS] = self.base_registry.get_coins(_pool)
     _padded_coins: address[MAX_METAREGISTRY_COINS] = empty(address[MAX_METAREGISTRY_COINS])
-    for i in range(MAX_COINS):
+    for i in range(MAX_METAREGISTRY_COINS):
         _padded_coins[i] = _coins[i]
     return _padded_coins
 
@@ -107,9 +106,9 @@ def _get_coins(_pool: address) -> address[MAX_METAREGISTRY_COINS]:
 @internal
 @view
 def _get_underlying_coins(_pool: address) -> address[MAX_METAREGISTRY_COINS]:
-    _coins: address[MAX_COINS] = self.base_registry.get_underlying_coins(_pool)
+    _coins: address[MAX_METAREGISTRY_COINS] = self.base_registry.get_underlying_coins(_pool)
     _padded_coins: address[MAX_METAREGISTRY_COINS] = empty(address[MAX_METAREGISTRY_COINS])
-    for i in range(MAX_COINS):
+    for i in range(MAX_METAREGISTRY_COINS):
         _padded_coins[i] = _coins[i]
     return _padded_coins
 
@@ -170,9 +169,9 @@ def _get_meta_underlying_balances(_pool: address) -> uint256[MAX_METAREGISTRY_CO
 
 @internal
 @view
-def _pad_uint_array(_array: uint256[MAX_COINS]) -> uint256[MAX_METAREGISTRY_COINS]:
+def _pad_uint_array(_array: uint256[MAX_METAREGISTRY_COINS]) -> uint256[MAX_METAREGISTRY_COINS]:
     _padded_array: uint256[MAX_METAREGISTRY_COINS] = empty(uint256[MAX_METAREGISTRY_COINS])
-    for i in range(MAX_COINS):
+    for i in range(MAX_METAREGISTRY_COINS):
         _padded_array[i] = _array[i]
     return _padded_array
 
