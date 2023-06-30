@@ -22,10 +22,10 @@ def swap(
 
     A = 2000
     fee = 1000000
-    method_ids = [bytes(b"")] * 4
-    oracles = [zero_address] * 4
+    method_ids = [bytes(b"")] * 8
+    oracles = [zero_address] * 8
     asset_type = 0  # 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
-    is_rebasing = False
+    is_rebasing = [False] * 8
 
     for i, t in enumerate(pool_token_types):
         if t == 0:
@@ -46,13 +46,13 @@ def swap(
             A = 500
             fee = 4000000
             asset_type = 1
-            is_rebasing = True
+            is_rebasing[i] = True
 
     with boa.env.prank(owner):
         pool = factory.deploy_plain_pool(
             "test",
             "test",
-            [pool_tokens[0].address, pool_tokens[1].address, zero_address, zero_address],
+            [pool_tokens[0].address, pool_tokens[1].address, *[zero_address] * 6],
             A,
             fee,
             866,
