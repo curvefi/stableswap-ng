@@ -124,17 +124,19 @@ event ApplyNewFee:
 
 # ---------------------------- Pool Variables --------------------------------
 
-MAX_POOL_COINS: constant(uint256) = 4
+MAX_COINS: constant(uint256) = 8
 
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 MAX_COIN: constant(int128) = N_COINS - 1
 PRECISION: constant(uint256) = 10 ** 18
-IS_REBASING: immutable(bool)
+
+# token: is_rebasing flag
+is_rebasing: HashMap[address, bool]
 
 BASE_POOL: immutable(address)
 BASE_N_COINS: immutable(uint256)
-BASE_COINS: immutable(address[MAX_POOL_COINS])
+BASE_COINS: immutable(address[MAX_COINS])
 
 factory: public(address)
 coins: public(address[N_COINS])
@@ -211,10 +213,10 @@ def __init__(
     _ma_exp_time: uint256,
     _method_id: bytes4,
     _oracle: address,
-    _is_rebasing: bool,
+    _is_rebasing: bool[MAX_COINS],  # [_coin, False, base_coin_0, base_coin_1, ...]
     _base_pool: address,
     _base_lp_token: address,
-    _base_coins: address[MAX_POOL_COINS],
+    _base_coins: address[MAX_COINS],  # base pool can have maximally (MAX_COINS - 1) coins
 ):
     """
     @notice Initialize the pool contract
@@ -241,8 +243,6 @@ def __init__(
     @param _base_lp_token Address of the basepool's lp token.
     @param _base_coins Addresses of coins in the base pool.
     """
-    IS_REBASING = _is_rebasing
-
     name = _name
     symbol = _symbol
 
@@ -253,6 +253,9 @@ def __init__(
     BASE_COINS = _base_coins
     BASE_POOL = _base_pool
 
+    self.is_rebasing[_coin] = _is_rebasing[0]
+    self.is_rebasing[_base_lp_token] = False
+
     base_n_coins: uint256 = 0
     for coin in _base_coins:
 
@@ -262,7 +265,9 @@ def __init__(
         ERC20(coin).approve(BASE_POOL, max_value(uint256))
         base_n_coins += 1
 
-    assert base_n_coins <= MAX_POOL_COINS, "Cannot onboard base pool with more than 4 coins"
+        # _is_rebasing from idx 1 and onwards is for base pool's coins
+        self.is_rebasing[coin] = _is_rebasing[base_n_coins]
+
     BASE_N_COINS = base_n_coins
 
     A: uint256 = _A * A_PRECISION
@@ -538,7 +543,7 @@ def exchange_received(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
-    assert not IS_REBASING, "Call disabled if IS_REBASING is True"
+    assert self.is_rebasing[self.coins[i]]  # dev: rebasing tokens are not supported
     return self._exchange(
         msg.sender,
         i,
@@ -610,6 +615,7 @@ def exchange_underlying_extended(
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
+    assert _cb != empty(bytes32)  # dev: no callback specified
     return self._exchange_underlying(
         msg.sender,
         i,
@@ -644,7 +650,6 @@ def exchange_underlying_received(
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
-    assert not IS_REBASING, "Call disabled if IS_REBASING is True"
     return self._exchange_underlying(
         msg.sender,
         i,
@@ -1049,6 +1054,8 @@ def _exchange_underlying(
     dx_w_fee: uint256 = 0
 
     if expect_optimistic_transfer:
+
+        assert self.is_rebasing[input_coin]  # dev: rebasing coins not supported
 
         # This branch is never reached for rebasing tokens
         if input_coin == BASE_COINS[base_i]:

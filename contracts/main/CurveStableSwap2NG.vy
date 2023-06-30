@@ -109,15 +109,15 @@ event ApplyNewFee:
     fee: uint256
 
 
+MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
+
 # ---------------------------- Pool Variables --------------------------------
 
 WETH20: immutable(address)
-MAX_POOL_COINS: constant(uint256) = 4
-
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
-IS_REBASING: immutable(bool[MAX_POOL_COINS])
+IS_REBASING: immutable(bool[N_COINS])
 
 factory: public(address)
 coins: public(address[N_COINS])
@@ -187,15 +187,15 @@ CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 def __init__(
     _name: String[32],
     _symbol: String[10],
-    _coins: address[MAX_POOL_COINS],
-    _rate_multipliers: uint256[MAX_POOL_COINS],
+    _coins: address[MAX_COINS],
+    _rate_multipliers: uint256[MAX_COINS],
     _A: uint256,
     _fee: uint256,
     _weth: address,
     _ma_exp_time: uint256,
-    _method_ids: bytes4[MAX_POOL_COINS],
-    _oracles: address[MAX_POOL_COINS],
-    _is_rebasing: bool[MAX_POOL_COINS]
+    _method_ids: bytes4[MAX_COINS],
+    _oracles: address[MAX_COINS],
+    _is_rebasing: bool[MAX_COINS]
 ):
     """
     @notice Initialize the pool contract
@@ -222,7 +222,7 @@ def __init__(
     """
 
     WETH20 = _weth
-    IS_REBASING = _is_rebasing
+    IS_REBASING = [_is_rebasing[0], _is_rebasing[1]]
 
     name = _name
     symbol = _symbol
