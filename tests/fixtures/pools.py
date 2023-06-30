@@ -68,13 +68,13 @@ def swap(
 
 # <---------------------   Functions   --------------------->
 # TODO: add Factory Meta Implementation
-@pytest.fixture
+@pytest.fixture(scope="module")
 def add_initial_liquidity(owner, approve_owner, mint_owner, deposit_amounts, swap):
     with boa.env.prank(owner):
         swap.add_liquidity(deposit_amounts, 0)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def add_initial_liquidity_alice(alice, approve_alice, mint_alice, deposit_amounts, swap):
     with boa.env.prank(alice):
         swap.add_liquidity(deposit_amounts, 0)

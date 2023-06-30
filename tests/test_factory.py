@@ -5,31 +5,11 @@ import pytest
 
 MAX_COINS = 8
 
+# TODO: ADD meta
+
 
 class TestFactory:
-    @pytest.fixture
-    def new_factory(self, alice, fee_receiver, weth):
-        with boa.env.prank(alice):
-            return boa.load(
-                "contracts/main/CurveStableSwapFactoryNG.vy",
-                fee_receiver,
-                alice,
-                weth,
-            )
-
     class TestBasic:
-        @pytest.fixture
-        def new_factory_setup(
-            self,
-            new_factory,
-            amm_implementation_plain,
-            pool_size,
-            alice,
-            fee_receiver,
-        ):
-            with boa.env.prank(alice):
-                new_factory.set_plain_implementations(pool_size, 0, amm_implementation_plain.address)
-
         @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
         def test_find_pool_for_coins(self, factory, swap, pool_tokens, sending, receiving):
             assert (

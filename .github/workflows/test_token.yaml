@@ -1,18 +1,9 @@
-name: test_factory
+name: test_token
 
-on:
-  pull_request:
-    paths:
-      - "tests/test_factory.py"
-      - "contracts/CurveStableSwapFactoryNG.vy"
-  push:
-    paths:
-      - "tests/test_factory.py"
-      - "contracts/CurveStableSwapFactoryNG.vy"
+on: [pull_request, push]
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
 
 jobs:
   tests:
@@ -38,7 +29,7 @@ jobs:
           poetry config virtualenvs.in-project true
           poetry install --no-interaction
 
-      - name: Run Tests
+      - name: Run Test Token
         run: |
           source .venv/bin/activate
-          pytest tests/test_factory.py --pool-size=2 --decimals=18,18 -n auto
+          pytest tests/test_token.py --pool-size=2 --pool-type=basic --token-types=plain --decimals=18,18 -n auto
