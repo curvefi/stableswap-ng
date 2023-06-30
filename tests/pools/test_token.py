@@ -151,8 +151,8 @@ class TestPoolToken:
             assert res is True
             assert len(events) == 1
 
+    @added_liquidity
     class TestTokenTransfer:
-        @added_liquidity
         def test_sender_balance_decreases(self, alice, bob, swap):
             sender_balance = swap.balanceOf(alice)
             amount = sender_balance // 4
@@ -161,7 +161,6 @@ class TestPoolToken:
 
             assert swap.balanceOf(alice) == sender_balance - amount
 
-        @added_liquidity
         def test_receiver_balance_increases(self, alice, bob, swap):
             receiver_balance = swap.balanceOf(bob)
             amount = swap.balanceOf(alice) // 4
@@ -170,7 +169,6 @@ class TestPoolToken:
 
             assert swap.balanceOf(bob) == receiver_balance + amount
 
-        @added_liquidity
         def test_total_supply_not_affected(self, alice, bob, swap):
             total_supply = swap.totalSupply()
             amount = swap.balanceOf(alice)
@@ -179,14 +177,12 @@ class TestPoolToken:
 
             assert swap.totalSupply() == total_supply
 
-        @added_liquidity
         def test_returns_true(self, alice, bob, swap):
             amount = swap.balanceOf(alice)
             res = swap.transfer(bob, amount, sender=alice)
 
             assert res is True
 
-        @added_liquidity
         def test_transfer_full_balance(self, alice, bob, swap):
             amount = swap.balanceOf(alice)
             receiver_balance = swap.balanceOf(bob)
@@ -196,7 +192,6 @@ class TestPoolToken:
             assert swap.balanceOf(alice) == 0
             assert swap.balanceOf(bob) == receiver_balance + amount
 
-        @added_liquidity
         def test_transfer_zero_tokens(self, alice, bob, swap):
             sender_balance = swap.balanceOf(alice)
             receiver_balance = swap.balanceOf(bob)
@@ -206,7 +201,6 @@ class TestPoolToken:
             assert swap.balanceOf(alice) == sender_balance
             assert swap.balanceOf(bob) == receiver_balance
 
-        @added_liquidity
         def test_transfer_to_self(self, alice, bob, swap):
             sender_balance = swap.balanceOf(alice)
             amount = sender_balance // 4
@@ -215,14 +209,12 @@ class TestPoolToken:
 
             assert swap.balanceOf(alice) == sender_balance
 
-        @added_liquidity
         def test_insufficient_balance(self, alice, bob, swap):
             balance = swap.balanceOf(alice)
 
             with boa.reverts():
                 swap.transfer(bob, balance + 1, sender=alice)
 
-        @added_liquidity
         def test_transfer_event_fires(self, alice, bob, swap):
             amount = swap.balanceOf(alice)
             _, events = call_returning_result_and_logs(swap, "transfer", bob, amount, sender=alice)
@@ -230,8 +222,8 @@ class TestPoolToken:
             assert len(events) == 1
             assert repr(events[0]) == f"Transfer(sender={alice}, receiver={bob}, value={amount})"
 
+    @added_liquidity
     class TestTokenTransferFrom:
-        @added_liquidity
         def test_sender_balance_decreases(self, alice, bob, charlie, swap):
             sender_balance = swap.balanceOf(alice)
             amount = sender_balance // 4
@@ -241,7 +233,6 @@ class TestPoolToken:
 
             assert swap.balanceOf(alice) == sender_balance - amount
 
-        @added_liquidity
         def test_receiver_balance_increases(self, alice, bob, charlie, swap):
             receiver_balance = swap.balanceOf(charlie)
             amount = swap.balanceOf(alice) // 4
@@ -251,7 +242,6 @@ class TestPoolToken:
 
             assert swap.balanceOf(charlie) == receiver_balance + amount
 
-        @added_liquidity
         def test_caller_balance_not_affected(self, alice, bob, charlie, swap):
             caller_balance = swap.balanceOf(bob)
             amount = swap.balanceOf(alice)
@@ -261,7 +251,6 @@ class TestPoolToken:
 
             assert swap.balanceOf(bob) == caller_balance
 
-        @added_liquidity
         def test_caller_approval_affected(self, alice, bob, charlie, swap):
             approval_amount = swap.balanceOf(alice)
             transfer_amount = approval_amount // 4
@@ -271,7 +260,6 @@ class TestPoolToken:
 
             assert swap.allowance(alice, bob) == approval_amount - transfer_amount
 
-        @added_liquidity
         def test_receiver_approval_not_affected(self, alice, bob, charlie, swap):
             approval_amount = swap.balanceOf(alice)
             transfer_amount = approval_amount // 4
@@ -282,7 +270,6 @@ class TestPoolToken:
 
             assert swap.allowance(alice, charlie) == approval_amount
 
-        @added_liquidity
         def test_total_supply_not_affected(self, alice, bob, charlie, swap):
             total_supply = swap.totalSupply()
             amount = swap.balanceOf(alice)
@@ -292,7 +279,6 @@ class TestPoolToken:
 
             assert swap.totalSupply() == total_supply
 
-        @added_liquidity
         def test_returns_true(self, alice, bob, charlie, swap):
             amount = swap.balanceOf(alice)
             swap.approve(bob, amount, sender=alice)
@@ -300,7 +286,6 @@ class TestPoolToken:
 
             assert res is True
 
-        @added_liquidity
         def test_transfer_full_balance(self, alice, bob, charlie, swap):
             amount = swap.balanceOf(alice)
             receiver_balance = swap.balanceOf(charlie)
@@ -311,7 +296,6 @@ class TestPoolToken:
             assert swap.balanceOf(alice) == 0
             assert swap.balanceOf(charlie) == receiver_balance + amount
 
-        @added_liquidity
         def test_transfer_zero_tokens(self, alice, bob, charlie, swap):
             sender_balance = swap.balanceOf(alice)
             receiver_balance = swap.balanceOf(charlie)
@@ -322,7 +306,6 @@ class TestPoolToken:
             assert swap.balanceOf(alice) == sender_balance
             assert swap.balanceOf(charlie) == receiver_balance
 
-        @added_liquidity
         def test_transfer_zero_tokens_without_approval(self, alice, bob, charlie, swap):
             sender_balance = swap.balanceOf(alice)
             receiver_balance = swap.balanceOf(charlie)
@@ -332,7 +315,6 @@ class TestPoolToken:
             assert swap.balanceOf(alice) == sender_balance
             assert swap.balanceOf(charlie) == receiver_balance
 
-        @added_liquidity
         def test_insufficient_balance(self, alice, bob, charlie, swap):
             balance = swap.balanceOf(alice)
 
@@ -340,7 +322,6 @@ class TestPoolToken:
             with boa.reverts():
                 swap.transferFrom(alice, charlie, balance + 1, sender=bob)
 
-        @added_liquidity
         def test_insufficient_approval(self, alice, bob, charlie, swap):
             balance = swap.balanceOf(alice)
 
@@ -348,14 +329,12 @@ class TestPoolToken:
             with boa.reverts():
                 swap.transferFrom(alice, charlie, balance, sender=bob)
 
-        @added_liquidity
         def test_no_approval(self, alice, bob, charlie, swap):
             balance = swap.balanceOf(alice)
 
             with boa.reverts():
                 swap.transferFrom(alice, charlie, balance, sender=bob)
 
-        @added_liquidity
         def test_revoked_approval(self, alice, bob, charlie, swap):
             balance = swap.balanceOf(alice)
 
@@ -365,7 +344,6 @@ class TestPoolToken:
             with boa.reverts():
                 swap.transferFrom(alice, charlie, balance, sender=bob)
 
-        @added_liquidity
         def test_transfer_to_self(self, alice, bob, swap):
             sender_balance = swap.balanceOf(alice)
             amount = sender_balance // 4
@@ -376,14 +354,12 @@ class TestPoolToken:
             assert swap.balanceOf(alice) == sender_balance
             assert swap.allowance(alice, alice) == sender_balance - amount
 
-        @added_liquidity
         def test_transfer_to_self_no_approval(self, alice, bob, swap):
             amount = swap.balanceOf(alice)
 
             with boa.reverts():
                 swap.transferFrom(alice, alice, amount, sender=alice)
 
-        @added_liquidity
         def test_transfer_event_fires(self, alice, bob, charlie, swap):
             amount = swap.balanceOf(alice)
 
