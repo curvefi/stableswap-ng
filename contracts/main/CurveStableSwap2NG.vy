@@ -10,7 +10,7 @@
      ERC20 tokens can have arbitrary decimals (<=18).
      Additional features include:
         1. Support for rebasing tokens: but this disables
-           `exchange_with_rebase` and `add_liquidity_with_rebase`
+           `exchange_received`.
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
            Note: Oracle precision _must_ be 10**18.
         3. Support for ETH/WETH transfers
@@ -18,18 +18,15 @@
         5. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        6. Adds feature: `exchange_with_rebase`, which is inspired
+        6. Adds feature: `exchange_received`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and `IS_REBASING` is True
-                    then calling `exchange_with_rebase` will REVERT.
+                    then calling `exchange_received` will REVERT.
                  b. If pool contains rebasing token and `IS_REBASING` is False
                     then this is an incorrect implementation and rebases can be
                     stolen.
-        7. Adds feature: `add_liquidity_with_rebase`. This is a version of
-           `add_liquidity` with optimistic ERC20 token transfers. As with
-           `exchange_with_rebase`, `IS_REBASING = True` disables this method.
-        8. Adds `get_dx`: Similar to `get_dy` which returns an expected output
+        7. Adds `get_dx`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
 """
@@ -108,25 +105,25 @@ event StopRampA:
     A: uint256
     t: uint256
 
-event CommitNewFee:
-    new_fee: uint256
-
 event ApplyNewFee:
     fee: uint256
 
 
+MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
+
 # ---------------------------- Pool Variables --------------------------------
 
-WETH20: public(immutable(address))
-
+WETH20: immutable(address)
 N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
-IS_REBASING: immutable(bool)
+IS_REBASING: immutable(bool[N_COINS])
 
 factory: public(address)
 coins: public(address[N_COINS])
 stored_balances: uint256[N_COINS]
+fee: public(uint256)  # fee * 1e10
+FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -139,21 +136,11 @@ future_A: public(uint256)
 initial_A_time: public(uint256)
 future_A_time: public(uint256)
 
-# ---------------------------- Fee Variables ---------------------------------
-
-ADMIN_FEE: constant(uint256) = 5000000000
-
-FEE_DENOMINATOR: constant(uint256) = 10 ** 10
-MAX_FEE: constant(uint256) = 5 * 10 ** 9
-fee: public(uint256)  # fee * 1e10
-future_fee: public(uint256)
-
 # ---------------------------- Admin Variables -------------------------------
 
+ADMIN_FEE: constant(uint256) = 5000000000
+MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
-ADMIN_ACTIONS_DEADLINE_DT: constant(uint256) = 86400 * 3
-admin_action_deadline: public(uint256)
-
 admin_balances: public(uint256[N_COINS])
 
 # ----------------------- Oracle Specific vars -------------------------------
@@ -200,15 +187,15 @@ CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 def __init__(
     _name: String[32],
     _symbol: String[10],
-    _coins: address[4],
-    _rate_multipliers: uint256[4],
+    _coins: address[MAX_COINS],
+    _rate_multipliers: uint256[MAX_COINS],
     _A: uint256,
     _fee: uint256,
     _weth: address,
     _ma_exp_time: uint256,
-    _method_ids: bytes4[4],
-    _oracles: address[4],
-    _is_rebasing: bool
+    _method_ids: bytes4[MAX_COINS],
+    _oracles: address[MAX_COINS],
+    _is_rebasing: bool[MAX_COINS]
 ):
     """
     @notice Initialize the pool contract
@@ -230,11 +217,12 @@ def __init__(
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
-    @param _is_rebasing If any of the coins rebases, then this should be set to True.
+    @param _is_rebasing Array of booleans where _is_rebasing[i] is True if _coins[i] is
+           a rebasing token: fee-on-transfer, tokens with slashing, positive rebasing, etc.
     """
 
     WETH20 = _weth
-    IS_REBASING = _is_rebasing
+    IS_REBASING = [_is_rebasing[0], _is_rebasing[1]]
 
     name = _name
     symbol = _symbol
@@ -557,7 +545,7 @@ def exchange_extended(
 
 @external
 @nonreentrant('lock')
-def exchange_with_rebase(
+def exchange_received(
     i: int128,
     j: int128,
     _dx: uint256,
@@ -571,7 +559,7 @@ def exchange_with_rebase(
          dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
          this method are dex aggregators, arbitrageurs, or other users who do not
          wish to grant approvals to the contract: they would instead send tokens
-         directly to the contract and call `exchange_on_rebase`.
+         directly to the contract and call `exchange_received`.
          The method is non-payable: does not accept native token.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
@@ -579,7 +567,7 @@ def exchange_with_rebase(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
-    assert not IS_REBASING, "Call disabled if IS_REBASING is True"
+    assert not IS_REBASING[i], "Call disabled if IS_REBASING[i] is True"
     return self._exchange(
         msg.sender,
         0,
@@ -619,39 +607,6 @@ def add_liquidity(
         _receiver,
         msg.value,
         False,  # <--------------------- Does not expect optimistic transfers.
-    )
-
-
-@external
-@nonreentrant('lock')
-def add_liquidity_with_rebase(
-    _amounts: uint256[N_COINS],
-    _min_mint_amount: uint256,
-    _use_eth: bool = False,
-    _receiver: address = msg.sender
-) -> uint256:
-    """
-    @notice Deposit coins into the pool
-    @dev The contract adds liquidity based on a change in balance of coins. The
-         dx = ERC20(coin[i]).balanceOf(self) - self.stored_balances[i]. Users of
-         this method are dex aggregators, arbitrageurs, or other users who do not
-         wish to grant approvals to the contract: they would instead send tokens
-         directly to the contract and call `add_liquidity_on_rebase`.
-         The method is non-payable: does not accept native token.
-    @param _amounts List of amounts of coins to deposit
-    @param _min_mint_amount Minimum amount of LP tokens to mint from the deposit
-    @param _receiver Address that owns the minted LP tokens
-    @return Amount of LP tokens received by depositing
-    """
-    assert not IS_REBASING, "Call disabled if IS_REBASING is True"
-    return self._add_liquidity(
-        msg.sender,
-        _amounts,
-        _min_mint_amount,
-        _use_eth,
-        _receiver,
-        0,
-        True,  # <------------------------------ Expects optimistic transfers.
     )
 
 
@@ -844,9 +799,7 @@ def _exchange(
     if expect_optimistic_transfer:
 
         # This branch is never reached for rebasing tokens
-        pool_x_balance: uint256 = ERC20(coins[i]).balanceOf(self)
-        dx = pool_x_balance - self.stored_balances[i]
-
+        dx = ERC20(coins[i]).balanceOf(self) - self.stored_balances[i]
         assert dx == _dx, "Pool did not receive tokens for swap"
 
     else:
@@ -1793,26 +1746,13 @@ def stop_ramp_A():
 
 
 @external
-def commit_new_fee(_new_fee: uint256):
+def apply_new_fee(_new_fee: uint256):
+
     assert msg.sender == Factory(self.factory).admin()
     assert _new_fee <= MAX_FEE
-    assert self.admin_action_deadline == 0
+    self.fee = _new_fee
 
-    self.future_fee = _new_fee
-    self.admin_action_deadline = block.timestamp + ADMIN_ACTIONS_DEADLINE_DT
-    log CommitNewFee(_new_fee)
-
-
-@external
-def apply_new_fee():
-    assert msg.sender == Factory(self.factory).admin()
-    deadline: uint256 = self.admin_action_deadline
-    assert deadline != 0 and block.timestamp >= deadline
-
-    fee: uint256 = self.future_fee
-    self.fee = fee
-    self.admin_action_deadline = 0
-    log ApplyNewFee(fee)
+    log ApplyNewFee(_new_fee)
 
 
 @external
