@@ -38,7 +38,12 @@ jobs:
           poetry config virtualenvs.in-project true
           poetry install --no-interaction
 
-      - name: Run Tests
+      - name: Run Tests Basic
         run: |
           source .venv/bin/activate
-          pytest tests/test_factory.py --pool-size=2 --decimals=18,18 -n auto
+          pytest tests/test_factory.py --pool-size=2 --pool-type=basic --decimals=18,18 -n auto
+
+      - name: Run Tests Meta
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_factory.py --pool-size=2 --pool-type=meta --decimals=18,18 -n auto

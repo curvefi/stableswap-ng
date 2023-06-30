@@ -24,12 +24,11 @@ def pytest_addoption(parser):
         default="2",
         help="pool size to test against",
     )
-    # TODO: add meta implementation
     parser.addoption(
         "--pool-type",
         action="store",
         default="basic",
-        help="comma-separated list of pool types to test against",
+        help="pool type to test against",
     )
     parser.addoption(
         "--token-types",
@@ -65,32 +64,42 @@ def pytest_generate_tests(metafunc):
             ids=[f"(PoolSize={pool_size})"],
         )
 
+    pool_type = metafunc.config.getoption("pool_type")
+
     if "pool_type" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("pool_type").split(",")
-        pool_type_ids = [pool_types[v] for v in cli_options]
         metafunc.parametrize(
             "pool_type",
-            pool_type_ids,
+            [pool_types[pool_type]],
             indirect=True,
-            ids=[f"(PoolType={i})" for i in cli_options],
+            ids=[f"(PoolType={pool_type})"],
         )
 
     if "pool_token_types" in metafunc.fixturenames:
         cli_options = metafunc.config.getoption("token_types").split(",")
 
-        combs = list(combinations(cli_options, pool_size))
-        if pool_size == 2:
-            # do not include (eth,eth) pair
-            for t in cli_options:
-                if t != "eth":
-                    combs.append((t, t))
+        if pool_types[pool_type] == 0:
+            combs = list(combinations(cli_options, pool_size))
+            if pool_size == 2:
+                # do not include (eth,eth) pair
+                for t in cli_options:
+                    if t != "eth":
+                        combs.append((t, t))
 
-        metafunc.parametrize(
-            "pool_token_types",
-            [(token_types[c[0]], token_types[c[1]]) for c in combs],
-            indirect=True,
-            ids=[f"(PoolTokenTypes={c})" for c in combs],
-        )
+            metafunc.parametrize(
+                "pool_token_types",
+                [(token_types[c[0]], token_types[c[1]]) for c in combs],
+                indirect=True,
+                ids=[f"(PoolTokenTypes={c})" for c in combs],
+            )
+        else:
+            # workaround for generating tokens
+            # for meta pool only 1st coin is selected
+            metafunc.parametrize(
+                "pool_token_types",
+                [[token_types[c]] for c in cli_options],
+                indirect=True,
+                ids=[f"(PoolTokenTypes={c})" for c in cli_options],
+            )
 
     if "initial_decimals" in metafunc.fixturenames:
         cli_options = metafunc.config.getoption("decimals")

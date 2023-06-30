@@ -317,15 +317,15 @@ def get_underlying_balances(_pool: address) -> uint256[MAX_COINS]:
     @return uint256 list of underlying balances
     """
 
+    base_pool: address = self.pool_data[_pool].base_pool
+    assert base_pool != empty(address)  # dev: pool is not a metapool
+
     underlying_balances: uint256[MAX_COINS] = empty(uint256[MAX_COINS])
     underlying_balances[0] = CurvePool(_pool).balances(0)
 
     base_total_supply: uint256 = ERC20(self.pool_data[_pool].coins[1]).totalSupply()
-    print(base_total_supply)
     if base_total_supply > 0:
         underlying_pct: uint256 = CurvePool(_pool).balances(1) * 10**36 / base_total_supply
-        base_pool: address = self.pool_data[_pool].base_pool
-        assert base_pool != empty(address)  # dev: pool is not a metapool
         n_coins: uint256 = self.base_pool_data[base_pool].n_coins
         for i in range(MAX_COINS):
             if i == n_coins:

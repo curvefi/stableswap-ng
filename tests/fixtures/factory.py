@@ -56,11 +56,38 @@ def factory(
 
 
 # <---------------------   Functions   --------------------->
-# TODO: add Factory Meta Implementation
 @pytest.fixture(scope="module")
 def set_plain_implementations(owner, factory, pool_size, pool_type, amm_implementation_plain):
     with boa.env.prank(owner):
         factory.set_plain_implementations(pool_size, pool_type, amm_implementation_plain.address)
+
+
+# <---------------------   Metapool configuration   --------------------->
+@pytest.fixture(scope="module")
+def set_meta_implementations(
+    owner,
+    fee_receiver,
+    factory,
+    pool_size,
+    pool_type,
+    amm_implementation_meta,
+    base_pool,
+    base_pool_lp_token,
+    base_pool_tokens,
+    zero_address,
+):
+    with boa.env.prank(owner):
+        factory.add_base_pool(
+            base_pool.address,
+            base_pool_lp_token.address,
+            fee_receiver,
+            [t.address for t in base_pool_tokens],
+            0,
+            len(base_pool_tokens),
+            [False] * len(base_pool_tokens),
+            [zero_address] * len((base_pool_tokens)),
+        )
+        factory.set_metapool_implementations(base_pool.address, [amm_implementation_meta.address] + [zero_address] * 9)
 
 
 @pytest.fixture(scope="module")

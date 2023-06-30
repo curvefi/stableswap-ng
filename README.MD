@@ -25,7 +25,7 @@ poetry install
 ### Paramaters
 
 - `--pool-size` - size of pool (N_COINS), available parameters: `[2]`
-- `--pool-type` - types of pool(divided by comma), available parameters: `[basic,meta]`
+- `--pool-type` - type of pool, available parameters: `[basic,meta]`
 - `--token-types` - token types to test against(divided by comma), available parameters: `[plain,eth,oracle,rebasing]`
 - `--decimals` - token decimals (divided by comma), default `18,18`
 - `--return-types` - types of .transfer() returns to test against (divided by comma), default `revert,False,None`
