@@ -105,11 +105,11 @@ base_pool_assets: public(HashMap[address, bool])
 # index -> implementation address
 plain_implementations: public(HashMap[uint256, address])
 metapool_implementations: public(HashMap[uint256, address])
+gauge_implementation: public(address)
+views_implementation: public(address)
 
 # fee receiver for plain pools
 fee_receiver: address
-
-gauge_implementation: public(address)
 
 # mapping of coins -> pools for trading
 # a mapping key is generated for each pair of addresses via
@@ -793,7 +793,6 @@ def set_metapool_implementations(
 
 @external
 def set_plain_implementations(
-    _n_coins: uint256,
     _implementation_index: uint256,
     _implementation: address,
 ):
@@ -816,6 +815,17 @@ def set_gauge_implementation(_gauge_implementation: address):
     """
     assert msg.sender == self.admin  # dev: admin-only function
     self.gauge_implementation = _gauge_implementation
+
+
+@external
+def set_views_implementation(_views_implementation: address):
+    """
+    @notice Set implementation contracts for Views methods
+    @dev Only callable by admin
+    @param _implementation Implementation address of views contract
+    """
+    assert msg.sender == self.admin  # dev: admin-only function
+    self.views_implementation = _views_implementation
 
 
 @external

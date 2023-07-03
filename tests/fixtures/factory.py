@@ -42,6 +42,7 @@ def factory(
     fee_receiver,
     owner,
     amm_implementation_plain,
+    amm_implementation_meta,
     gauge_implementation,
     weth,
 ):
@@ -56,11 +57,16 @@ def factory(
 
 
 # <---------------------   Functions   --------------------->
-# TODO: add Factory Meta Implementation
 @pytest.fixture(scope="module")
-def set_plain_implementations(owner, factory, pool_size, pool_type, amm_implementation_plain):
+def set_meta_implementations(owner, factory, amm_implementation_meta):
     with boa.env.prank(owner):
-        factory.set_plain_implementations(pool_size, pool_type, amm_implementation_plain.address)
+        factory.set_metapool_implementations(0, amm_implementation_plain.address)
+
+
+@pytest.fixture(scope="module")
+def set_plain_implementations(owner, factory, amm_implementation_plain):
+    with boa.env.prank(owner):
+        factory.set_plain_implementations(0, amm_implementation_plain.address)
 
 
 @pytest.fixture(scope="module")

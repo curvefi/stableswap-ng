@@ -30,6 +30,7 @@ interface Factory:
     def convert_metapool_fees() -> bool: nonpayable
     def get_fee_receiver(_pool: address) -> address: view
     def admin() -> address: view
+    def views_implementation() -> address: view
 
 interface ERC1271:
     def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
@@ -54,6 +55,21 @@ interface Curve3:
 interface Curve4:
     def calc_token_amount(amounts: uint256[4], deposit: bool) -> uint256: view
     def add_liquidity(amounts: uint256[4], min_mint_amount: uint256): nonpayable
+
+interface StableSwapViews:
+    def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dy(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dy_underlying(
+        i: int128, j: int128, dy: uint256, pool: address
+    ) -> uint256: view
+    def get_dx_underlying(
+        i: int128, j: int128, dy: uint256, pool: address
+    ) -> uint256: view
+    def calc_token_amount(
+        _amounts: uint256[MAX_COINS],
+        _is_deposit: bool,
+        _pool: address
+    ) -> uint256: view
 
 # --------------------------------- Events -----------------------------------
 
@@ -126,7 +142,7 @@ event ApplyNewFee:
 
 MAX_COINS: constant(uint256) = 8
 
-N_COINS: constant(uint256) = 2
+N_COINS: public(constant(uint256)) = 2
 N_COINS_128: constant(int128) = 2
 MAX_COIN: constant(int128) = N_COINS - 1
 PRECISION: constant(uint256) = 10 ** 18
@@ -134,12 +150,12 @@ PRECISION: constant(uint256) = 10 ** 18
 # token: is_rebasing flag
 is_rebasing: HashMap[address, bool]
 
-BASE_POOL: immutable(address)
-BASE_N_COINS: immutable(uint256)
-BASE_COINS: immutable(address[MAX_COINS])
+BASE_POOL: public(immutable(address))
+BASE_N_COINS: public(immutable(uint256))
+BASE_COINS: public(immutable(address[MAX_COINS]))
 
-factory: public(address)
-coins: public(address[N_COINS])
+factory: public(immutable(Factory))
+coins: public(immutable(address[N_COINS]))
 stored_balances: uint256[N_COINS]
 fee: public(uint256)  # fee * 1e10
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
@@ -245,14 +261,14 @@ def __init__(
     """
     name = _name
     symbol = _symbol
-
-    self.coins = [_coin, _base_lp_token]
-    self.rate_multipliers = _rate_multiplier
-    self.oracles = convert(_method_id, uint256) * 2**224 | convert(_oracle, uint256)
+    coins = [_coin, _base_lp_token]
+    factory = Factory(msg.sender)
 
     BASE_COINS = _base_coins
     BASE_POOL = _base_pool
 
+    self.rate_multipliers = _rate_multiplier
+    self.oracles = convert(_method_id, uint256) * 2**224 | convert(_oracle, uint256)
     self.is_rebasing[_coin] = _is_rebasing[0]
     self.is_rebasing[_base_lp_token] = False
 
@@ -274,7 +290,6 @@ def __init__(
     self.initial_A = A
     self.future_A = A
     self.fee = _fee
-    self.factory = msg.sender
 
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
@@ -681,7 +696,6 @@ def add_liquidity(
     amp: uint256 = self._A()
     old_balances: uint256[N_COINS] = self._balances()
     rates: uint256[N_COINS] = self._stored_rates()
-    coins: address[N_COINS] = self.coins
 
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
@@ -819,7 +833,6 @@ def remove_liquidity_imbalance(
     rates: uint256[N_COINS] = self._stored_rates()
     old_balances: uint256[N_COINS] = self._balances()
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
-    coins: address[N_COINS] = self.coins
 
     new_balances: uint256[N_COINS] = old_balances
     for i in range(N_COINS):
@@ -886,7 +899,6 @@ def remove_liquidity(
     total_supply: uint256 = self.totalSupply
     amounts: uint256[N_COINS] = empty(uint256[N_COINS])
     balances: uint256[N_COINS] = self._balances()
-    coins: address[N_COINS] = self.coins
 
     for i in range(N_COINS):
         value: uint256 = balances[i] * _burn_amount / total_supply
@@ -923,6 +935,36 @@ def withdraw_admin_fees():
 
 
 @internal
+def _exchange_core(
+    dx: uint256,
+    x: uint256,
+    xp: uint256[N_COINS],
+    rates: uint256[N_COINS],
+    i: int128,
+    j: int128,
+) -> uint256:
+
+    amp: uint256 = self._A()
+    D: uint256 = self.get_D(xp, amp)
+    y: uint256 = self.get_y(i, j, x, xp, amp, D)
+
+    dy: uint256 = xp[j] - y - 1  # -1 just in case there were some rounding errors
+    dy_fee: uint256 = dy * self.fee / FEE_DENOMINATOR
+
+    # Convert all to real units
+    dy = (dy - dy_fee) * PRECISION / rates[j]
+
+    self.admin_balances[j] += (
+        dy_fee * ADMIN_FEE / FEE_DENOMINATOR
+    ) * PRECISION / rates[j]
+
+    # D is not changed because we did not apply a fee
+    self.save_p([x, y], amp, D)
+
+    return dy
+
+
+@internal
 def _exchange(
     sender: address,
     i: int128,
@@ -941,7 +983,6 @@ def _exchange(
     rates: uint256[N_COINS] = self._stored_rates()
     old_balances: uint256[N_COINS] = self._balances()
     xp: uint256[N_COINS] = self._xp_mem(rates, old_balances)
-    coins: address[N_COINS] = self.coins
 
     # --------------------------- Do Transfer in -----------------------------
 
@@ -974,27 +1015,8 @@ def _exchange(
     # ------------------------------------------------------------------------
 
     x: uint256 = xp[i] + dx * rates[i] / PRECISION
-
-    amp: uint256 = self._A()
-    D: uint256 = self.get_D(xp, amp)
-    y: uint256 = self.get_y(i, j, x, xp, amp, D)
-
-    dy: uint256 = xp[j] - y - 1  # -1 just in case there were some rounding errors
-    dy_fee: uint256 = dy * self.fee / FEE_DENOMINATOR
-
-    # Convert all to real units
-    dy = (dy - dy_fee) * PRECISION / rates[j]
+    dy: uint256 = self._exchange_core(dx, x, xp, rates, i, j)
     assert dy >= _min_dy, "Exchange resulted in fewer coins than expected"
-
-    self.admin_balances[j] += (
-        dy_fee * ADMIN_FEE / FEE_DENOMINATOR
-    ) * PRECISION / rates[j]
-
-    # xp is not used anymore, so we reuse it for price calc
-    xp[i] = x
-    xp[j] = y
-    # D is not changed because we did not apply a fee
-    self.save_p(xp, amp, D)
 
     # --------------------------- Do Transfer out ----------------------------
 
@@ -1093,23 +1115,7 @@ def _exchange_underlying(
             x = dx_w_fee * rates[MAX_COIN] / PRECISION
             x += xp[MAX_COIN]
 
-        amp: uint256 = self._A()
-        D: uint256 = self.get_D(xp, amp)
-        y: uint256 = self.get_y(meta_i, meta_j, x, xp, amp, D)
-
-        # Either a real coin or token
-        dy = xp[meta_j] - y - 1  # -1 just in case there were some rounding errors
-        dy_fee: uint256 = dy * self.fee / FEE_DENOMINATOR
-
-        # Convert all to real units
-        # Works for both pool coins and real coins
-        dy = (dy - dy_fee) * PRECISION / rates[meta_j]
-
-        dy_admin_fee: uint256 = dy_fee * ADMIN_FEE / FEE_DENOMINATOR
-        dy_admin_fee = dy_admin_fee * PRECISION / rates[meta_j]
-
-        self.admin_balances[meta_j] += dy_admin_fee
-        self.stored_balances[meta_j] -= dy
+        dy = self._exchange_core(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
         # Withdraw from the base pool if needed
         if j > 0:
@@ -1119,11 +1125,8 @@ def _exchange_underlying(
 
         assert dy >= _min_dy
 
-        # xp is not used anymore, so we reuse it for price calc
-        xp[meta_i] = x
-        xp[meta_j] = y
-        # D is not changed because we did not apply a fee
-        self.save_p(xp, amp, D)
+        # Adjust stored balances:
+        self.stored_balances[meta_j] -= dy
 
     else:  # base pool swap (user should swap at base pool for better gas)
 
@@ -1145,9 +1148,7 @@ def _exchange_underlying(
 @internal
 def _withdraw_admin_fees():
 
-    factory: Factory = Factory(self.factory)
     amounts: uint256[N_COINS] = self.admin_balances
-    coins: address[N_COINS] = self.coins
 
     if amounts[0] > 0:
 
@@ -1230,6 +1231,25 @@ def _meta_calc_token_amounts_deposit(
 
 # --------------------------- AMM Math Functions -----------------------------
 
+@internal
+@pure
+def newton_y(b: uint256, c: uint256, D: uint256, _y: uint256) -> uint256:
+
+    y_prev: uint256 = 0
+    y: uint256 = _y
+
+    for _i in range(255):
+        y_prev = y
+        y = (y*y + c) / (2 * y + b - D)
+        # Equality with the precision of 1
+        if y > y_prev:
+            if y - y_prev <= 1:
+                return y
+        else:
+            if y_prev - y <= 1:
+                return y
+    raise
+
 
 @view
 @internal
@@ -1267,7 +1287,6 @@ def get_y(
         D = self.get_D(xp, amp)
     S_: uint256 = 0
     _x: uint256 = 0
-    y_prev: uint256 = 0
     c: uint256 = D
     Ann: uint256 = amp * N_COINS
 
@@ -1285,17 +1304,7 @@ def get_y(
     b: uint256 = S_ + D * A_PRECISION / Ann  # - D
     y: uint256 = D
 
-    for _i in range(255):
-        y_prev = y
-        y = (y*y + c) / (2 * y + b - D)
-        # Equality with the precision of 1
-        if y > y_prev:
-            if y - y_prev <= 1:
-                return y
-        else:
-            if y_prev - y <= 1:
-                return y
-    raise
+    return self.newton_y(b, c, D, y)
 
 
 @pure
@@ -1369,17 +1378,7 @@ def get_y_D(A: uint256, i: int128, xp: uint256[N_COINS], D: uint256) -> uint256:
     b: uint256 = S_ + D * A_PRECISION / Ann
     y: uint256 = D
 
-    for _i in range(255):
-        y_prev = y
-        y = (y*y + c) / (2 * y + b - D)
-        # Equality with the precision of 1
-        if y > y_prev:
-            if y - y_prev <= 1:
-                return y
-        else:
-            if y_prev - y <= 1:
-                return y
-    raise
+    return self.newton_y(b, c, D, y)
 
 
 @view
@@ -1769,19 +1768,14 @@ def get_dx(i: int128, j: int128, dy: uint256) -> uint256:
     @param dy Amount of `j` being received after exchange
     @return Amount of `i` predicted
     """
-    rates: uint256[N_COINS] = self._stored_rates()
-    xp: uint256[N_COINS] = self._xp_mem(rates, self._balances())
-
-    y: uint256 = xp[j] - (dy * rates[j] / PRECISION + 1) * FEE_DENOMINATOR / (FEE_DENOMINATOR - self.fee)
-    x: uint256 = self.get_y(j, i, y, xp, 0, 0)
-    return (x - xp[i]) * PRECISION / rates[i]
+    return StableSwapViews(factory.views_implementation()).get_dx(i, j, dy, self)
 
 
 @view
 @external
-def get_dx_underlying(i: int128, j: int128, dx: uint256) -> uint256:
+def get_dx_underlying(i: int128, j: int128, dy: uint256) -> uint256:
     # TODO: Needs get_dx_underlying
-    return 0
+    return StableSwapViews(factory.views_implementation()).get_dx_underlying(i, j, dy, self)
 
 
 @view
@@ -1795,15 +1789,7 @@ def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     @param dx Amount of `i` being exchanged
     @return Amount of `j` predicted
     """
-    rates: uint256[N_COINS] = self._stored_rates()
-    xp: uint256[N_COINS] = self._xp_mem(rates, self._balances())
-
-    x: uint256 = xp[i] + (dx * rates[i] / PRECISION)
-    y: uint256 = self.get_y(i, j, x, xp, 0, 0)
-    dy: uint256 = xp[j] - y - 1
-    fee: uint256 = self.fee * dy / FEE_DENOMINATOR
-    return (dy - fee) * PRECISION / rates[j]
-
+    return StableSwapViews(factory.views_implementation()).get_dy(i, j, dx, self)
 
 @view
 @external
@@ -1816,55 +1802,7 @@ def get_dy_underlying(i: int128, j: int128, dx: uint256) -> uint256:
     @param dx Amount of `i` being exchanged
     @return Amount of `j` predicted
     """
-
-    # TODO: Ivan needs to check this implementation
-
-    rates: uint256[N_COINS] = self._stored_rates()
-    xp: uint256[N_COINS] = self._xp_mem(rates, self._balances())
-
-    x: uint256 = 0
-    base_i: int128 = 0
-    base_j: int128 = 0
-    meta_i: int128 = 0
-    meta_j: int128 = 0
-
-    if i != 0:
-        base_i = i - MAX_COIN
-        meta_i = 1
-    if j != 0:
-        base_j = j - MAX_COIN
-        meta_j = 1
-
-    if i == 0:
-        x = xp[i] + dx * (rates[0] / 10**18)
-    else:
-        if j == 0:
-            # i is from BasePool
-            x = self._meta_calc_token_amounts_deposit(dx, base_i, rates[1])
-            # Accounting for deposit/withdraw fees approximately
-            x -= x * Curve(BASE_POOL).fee() / (2 * FEE_DENOMINATOR)
-            # Adding number of pool tokens
-            x += xp[MAX_COIN]
-        else:
-            # If both are from the base pool
-            return Curve(BASE_POOL).get_dy(base_i, base_j, dx)
-
-    # This pool is involved only when in-pool assets are used
-    amp: uint256 = self._A()
-    D: uint256 = self.get_D(xp, amp)
-    y: uint256 = self.get_y(meta_i, meta_j, x, xp, amp, D)
-    dy: uint256 = xp[meta_j] - y - 1
-    dy = (dy - self.fee * dy / FEE_DENOMINATOR)
-
-    # If output is going via the metapool
-    if j == 0:
-        dy /= (rates[0] / 10**18)
-    else:
-        # j is from BasePool
-        # The fee is already accounted for
-        dy = Curve(BASE_POOL).calc_withdraw_one_coin(dy * PRECISION / rates[1], base_j)
-
-    return dy
+    return StableSwapViews(factory.views_implementation()).get_dy_underlying(i, j, dx, self)
 
 
 @view
@@ -1905,51 +1843,14 @@ def calc_token_amount(_amounts: uint256[N_COINS], _is_deposit: bool) -> uint256:
     @param _is_deposit set True for deposits, False for withdrawals
     @return Expected amount of LP tokens received
     """
-    amp: uint256 = self._A()
-    old_balances: uint256[N_COINS] = self._balances()
-    rates: uint256[N_COINS] = self._stored_rates()
+    amounts: uint256[MAX_COINS] = empty(uint256[MAX_COINS])
+    for i in range(MAX_COINS):
+        if i == N_COINS:
+            break
+        amounts[i] = _amounts[i]
 
-    # Initial invariant
-    D0: uint256 = self.get_D_mem(rates, old_balances, amp)
-
-    total_supply: uint256 = self.totalSupply
-    new_balances: uint256[N_COINS] = old_balances
-    for i in range(N_COINS):
-        amount: uint256 = _amounts[i]
-        if _is_deposit:
-            new_balances[i] += amount
-        else:
-            new_balances[i] -= amount
-
-    # Invariant after change
-    D1: uint256 = self.get_D_mem(rates, new_balances, amp)
-
-    # We need to recalculate the invariant accounting for fees
-    # to calculate fair user's share
-    D2: uint256 = D1
-    if total_supply > 0:
-        # Only account for fees if we are not the first to deposit
-        base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-        for i in range(N_COINS):
-            ideal_balance: uint256 = D1 * old_balances[i] / D0
-            difference: uint256 = 0
-            new_balance: uint256 = new_balances[i]
-            if ideal_balance > new_balance:
-                difference = ideal_balance - new_balance
-            else:
-                difference = new_balance - ideal_balance
-            new_balances[i] -= base_fee * difference / FEE_DENOMINATOR
-        xp: uint256[N_COINS] = self._xp_mem(rates, new_balances)
-        D2 = self.get_D(xp, amp)
-    else:
-        return D1  # Take the dust if there was any
-
-    diff: uint256 = 0
-    if _is_deposit:
-        diff = D2 - D0
-    else:
-        diff = D0 - D2
-    return diff * total_supply / D0
+    views: address = factory.views_implementation()
+    return StableSwapViews(views).calc_token_amount(amounts, _is_deposit, self)
 
 
 @view
@@ -1994,12 +1895,18 @@ def oracle(_idx: uint256) -> address:
     return convert(self.oracles % 2**160, address)
 
 
+@view
+@external
+def stored_rates(i: uint256) -> uint256:
+    return self._stored_rates()[i]
+
+
 # --------------------------- AMM Admin Functions ----------------------------
 
 
 @external
 def ramp_A(_future_A: uint256, _future_time: uint256):
-    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
+    assert msg.sender == factory.admin()  # dev: only owner
     assert block.timestamp >= self.initial_A_time + MIN_RAMP_TIME
     assert _future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
 
@@ -2022,7 +1929,7 @@ def ramp_A(_future_A: uint256, _future_time: uint256):
 
 @external
 def stop_ramp_A():
-    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
+    assert msg.sender == factory.admin()  # dev: only owner
 
     current_A: uint256 = self._A()
     self.initial_A = current_A
@@ -2037,7 +1944,7 @@ def stop_ramp_A():
 @external
 def apply_new_fee(_new_fee: uint256):
 
-    assert msg.sender == Factory(self.factory).admin()
+    assert msg.sender == factory.admin()
     assert _new_fee <= MAX_FEE
     self.fee = _new_fee
 
@@ -2050,7 +1957,7 @@ def set_ma_exp_time(_ma_exp_time: uint256):
     @notice Set the moving average window of the price oracle.
     @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
     """
-    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
+    assert msg.sender == factory.admin()  # dev: only owner
     assert _ma_exp_time != 0
 
     self.ma_exp_time = _ma_exp_time
