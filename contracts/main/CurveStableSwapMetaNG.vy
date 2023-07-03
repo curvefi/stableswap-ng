@@ -27,7 +27,7 @@ implements: ERC20
 # ------------------------------- Interfaces ---------------------------------
 
 interface Factory:
-    def convert_fees() -> bool: nonpayable
+    def convert_metapool_fees() -> bool: nonpayable
     def get_fee_receiver(_pool: address) -> address: view
     def admin() -> address: view
 
@@ -1145,18 +1145,27 @@ def _exchange_underlying(
 @internal
 def _withdraw_admin_fees():
 
-    receiver: address = Factory(self.factory).get_fee_receiver(self)
+    factory: Factory = Factory(self.factory)
     amounts: uint256[N_COINS] = self.admin_balances
+    coins: address[N_COINS] = self.coins
 
-    for i in range(N_COINS):
+    if amounts[0] > 0:
 
-        if amounts[i] > 0:
+        assert ERC20(coins[0]).transfer(
+            factory.address,
+            amounts[0],
+            default_return_value=True
+        )
+        factory.convert_metapool_fees()
 
-            assert ERC20(self.coins[i]).transfer(
-                receiver,
-                amounts[i],
-                default_return_value=True
-            )
+    if amounts[1] > 0:
+
+        receiver: address = factory.get_fee_receiver(self)
+        assert ERC20(coins[1]).transfer(
+            receiver,
+            amounts[1],
+            default_return_value=True
+        )
 
     self.admin_balances = empty(uint256[N_COINS])
 
