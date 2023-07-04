@@ -54,7 +54,11 @@ class TestLiquidityMethods:
             )
 
         # TODO: fix this
-        # @pytest.mark.parametrize("use_eth", (True, False))
-        # def test_send_eth(self, bob, swap, deposit_amounts, use_eth):
-        #     with boa.reverts():
-        #         swap.add_liquidity(deposit_amounts, 0, use_eth, sender=bob, value=1)
+        @pytest.mark.parametrize("use_eth", (True, False))
+        def test_send_eth(self, bob, swap, deposit_amounts, use_eth, weth, pool_tokens):
+            assert swap.WETH20() == weth.address
+            assert weth.address not in [t.address for t in pool_tokens]
+            assert swap.coins(0) == pool_tokens[0].address
+            assert swap.coins(1) == pool_tokens[1].address
+            with boa.reverts():
+                swap.add_liquidity(deposit_amounts, 0, use_eth, sender=bob, value=1)
