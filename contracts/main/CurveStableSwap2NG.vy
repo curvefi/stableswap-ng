@@ -38,9 +38,9 @@ implements: ERC20
 # ------------------------------- Interfaces ---------------------------------
 
 interface Factory:
-    def convert_fees() -> bool: nonpayable
     def get_fee_receiver(_pool: address) -> address: view
     def admin() -> address: view
+    def views_implementation() -> address: view
 
 interface ERC1271:
     def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
@@ -48,6 +48,15 @@ interface ERC1271:
 interface WETH:
     def deposit(): payable
     def withdraw(_amount: uint256): nonpayable
+
+interface StableSwapViews:
+    def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dy(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def calc_token_amount(
+        _amounts: uint256[MAX_COINS],
+        _is_deposit: bool,
+        _pool: address
+    ) -> uint256: view
 
 # --------------------------------- Events -----------------------------------
 
@@ -118,9 +127,13 @@ N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 IS_REBASING: immutable(bool[N_COINS])
+PERMISSIONED: public(constant(bool)) = False  # Implementation contains permissionless tokens
 
-factory: public(address)
-coins: public(address[N_COINS])
+# to denote that it is a plain pool:
+BASE_POOL: public(constant(address)) = 0x0000000000000000000000000000000000000000
+
+factory: public(immutable(Factory))
+coins: public(immutable(address[N_COINS]))
 stored_balances: uint256[N_COINS]
 fee: public(uint256)  # fee * 1e10
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
@@ -226,19 +239,18 @@ def __init__(
 
     name = _name
     symbol = _symbol
+    factory = Factory(msg.sender)
+    coins = [_coins[0], _coins[1]]
 
     for i in range(N_COINS):
 
-        coin: address = _coins[i]
-
-        if coin == empty(address):
+        if _coins[i] == empty(address):
             break
 
         # Enforce native token as coin[0] (makes integrators happy)
-        if coin == WETH20 and i > 0:
+        if _coins[i] == WETH20 and i > 0:
             raise "ETH must be at index 0"
 
-        self.coins[i] = coin
         self.rate_multipliers[i] = _rate_multipliers[i]
         self.oracles[i] = convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256)
 
@@ -246,7 +258,6 @@ def __init__(
     self.initial_A = A
     self.future_A = A
     self.fee = _fee
-    self.factory = msg.sender
 
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
@@ -279,7 +290,7 @@ def __init__(
 @external
 def __default__():
     if msg.value > 0:
-        assert WETH20 in self.coins
+        assert WETH20 in coins
 
 
 @internal
@@ -433,7 +444,7 @@ def _balances() -> uint256[N_COINS]:
     """
     result: uint256[N_COINS] = empty(uint256[N_COINS])
     for i in range(N_COINS):
-        result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
+        result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
 
     return result
 
@@ -637,7 +648,7 @@ def remove_liquidity_one_coin(
 
     log Transfer(msg.sender, empty(address), _burn_amount)
 
-    self._transfer_out(self.coins[i], dy[0], _use_eth, _receiver)
+    self._transfer_out(coins[i], dy[0], _use_eth, _receiver)
 
     # Decrease coin[i] balance in self.stored_balances
     self.stored_balances[i] -= dy[0]
@@ -668,7 +679,6 @@ def remove_liquidity_imbalance(
     rates: uint256[N_COINS] = self._stored_rates()
     old_balances: uint256[N_COINS] = self._balances()
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
-    coins: address[N_COINS] = self.coins
 
     new_balances: uint256[N_COINS] = old_balances
     for i in range(N_COINS):
@@ -733,7 +743,6 @@ def remove_liquidity(
     total_supply: uint256 = self.totalSupply
     amounts: uint256[N_COINS] = empty(uint256[N_COINS])
     balances: uint256[N_COINS] = self._balances()
-    coins: address[N_COINS] = self.coins
 
     for i in range(N_COINS):
         value: uint256 = balances[i] * _burn_amount / total_supply
@@ -790,7 +799,6 @@ def _exchange(
     rates: uint256[N_COINS] = self._stored_rates()
     old_balances: uint256[N_COINS] = self._balances()
     xp: uint256[N_COINS] = self._xp_mem(rates, old_balances)
-    coins: address[N_COINS] = self.coins
 
     # --------------------------- Do Transfer in -----------------------------
 
@@ -867,7 +875,6 @@ def _add_liquidity(
     amp: uint256 = self._A()
     old_balances: uint256[N_COINS] = self._balances()
     rates: uint256[N_COINS] = self._stored_rates()
-    coins: address[N_COINS] = self.coins
 
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
@@ -990,17 +997,17 @@ def _add_liquidity(
 @internal
 def _withdraw_admin_fees():
 
-    receiver: address = Factory(self.factory).get_fee_receiver(self)
+    receiver: address = factory.get_fee_receiver(self)
     amounts: uint256[N_COINS] = self.admin_balances
 
     for i in range(N_COINS):
 
         if amounts[i] > 0:
 
-            if self.coins[i] == WETH20:
+            if coins[i] == WETH20:
                 raw_call(receiver, b"", value=amounts[i])
             else:
-                assert ERC20(self.coins[i]).transfer(
+                assert ERC20(coins[i]).transfer(
                     receiver,
                     amounts[i],
                     default_return_value=True
@@ -1547,12 +1554,7 @@ def get_dx(i: int128, j: int128, dy: uint256) -> uint256:
     @param dy Amount of `j` being received after exchange
     @return Amount of `i` predicted
     """
-    rates: uint256[N_COINS] = self._stored_rates()
-    xp: uint256[N_COINS] = self._xp_mem(rates, self._balances())
-
-    y: uint256 = xp[j] - (dy * rates[j] / PRECISION + 1) * FEE_DENOMINATOR / (FEE_DENOMINATOR - self.fee)
-    x: uint256 = self.get_y(j, i, y, xp, 0, 0)
-    return (x - xp[i]) * PRECISION / rates[i]
+    return StableSwapViews(factory.views_implementation()).get_dx(i, j, dy, self)
 
 
 @view
@@ -1566,14 +1568,7 @@ def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     @param dx Amount of `i` being exchanged
     @return Amount of `j` predicted
     """
-    rates: uint256[N_COINS] = self._stored_rates()
-    xp: uint256[N_COINS] = self._xp_mem(rates, self._balances())
-
-    x: uint256 = xp[i] + (dx * rates[i] / PRECISION)
-    y: uint256 = self.get_y(i, j, x, xp, 0, 0)
-    dy: uint256 = xp[j] - y - 1
-    fee: uint256 = self.fee * dy / FEE_DENOMINATOR
-    return (dy - fee) * PRECISION / rates[j]
+    return StableSwapViews(factory.views_implementation()).get_dy(i, j, dx, self)
 
 
 @view
@@ -1614,51 +1609,14 @@ def calc_token_amount(_amounts: uint256[N_COINS], _is_deposit: bool) -> uint256:
     @param _is_deposit set True for deposits, False for withdrawals
     @return Expected amount of LP tokens received
     """
-    amp: uint256 = self._A()
-    old_balances: uint256[N_COINS] = self._balances()
-    rates: uint256[N_COINS] = self._stored_rates()
+    amounts: uint256[MAX_COINS] = empty(uint256[MAX_COINS])
+    for i in range(MAX_COINS):
+        if i == N_COINS:
+            break
+        amounts[i] = _amounts[i]
 
-    # Initial invariant
-    D0: uint256 = self.get_D_mem(rates, old_balances, amp)
-
-    total_supply: uint256 = self.totalSupply
-    new_balances: uint256[N_COINS] = old_balances
-    for i in range(N_COINS):
-        amount: uint256 = _amounts[i]
-        if _is_deposit:
-            new_balances[i] += amount
-        else:
-            new_balances[i] -= amount
-
-    # Invariant after change
-    D1: uint256 = self.get_D_mem(rates, new_balances, amp)
-
-    # We need to recalculate the invariant accounting for fees
-    # to calculate fair user's share
-    D2: uint256 = D1
-    if total_supply > 0:
-        # Only account for fees if we are not the first to deposit
-        base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-        for i in range(N_COINS):
-            ideal_balance: uint256 = D1 * old_balances[i] / D0
-            difference: uint256 = 0
-            new_balance: uint256 = new_balances[i]
-            if ideal_balance > new_balance:
-                difference = ideal_balance - new_balance
-            else:
-                difference = new_balance - ideal_balance
-            new_balances[i] -= base_fee * difference / FEE_DENOMINATOR
-        xp: uint256[N_COINS] = self._xp_mem(rates, new_balances)
-        D2 = self.get_D(xp, amp)
-    else:
-        return D1  # Take the dust if there was any
-
-    diff: uint256 = 0
-    if _is_deposit:
-        diff = D2 - D0
-    else:
-        diff = D0 - D2
-    return diff * total_supply / D0
+    views: address = factory.views_implementation()
+    return StableSwapViews(views).calc_token_amount(amounts, _is_deposit, self)
 
 
 @view
@@ -1705,12 +1663,18 @@ def oracle(_idx: uint256) -> address:
     return empty(address)
 
 
+@view
+@external
+def stored_rates(i: uint256) -> uint256:
+    return self._stored_rates()[i]
+
+
 # --------------------------- AMM Admin Functions ----------------------------
 
 
 @external
 def ramp_A(_future_A: uint256, _future_time: uint256):
-    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
+    assert msg.sender == factory.admin()  # dev: only owner
     assert block.timestamp >= self.initial_A_time + MIN_RAMP_TIME
     assert _future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
 
@@ -1733,7 +1697,7 @@ def ramp_A(_future_A: uint256, _future_time: uint256):
 
 @external
 def stop_ramp_A():
-    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
+    assert msg.sender == factory.admin()  # dev: only owner
 
     current_A: uint256 = self._A()
     self.initial_A = current_A
@@ -1748,7 +1712,7 @@ def stop_ramp_A():
 @external
 def apply_new_fee(_new_fee: uint256):
 
-    assert msg.sender == Factory(self.factory).admin()
+    assert msg.sender == factory.admin()
     assert _new_fee <= MAX_FEE
     self.fee = _new_fee
 
@@ -1761,7 +1725,7 @@ def set_ma_exp_time(_ma_exp_time: uint256):
     @notice Set the moving average window of the price oracle.
     @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
     """
-    assert msg.sender == Factory(self.factory).admin()  # dev: only owner
+    assert msg.sender == factory.admin()  # dev: only owner
     assert _ma_exp_time != 0
 
     self.ma_exp_time = _ma_exp_time
