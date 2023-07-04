@@ -289,7 +289,7 @@ def __init__(
 @external
 def __default__():
     if msg.value > 0:
-        assert WETH20 in self.coins
+        assert WETH20 in coins
 
 
 @internal
@@ -443,7 +443,7 @@ def _balances() -> uint256[N_COINS]:
     """
     result: uint256[N_COINS] = empty(uint256[N_COINS])
     for i in range(N_COINS):
-        result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
+        result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
 
     return result
 
@@ -647,7 +647,7 @@ def remove_liquidity_one_coin(
 
     log Transfer(msg.sender, empty(address), _burn_amount)
 
-    self._transfer_out(self.coins[i], dy[0], _use_eth, _receiver)
+    self._transfer_out(coins[i], dy[0], _use_eth, _receiver)
 
     # Decrease coin[i] balance in self.stored_balances
     self.stored_balances[i] -= dy[0]
@@ -1003,10 +1003,10 @@ def _withdraw_admin_fees():
 
         if amounts[i] > 0:
 
-            if self.coins[i] == WETH20:
+            if coins[i] == WETH20:
                 raw_call(receiver, b"", value=amounts[i])
             else:
-                assert ERC20(self.coins[i]).transfer(
+                assert ERC20(coins[i]).transfer(
                     receiver,
                     amounts[i],
                     default_return_value=True

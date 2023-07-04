@@ -430,7 +430,7 @@ def _balances() -> uint256[N_COINS]:
     """
     result: uint256[N_COINS] = empty(uint256[N_COINS])
     for i in range(N_COINS):
-        result[i] = ERC20(self.coins[i]).balanceOf(self) - self.admin_balances[i]
+        result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
 
     return result
 
@@ -558,7 +558,7 @@ def exchange_received(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
-    assert self.is_rebasing[self.coins[i]]  # dev: rebasing tokens are not supported
+    assert self.is_rebasing[coins[i]]  # dev: rebasing tokens are not supported
     return self._exchange(
         msg.sender,
         i,
@@ -802,7 +802,7 @@ def remove_liquidity_one_coin(
 
     log Transfer(msg.sender, empty(address), _burn_amount)
 
-    assert ERC20(self.coins[i]).transfer(_receiver, dy[0], default_return_value=True)
+    assert ERC20(coins[i]).transfer(_receiver, dy[0], default_return_value=True)
 
     # Decrease coin[i] balance in self.stored_balances
     self.stored_balances[i] -= dy[0]
@@ -1059,13 +1059,13 @@ def _exchange_underlying(
     output_coin: address = empty(address)
 
     if i == 0:
-        input_coin = self.coins[0]
+        input_coin = coins[0]
     else:
         base_i = i - MAX_COIN  # if i == 1, this reverts
         meta_i = 1
         input_coin = BASE_COINS[base_i]
     if j == 0:
-        output_coin = self.coins[0]
+        output_coin = coins[0]
     else:
         base_j = j - MAX_COIN  # if j == 1, this reverts
         meta_j = 1
@@ -1180,7 +1180,7 @@ def _withdraw_admin_fees():
 @internal
 def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
 
-    coin_i: address = self.coins[MAX_COIN]
+    coin_i: address = coins[MAX_COIN]
     x: uint256 = ERC20(coin_i).balanceOf(self)
 
     if BASE_N_COINS == 2:
