@@ -17,6 +17,9 @@ class TestFactory:
                 == swap.address
             )
 
+        def test_get_n_coins(self, factory, swap, pool_tokens, pool_size, zero_address):
+            assert factory.get_n_coins(swap.address) == 2
+
         def test_get_coins(self, factory, swap, pool_tokens, pool_size, zero_address):
             assert factory.get_coins(swap.address) == [pt.address for pt in pool_tokens] + [zero_address] * (
                 MAX_COINS - pool_size
@@ -54,6 +57,15 @@ class TestFactory:
             )
             assert i == sending
             assert j == receiving
+
+        def test_get_implementation_address(self, factory, swap, amm_implementation_plain):
+            assert factory.get_implementation_address(swap.address) == amm_implementation_plain.address
+
+        def test_is_meta(self, factory, swap):
+            assert factory.is_meta(swap.address) is False
+
+        def test_fee_receiver(self, factory, swap, fee_receiver):
+            assert factory.get_fee_receiver(swap.address) == fee_receiver
 
     # @pytest.mark.only_for_pool_type(1)
     # class TestMeta:
