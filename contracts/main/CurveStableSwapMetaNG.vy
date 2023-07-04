@@ -146,6 +146,7 @@ N_COINS: public(constant(uint256)) = 2
 N_COINS_128: constant(int128) = 2
 MAX_COIN: constant(int128) = N_COINS - 1
 PRECISION: constant(uint256) = 10 ** 18
+PERMISSIONED: public(constant(bool)) = False  # Implementation contains permissionless tokens
 
 # token: is_rebasing flag
 is_rebasing: HashMap[address, bool]

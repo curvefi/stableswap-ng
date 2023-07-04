@@ -127,6 +127,7 @@ N_COINS: constant(uint256) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 IS_REBASING: immutable(bool[N_COINS])
+PERMISSIONED: public(constant(bool)) = False  # Implementation contains permissionless tokens
 
 # to denote that it is a plain pool:
 BASE_POOL: public(constant(address)) = 0x0000000000000000000000000000000000000000
