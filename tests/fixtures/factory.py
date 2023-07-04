@@ -37,13 +37,17 @@ def amm_implementation_meta(deployer, amm_interface_meta):
 
 
 @pytest.fixture(scope="module")
+def views_implementation(deployer):
+    with boa.env.prank(deployer):
+        views = boa.load("contracts/main/CurveStableSwapNGViews.vy")
+        return views
+
+
+@pytest.fixture(scope="module")
 def factory(
     deployer,
     fee_receiver,
     owner,
-    amm_implementation_plain,
-    amm_implementation_meta,
-    gauge_implementation,
     weth,
 ):
     with boa.env.prank(deployer):
@@ -60,7 +64,7 @@ def factory(
 @pytest.fixture(scope="module")
 def set_meta_implementations(owner, factory, amm_implementation_meta):
     with boa.env.prank(owner):
-        factory.set_metapool_implementations(0, amm_implementation_plain.address)
+        factory.set_metapool_implementations(0, amm_implementation_meta.address)
 
 
 @pytest.fixture(scope="module")
@@ -73,6 +77,12 @@ def set_plain_implementations(owner, factory, amm_implementation_plain):
 def set_gauge_implementation(owner, factory, gauge_implementation):
     with boa.env.prank(owner):
         factory.set_gauge_implementation(gauge_implementation.address)
+
+
+@pytest.fixture(scope="module")
+def set_views_implementation(owner, factory, views_implementation):
+    with boa.env.prank(owner):
+        factory.set_views_implementation(views_implementation.address)
 
 
 @pytest.fixture(scope="module")
