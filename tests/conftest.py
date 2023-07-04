@@ -24,12 +24,11 @@ def pytest_addoption(parser):
         default="2",
         help="pool size to test against",
     )
-    # TODO: add meta implementation
     parser.addoption(
         "--pool-type",
         action="store",
         default="basic",
-        help="comma-separated list of pool types to test against",
+        help="pool type to test against",
     )
     parser.addoption(
         "--token-types",
@@ -53,10 +52,11 @@ def pytest_addoption(parser):
 
 def pytest_generate_tests(metafunc):
     pool_size = int(metafunc.config.getoption("pool_size"))
-    if "pool_size" in metafunc.fixturenames:
-        # TODO: remove after adding implementations
-        assert pool_size == 2, "Only 2-coin pools supported"
 
+    # TODO: remove after adding implementations
+    assert pool_size == 2, "Only 2-coin pools supported"
+
+    if "pool_size" in metafunc.fixturenames:
         metafunc.parametrize(
             "pool_size",
             [pool_size],
@@ -64,32 +64,42 @@ def pytest_generate_tests(metafunc):
             ids=[f"(PoolSize={pool_size})"],
         )
 
+    pool_type = metafunc.config.getoption("pool_type")
+
     if "pool_type" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("pool_type").split(",")
-        pool_type_ids = [pool_types[v] for v in cli_options]
         metafunc.parametrize(
             "pool_type",
-            pool_type_ids,
+            [pool_types[pool_type]],
             indirect=True,
-            ids=[f"(PoolType={i})" for i in cli_options],
+            ids=[f"(PoolType={pool_type})"],
         )
 
     if "pool_token_types" in metafunc.fixturenames:
         cli_options = metafunc.config.getoption("token_types").split(",")
 
-        combs = list(combinations(cli_options, pool_size))
-        if pool_size == 2:
-            # do not include (eth,eth) pair
-            for t in cli_options:
-                if t != "eth":
-                    combs.append((t, t))
+        if pool_types[pool_type] == 0:
+            combs = list(combinations(cli_options, pool_size))
+            if pool_size == 2:
+                # do not include (eth,eth) pair
+                for t in cli_options:
+                    if t != "eth":
+                        combs.append((t, t))
 
-        metafunc.parametrize(
-            "pool_token_types",
-            [(token_types[v[0]], token_types[v[1]]) for v in combs],
-            indirect=True,
-            ids=[f"(PoolTokenTypes={c})" for c in combs],
-        )
+            metafunc.parametrize(
+                "pool_token_types",
+                [(token_types[c[0]], token_types[c[1]]) for c in combs],
+                indirect=True,
+                ids=[f"(PoolTokenTypes={c})" for c in combs],
+            )
+        else:
+            # workaround for generating tokens
+            # for meta pool only 1st coin is selected
+            metafunc.parametrize(
+                "pool_token_types",
+                [[token_types[c]] for c in cli_options],
+                indirect=True,
+                ids=[f"(PoolTokenTypes={c})" for c in cli_options],
+            )
 
     if "initial_decimals" in metafunc.fixturenames:
         cli_options = metafunc.config.getoption("decimals")
@@ -139,8 +149,35 @@ def initial_decimals(request):
 
 @pytest.fixture(scope="session")
 def decimals(initial_decimals, pool_token_types):
-    # eth and oracle pools are always 18
+    # eth and oracle tokens are always 18 decimals
     return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
+
+
+# Usage
+# @pytest.mark.only_for_token_types(1,2)
+#
+# will not be skipped only if at least one of tokens in pool is eth or oracle
+# can be applied to classes
+#
+# @pytest.mark.only_for_token_types(2)
+# class TestPoolsWithOracleToken:
+@pytest.fixture(autouse=True)
+def skip_by_token_type(request, pool_token_types):
+    only_for_token_types = request.node.get_closest_marker("only_for_token_types")
+    if only_for_token_types:
+        if not any(pool_token_type in only_for_token_types.args for pool_token_type in pool_token_types):
+            pytest.skip("skipped because no tokens for these types")
+
+
+# Usage
+# @pytest.mark.only_for_pool_type(1)
+# class TestMetaPool...
+@pytest.fixture(autouse=True)
+def skip_by_pool_type(request, pool_type):
+    only_for_pool_type = request.node.get_closest_marker("only_for_pool_type")
+    if only_for_pool_type:
+        if pool_type not in only_for_pool_type.args:
+            pytest.skip("skipped because another pool type")
 
 
 @pytest.fixture(scope="module")

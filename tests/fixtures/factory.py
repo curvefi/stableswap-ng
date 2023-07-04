@@ -14,9 +14,8 @@ def gauge_implementation(deployer, gauge_interface):
 
 
 @pytest.fixture(scope="module")
-def amm_interface_plain(pool_size):
-    if pool_size == 2:
-        return boa.load_partial("contracts/main/CurveStableSwap2NG.vy")
+def amm_interface_plain():
+    return boa.load_partial("contracts/main/CurveStableSwap2NG.vy")
 
 
 @pytest.fixture(scope="module")
@@ -39,8 +38,7 @@ def amm_implementation_meta(deployer, amm_interface_meta):
 @pytest.fixture(scope="module")
 def views_implementation(deployer):
     with boa.env.prank(deployer):
-        views = boa.load("contracts/main/CurveStableSwapNGViews.vy")
-        return views
+        return boa.load("contracts/main/CurveStableSwapNGViews.vy")
 
 
 @pytest.fixture(scope="module")
@@ -62,15 +60,38 @@ def factory(
 
 # <---------------------   Functions   --------------------->
 @pytest.fixture(scope="module")
+def set_plain_implementations(owner, factory, amm_implementation_plain):
+    with boa.env.prank(owner):
+        factory.set_plain_implementations(0, amm_implementation_plain.address)
+
+
+@pytest.fixture(scope="module")
 def set_meta_implementations(owner, factory, amm_implementation_meta):
     with boa.env.prank(owner):
         factory.set_metapool_implementations(0, amm_implementation_meta.address)
 
 
 @pytest.fixture(scope="module")
-def set_plain_implementations(owner, factory, amm_implementation_plain):
+def add_base_pool(
+    owner,
+    fee_receiver,
+    factory,
+    base_pool,
+    base_pool_lp_token,
+    base_pool_tokens,
+    zero_address,
+):
     with boa.env.prank(owner):
-        factory.set_plain_implementations(0, amm_implementation_plain.address)
+        factory.add_base_pool(
+            base_pool.address,
+            base_pool_lp_token.address,
+            fee_receiver,
+            [t.address for t in base_pool_tokens],
+            0,
+            len(base_pool_tokens),
+            [False] * len(base_pool_tokens),
+            [zero_address] * len((base_pool_tokens)),
+        )
 
 
 @pytest.fixture(scope="module")

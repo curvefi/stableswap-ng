@@ -58,3 +58,9 @@ target_version = ['py310']
 profile = "black"
 py_version = 310
 known_first_party = "poetry"
+
+[tool.pytest.ini_options]
+markers = [
+    "only_for_pool_type: running tests only for specific pool types",
+    "only_for_token_types: running tests only if tokens of specific types are in pool",
+]

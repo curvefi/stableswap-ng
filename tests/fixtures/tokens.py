@@ -6,8 +6,8 @@ import pytest
 def plain_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
-        tokens.append(boa.load("contracts/mocks/ERC20.vy", "USDC", "USDC", decimals[0]))
-        tokens.append(boa.load("contracts/mocks/ERC20.vy", "DAI", "DAI", decimals[1]))
+        for i, d in enumerate(decimals):
+            tokens.append(boa.load("contracts/mocks/ERC20.vy", f"TKN{i}", f"TKN{i}", decimals[i]))
     return tokens
 
 
@@ -46,8 +46,8 @@ def oracle_tokens(deployer, decimals):
 def rebase_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
-        tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", "downETH", "downETH", decimals[0], False))
-        tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", "stETH", "stETH", decimals[1], True))
+        for i, d in enumerate(decimals):
+            tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", f"OR_TKN{i}", f"OR_TKN{i}", decimals[i], i != 0))
     return tokens
 
 
@@ -70,6 +70,49 @@ def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_toke
     return pool_tokens
 
 
+# <---------------------   Metapool configuration   --------------------->
+@pytest.fixture(scope="module")
+def base_pool_decimals():
+    return [18, 6, 6]
+
+
+@pytest.fixture(scope="module")
+def base_pool_tokens(deployer, base_pool_decimals):
+    tokens = []
+    with boa.env.prank(deployer):
+        tokens.append(boa.load("contracts/mocks/ERC20.vy", "DAI", "DAI", base_pool_decimals[0]))
+        tokens.append(boa.load("contracts/mocks/ERC20.vy", "USDC", "USDC", base_pool_decimals[1]))
+        tokens.append(boa.load("contracts/mocks/ERC20.vy", "USDT", "USDT", base_pool_decimals[2]))
+    return tokens
+
+
+@pytest.fixture(scope="module")
+def base_pool_lp_token(deployer):
+    with boa.env.prank(deployer):
+        return boa.load("contracts/mocks/CurveTokenV3.vy", "LP", "LP")
+
+
+@pytest.fixture(scope="module")
+def underlying_tokens(
+    pool_token_types, plain_tokens, weth, oracle_tokens, rebase_tokens, base_pool_tokens, base_pool_lp_token
+):
+    pool_tokens = []
+    metapool_token_type = pool_token_types[0]
+    if metapool_token_type == 0:
+        pool_tokens.append(plain_tokens[0])
+    elif metapool_token_type == 1:
+        pool_tokens = pool_tokens.append(weth)
+    elif metapool_token_type == 2:
+        pool_tokens.append(oracle_tokens[0])
+    elif metapool_token_type == 3:
+        pool_tokens.append(rebase_tokens[0])
+    else:
+        raise ValueError("Wrong pool token type")
+
+    return pool_tokens + [base_pool_lp_token.address, *[t.address for t in base_pool_tokens]]
+
+
+# <---------------------   Gauge rewards  --------------------->
 @pytest.fixture(scope="module")
 def coin_reward(owner):
     with boa.env.prank(owner):

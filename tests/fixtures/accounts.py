@@ -62,29 +62,43 @@ def accounts(bob, charlie, dave, erin, frank):
 
 
 # <---------------------   Functions   --------------------->
+def mint_account(account, pool_tokens, initial_amounts):
+    mint_for_testing(account, 10**18, None, True)
+    for pool_token, amount in zip(pool_tokens, initial_amounts):
+        mint_for_testing(account, amount, pool_token, False)
+
+
+def approve_account(account, pool_tokens, swap):
+    for pool_token in pool_tokens:
+        with boa.env.prank(account):
+            pool_token.approve(swap.address, 2**256 - 1)
+
+
 @pytest.fixture(scope="module")
 def mint_owner(owner, pool_tokens, initial_amounts):
-    mint_for_testing(owner, 10**18, None, True)
-    for pool_token, amount in zip(pool_tokens, initial_amounts):
-        mint_for_testing(owner, amount, pool_token, False)
+    mint_account(owner, pool_tokens, initial_amounts)
 
 
 @pytest.fixture(scope="module")
 def approve_owner(owner, pool_tokens, swap):
-    for pool_token in pool_tokens:
-        with boa.env.prank(owner):
-            pool_token.approve(swap.address, 2**256 - 1)
+    approve_account(owner, pool_tokens, swap)
 
 
 @pytest.fixture(scope="module")
 def mint_alice(alice, pool_tokens, initial_amounts):
-    mint_for_testing(alice, 10**18, None, True)
-    for pool_token, amount in zip(pool_tokens, initial_amounts):
-        mint_for_testing(alice, amount, pool_token, False)
+    mint_account(alice, pool_tokens, initial_amounts)
 
 
 @pytest.fixture(scope="module")
 def approve_alice(alice, pool_tokens, swap):
-    for pool_token in pool_tokens:
-        with boa.env.prank(alice):
-            pool_token.approve(swap.address, 2**256 - 1)
+    approve_account(alice, pool_tokens, swap)
+
+
+@pytest.fixture(scope="module")
+def mint_bob(bob, pool_tokens, initial_amounts):
+    mint_account(bob, pool_tokens, initial_amounts)
+
+
+@pytest.fixture(scope="module")
+def approve_bob(bob, pool_tokens, swap):
+    approve_account(bob, pool_tokens, swap)
