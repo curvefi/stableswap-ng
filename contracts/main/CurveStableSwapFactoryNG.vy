@@ -16,7 +16,6 @@ struct PoolArray:
     asset_type: uint256
 
 struct BasePoolArray:
-    implementations: address[10]
     lp_token: address
     fee_receiver: address
     coins: address[MAX_COINS]
@@ -103,15 +102,14 @@ base_pool_data: public(HashMap[address, BasePoolArray])
 # asset -> is used in a metapool?
 base_pool_assets: public(HashMap[address, bool])
 
-# number of coins -> implementation addresses
-# for "plain pools" (as opposed to metapools), implementation contracts
-# are organized according to the number of coins in the pool
-plain_implementations: public(HashMap[uint256, address[10]])
+# index -> implementation address
+plain_implementations: public(HashMap[uint256, address])
+metapool_implementations: public(HashMap[uint256, address])
+gauge_implementation: public(address)
+views_implementation: public(address)
 
 # fee receiver for plain pools
 fee_receiver: address
-
-gauge_implementation: public(address)
 
 # mapping of coins -> pools for trading
 # a mapping key is generated for each pair of addresses via
@@ -130,17 +128,6 @@ def __init__(_fee_receiver: address, _owner: address, _weth: address):
 
 
 # <--- Factory Getters --->
-
-@view
-@external
-def metapool_implementations(_base_pool: address) -> address[10]:
-    """
-    @notice Get a list of implementation contracts for metapools targetting the given base pool
-    @dev A base pool is the pool for the LP token contained within the metapool
-    @param _base_pool Address of the base pool
-    @return List of implementation contract addresses
-    """
-    return self.base_pool_data[_base_pool].implementations
 
 
 @view
@@ -558,7 +545,7 @@ def deploy_plain_pool(
                 break
             assert coin != _coins[x+1], "Duplicate coins"
 
-    implementation: address = self.plain_implementations[n_coins][_implementation_idx]
+    implementation: address = self.plain_implementations[_implementation_idx]
     assert implementation != empty(address), "Invalid implementation index"
     pool: address = create_from_blueprint(
         implementation,
@@ -651,7 +638,7 @@ def deploy_metapool(
     assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
     assert _fee <= 100000000, "Invalid fee"
 
-    implementation: address = self.base_pool_data[_base_pool].implementations[_implementation_idx]
+    implementation: address = self.metapool_implementations[_implementation_idx]
     assert implementation != empty(address), "Invalid implementation index"
 
     # things break if a token has >18 decimals
@@ -751,7 +738,6 @@ def add_base_pool(
     _asset_type: uint256,
     _n_coins: uint256,
     _is_rebasing: bool[MAX_COINS],
-    _implementations: address[10],
 ):
     """
     @notice Add a base pool to the registry, which may be used in factory metapools
@@ -760,7 +746,6 @@ def add_base_pool(
     @param _fee_receiver Admin fee receiver address for metapools using this base pool
     @param _asset_type Asset type for pool, as an integer  0 = USD, 1 = ETH, 2 = BTC, 3 = Other
     @param _is_rebasing Array of booleans: _is_rebasing[i] is True if basepool coin[i] is rebasing
-    @param _implementations List of implementation addresses that can be used with this base pool
     """
     assert msg.sender == self.admin  # dev: admin-only function
     assert self.base_pool_data[_base_pool].coins[0] == empty(address)  # dev: pool exists
@@ -775,12 +760,6 @@ def add_base_pool(
     self.base_pool_data[_base_pool].fee_receiver = _fee_receiver
     if _asset_type != 0:
         self.base_pool_data[_base_pool].asset_type = _asset_type
-
-    for i in range(10):
-        implementation: address = _implementations[i]
-        if implementation == empty(address):
-            break
-        self.base_pool_data[_base_pool].implementations[i] = implementation
 
     decimals: uint256 = 0
     coins: address[MAX_COINS] = _coins
@@ -799,46 +778,55 @@ def add_base_pool(
 
 @external
 def set_metapool_implementations(
-    _base_pool: address,
-    _implementations: address[10],
+    _implementation_index: uint256,
+    _implementation: address,
 ):
     """
     @notice Set implementation contracts for a metapool
     @dev Only callable by admin
-    @param _base_pool Pool address to add
-    @param _implementations Implementation address to use when deploying metapools
+    @param _implementation_index Implementation index where implementation is stored
+    @param _implementation Implementation address to use when deploying metapools
     """
-
-    # TODO: ensure only one implementation can be set at a time
-
     assert msg.sender == self.admin  # dev: admin-only function
-    assert self.base_pool_data[_base_pool].coins[0] != empty(address)  # dev: base pool does not exist
+    self.metapool_implementations[_implementation_index] = _implementation
 
-    for i in range(10):
-        new_imp: address = _implementations[i]
-        current_imp: address = self.base_pool_data[_base_pool].implementations[i]
-        if new_imp == current_imp:
-            if new_imp == empty(address):
-                break
-        else:
-            self.base_pool_data[_base_pool].implementations[i] = new_imp
 
 
 @external
 def set_plain_implementations(
-    _n_coins: uint256,
     _implementation_index: uint256,
     _implementation: address,
 ):
+    """
+    @notice Set implementation contracts for plain pools
+    @dev Only callable by admin
+    @param _implementation_index Implementation index where implementation is stored
+    @param _implementation Implementation address to use when deploying plain pools
+    """
     assert msg.sender == self.admin  # dev: admin-only function
-    self.plain_implementations[_n_coins][_implementation_index] = _implementation
+    self.plain_implementations[_implementation_index] = _implementation
 
 
 @external
 def set_gauge_implementation(_gauge_implementation: address):
+    """
+    @notice Set implementation contracts for liquidity gauge
+    @dev Only callable by admin
+    @param _implementation Implementation address to use when deploying gauges
+    """
     assert msg.sender == self.admin  # dev: admin-only function
-
     self.gauge_implementation = _gauge_implementation
+
+
+@external
+def set_views_implementation(_views_implementation: address):
+    """
+    @notice Set implementation contracts for Views methods
+    @dev Only callable by admin
+    @param _implementation Implementation address of views contract
+    """
+    assert msg.sender == self.admin  # dev: admin-only function
+    self.views_implementation = _views_implementation
 
 
 @external
