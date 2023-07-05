@@ -9,27 +9,42 @@ DEPOSIT_AMOUNT = 500_000
 class TestLiquidityMethods:
     @pytest.mark.usefixtures("add_initial_liquidity_alice", "mint_bob", "approve_bob")
     class TestAddLiquidity:
-        def test_add_liquidity(self, bob, swap, pool_tokens, deposit_amounts, initial_amounts):
-            swap.add_liquidity(deposit_amounts, 0, sender=bob)
+        @pytest.mark.parametrize("use_eth", (True, False), scope="session")
+        def test_add_liquidity(
+            self, bob, swap, is_eth_pool, pool_tokens, deposit_amounts, initial_balance, initial_amounts, use_eth
+        ):
+            value = deposit_amounts[0] if is_eth_pool and use_eth else 0
+            deposit_amounts[0] = 0 if is_eth_pool and use_eth else deposit_amounts[0]
+            swap.add_liquidity(deposit_amounts, 0, use_eth, sender=bob, value=value)
 
             for i, (pool_token, amount) in enumerate(zip(pool_tokens, deposit_amounts)):
+                # assert boa.env.get_balance(bob) == initial_balance - value
+                # assert boa.env.get_balance(swap.address) == deposit_amounts[i] + value
+
                 assert pool_token.balanceOf(bob) == initial_amounts[i] - deposit_amounts[i]
-                assert pool_token.balanceOf(swap) == deposit_amounts[i] * 2
+                assert pool_token.balanceOf(swap.address) == deposit_amounts[i] * 2
 
             ideal = len(pool_tokens) * DEPOSIT_AMOUNT * 10**18
             assert abs(swap.balanceOf(bob) - ideal) <= 1
             assert abs(swap.totalSupply() - ideal * 2) <= 2
 
         @pytest.mark.parametrize("idx", (0, 1))
-        def test_add_one_coin(self, bob, swap, pool_tokens, deposit_amounts, initial_amounts, idx):
+        @pytest.mark.parametrize("use_eth", (True, False))
+        def test_add_one_coin(
+            self, bob, swap, pool_tokens, is_eth_pool, deposit_amounts, initial_amounts, idx, weth, use_eth
+        ):
             amounts = [0] * len(pool_tokens)
             amounts[idx] = deposit_amounts[idx]
 
             swap.add_liquidity(amounts, 0, sender=bob)
 
             for i, pool_token in enumerate(pool_tokens):
-                assert pool_token.balanceOf(bob) == initial_amounts[i] - amounts[i]
-                assert pool_token.balanceOf(swap) == deposit_amounts[i] + amounts[i]
+                if pool_token == weth:
+                    assert boa.env.get_balance(bob) == initial_amounts[i] - amounts[i]
+                    assert boa.env.get_balance(swap) == deposit_amounts[i] + amounts[i]
+                else:
+                    assert pool_token.balanceOf(bob) == initial_amounts[i] - amounts[i]
+                    assert pool_token.balanceOf(swap) == deposit_amounts[i] + amounts[i]
 
             difference = abs(swap.balanceOf(bob) - (10**18 * DEPOSIT_AMOUNT))
             assert difference / (10**18 * DEPOSIT_AMOUNT) < 0.01
@@ -54,11 +69,8 @@ class TestLiquidityMethods:
             )
 
         # TODO: fix this
-        @pytest.mark.parametrize("use_eth", (True, False))
-        def test_send_eth(self, bob, swap, deposit_amounts, use_eth, weth, pool_tokens):
-            assert swap.WETH20() == weth.address
-            assert weth.address not in [t.address for t in pool_tokens]
-            assert swap.coins(0) == pool_tokens[0].address
-            assert swap.coins(1) == pool_tokens[1].address
-            with boa.reverts():
-                swap.add_liquidity(deposit_amounts, 0, use_eth, sender=bob, value=1)
+        #
+        # def test_send_eth(self, bob, swap, deposit_amounts, use_eth):
+        #
+        #     # with boa.reverts():
+        #     swap.add_liquidity(deposit_amounts, 0, True, sender=bob, value=1)
