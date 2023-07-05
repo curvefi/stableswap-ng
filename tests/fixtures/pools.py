@@ -121,7 +121,7 @@ def swap(
 
 
 # <---------------------   Metapool configuration   --------------------->
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base_pool_lp_token, zero_address):
     with boa.env.prank(deployer):
         base_pool = boa.load(
@@ -148,6 +148,11 @@ def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base
 
 
 # <---------------------   Functions   --------------------->
+@pytest.fixture(scope="module")
+def is_eth_pool(pool_tokens, weth):
+    return weth in pool_tokens
+
+
 @pytest.fixture(scope="module")
 def add_initial_liquidity(owner, approve_owner, mint_owner, deposit_amounts, swap):
     with boa.env.prank(owner):

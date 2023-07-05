@@ -444,7 +444,12 @@ def _balances() -> uint256[N_COINS]:
     """
     result: uint256[N_COINS] = empty(uint256[N_COINS])
     for i in range(N_COINS):
-        result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
+
+        if coins[i] == WETH20:
+            result[i] = self.balance - self.admin_balances[i]
+
+        else:
+            result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
 
     return result
 
@@ -887,6 +892,7 @@ def _add_liquidity(
     if expect_optimistic_transfer:
 
         dx: uint256 = 0
+        assert mvalue == 0  # dev: not supported
 
         for i in range(N_COINS):
 
@@ -912,9 +918,18 @@ def _add_liquidity(
 
                 if coins[i] == WETH20:
 
+                    _amount: uint256 = amounts[i]
+
+                    if use_eth:
+                        assert _amount == 0  # dev: only eth, no WETH should be sent
+                        _amount = mvalue
+
+                    else:
+                        assert mvalue == 0  # dev: only WETH should be sent
+
                     new_balances[i] += self._transfer_in(
                         coins[i],
-                        amounts[i],
+                        _amount,
                         0,
                         mvalue,
                         empty(address),
@@ -925,6 +940,10 @@ def _add_liquidity(
                     )
 
                 else:
+
+                    # fix: this is workaround
+                    if coins[0] != WETH20:
+                        assert mvalue == 0
 
                     new_balances[i] += self._transfer_in(
                         coins[i],

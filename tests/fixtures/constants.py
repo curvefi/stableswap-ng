@@ -4,6 +4,11 @@ INITIAL_AMOUNT = 1_000_000
 
 
 @pytest.fixture(scope="module")
+def initial_balance() -> int:
+    return INITIAL_AMOUNT * 10**18
+
+
+@pytest.fixture(scope="module")
 def initial_amounts(decimals: list[int]) -> list[int]:
     return [INITIAL_AMOUNT * 10**precision for precision in decimals]
 

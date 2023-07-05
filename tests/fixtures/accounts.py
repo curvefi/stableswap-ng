@@ -62,8 +62,8 @@ def accounts(bob, charlie, dave, erin, frank):
 
 
 # <---------------------   Functions   --------------------->
-def mint_account(account, pool_tokens, initial_amounts):
-    mint_for_testing(account, 10**18, None, True)
+def mint_account(account, pool_tokens, initial_balance, initial_amounts):
+    mint_for_testing(account, initial_balance, None, True)
     for pool_token, amount in zip(pool_tokens, initial_amounts):
         mint_for_testing(account, amount, pool_token, False)
 
@@ -75,8 +75,8 @@ def approve_account(account, pool_tokens, swap):
 
 
 @pytest.fixture(scope="module")
-def mint_owner(owner, pool_tokens, initial_amounts):
-    mint_account(owner, pool_tokens, initial_amounts)
+def mint_owner(owner, pool_tokens, initial_balance, initial_amounts):
+    mint_account(owner, pool_tokens, initial_balance, initial_amounts)
 
 
 @pytest.fixture(scope="module")
@@ -85,8 +85,8 @@ def approve_owner(owner, pool_tokens, swap):
 
 
 @pytest.fixture(scope="module")
-def mint_alice(alice, pool_tokens, initial_amounts):
-    mint_account(alice, pool_tokens, initial_amounts)
+def mint_alice(alice, pool_tokens, initial_balance, initial_amounts):
+    mint_account(alice, pool_tokens, initial_balance, initial_amounts)
 
 
 @pytest.fixture(scope="module")
@@ -95,8 +95,8 @@ def approve_alice(alice, pool_tokens, swap):
 
 
 @pytest.fixture(scope="module")
-def mint_bob(bob, pool_tokens, initial_amounts):
-    mint_account(bob, pool_tokens, initial_amounts)
+def mint_bob(bob, pool_tokens, initial_balance, initial_amounts):
+    mint_account(bob, pool_tokens, initial_balance, initial_amounts)
 
 
 @pytest.fixture(scope="module")
