@@ -947,14 +947,11 @@ def _withdraw_admin_fees():
 
         if amounts[i] > 0:
 
-            if coins[i] == WETH20:
-                raw_call(receiver, b"", value=amounts[i])
-            else:
-                assert ERC20(coins[i]).transfer(
-                    receiver,
-                    amounts[i],
-                    default_return_value=True
-                )
+            assert ERC20(coins[i]).transfer(
+                receiver,
+                amounts[i],
+                default_return_value=True
+            )
 
     self.admin_balances = empty(uint256[N_COINS])
     # Reduce stored balances:
