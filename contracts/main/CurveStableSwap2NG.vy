@@ -349,9 +349,6 @@ def _transfer_in(
 
     # ---- For normal ERC20 token handling: with callbacks!
 
-    if coins[0] != WETH20:
-        assert mvalue == 0  # dev: msg.value must be zero
-
     _dx: uint256 = ERC20(coin).balanceOf(self)
 
     if callback_sig != empty(bytes32):  # <---- ERC20 token transfer is handled by callback.
