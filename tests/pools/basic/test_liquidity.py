@@ -18,9 +18,6 @@ class TestLiquidityMethods:
             swap.add_liquidity(deposit_amounts, 0, use_eth, sender=bob, value=value)
 
             for i, (pool_token, amount) in enumerate(zip(pool_tokens, deposit_amounts)):
-                # assert boa.env.get_balance(bob) == initial_balance - value
-                # assert boa.env.get_balance(swap.address) == deposit_amounts[i] + value
-
                 assert pool_token.balanceOf(bob) == initial_amounts[i] - deposit_amounts[i]
                 assert pool_token.balanceOf(swap.address) == deposit_amounts[i] * 2
 
