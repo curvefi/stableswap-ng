@@ -295,7 +295,7 @@ def __default__():
 
 @internal
 def _transfer_in(
-    coin: address,
+    coin_idx: int128,
     dx: uint256,
     dy: uint256,
     mvalue: uint256,
@@ -304,10 +304,10 @@ def _transfer_in(
     sender: address,
     receiver: address,
     use_eth: bool,
+    expect_optimistic_transfer: bool,
 ) -> uint256:
     """
-    @notice Transfers `_coin` from `sender` to `self` and calls `callback_sig`
-            if it is not empty.
+    @notice Contains all logic to handle ERC20 or native token transfers
     @dev The callback sig must have the following args:
             sender: address
             receiver: address
@@ -327,51 +327,55 @@ def _transfer_in(
     @params sender address to transfer `_coin` from.
     @params receiver address to transfer `_coin` to.
     @params use_eth True if the transfer is ETH, False otherwise.
+    @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
-    _dx: uint256 = dx
+    coin: address = coins[coin_idx]
+    is_rebasing: bool = True in IS_REBASING
 
     if use_eth and coin == WETH20:  # <----------- Pool receives native token.
 
-        assert mvalue == _dx  # dev: incorrect eth amount
+        assert mvalue == dx  # dev: incorrect eth amount
+        WETH(WETH20).deposit(value=dx)  # <--- deposit incoming native token.
 
-    else:  # <------- Pool receives wrapped native token and not native token.
+        return dx
 
-        assert mvalue == 0  # dev: nonzero eth amount
+    if expect_optimistic_transfer:  # <---- Pool expects _dx of coin transferred to it by the user.
 
-        initial_x: uint256 = ERC20(coin).balanceOf(self)
+        assert not is_rebasing
 
-        # --------------------- Start Callback Handling ----------------------
+        assert ERC20(coin).balanceOf(self) - self.stored_balances[coin_idx] == dx, "Pool did not receive tokens for swap"
 
-        if callback_sig == empty(bytes32):
+        return dx
 
-            assert ERC20(coin).transferFrom(
-                sender, self, _dx, default_return_value=True
-            )
+    # ---- For normal ERC20 token handling: with callbacks!
 
-        else:
+    assert mvalue == 0  # dev: msg.value must be zero
 
-            raw_call(
+    _dx: uint256 = ERC20(coin).balanceOf(self)
+
+    if callback_sig != empty(bytes32):  # <---- ERC20 token transfer is handled by callback.
+
+        raw_call(
                 callbacker,
                 concat(
                     slice(callback_sig, 0, 4),
-                    _abi_encode(sender, receiver, coin, _dx, dy)
+                    _abi_encode(sender, receiver, coin, dx, dy)
                 )
             )
 
-        # If the coin is a fee-on-transfer token, transferring `_dx` amount can
-        # result in the pool receiving slightly less amount. So: recalculate dx
+    else:  # <--- Pool calls ERC20.transferFrom if msg.sender has given approval.
 
-        _dx = ERC20(coin).balanceOf(self) - initial_x
+        assert ERC20(coin).transferFrom(
+            sender, self, dx, default_return_value=True
+        )
 
+    # Check if the pool received tokens at all. _dx == dx if coins are not rebasing
+    _dx = ERC20(coin).balanceOf(self) - _dx
+    if is_rebasing:
         assert _dx > 0  # dev: pool received 0 tokens
+        return _dx
 
-        # -------------------- End Callback Handling -------------------------
-
-        if coin == WETH20:
-            WETH(WETH20).withdraw(_dx)  # <--------- if WETH was transferred in
-            #           previous step and `not use_eth`, withdraw WETH to ETH.
-
-    # Return _dx so it can be used by `_exchange` and `add_liquidity`.
+    assert dx == _dx
     return _dx
 
 
@@ -390,10 +394,11 @@ def _transfer_out(
     """
 
     if use_eth and _coin == WETH20:
+
+        WETH(WETH20).withdraw(_amount)
         raw_call(receiver, b"", value=_amount)
+
     else:
-        if _coin == WETH20:
-            WETH(WETH20).deposit(value=_amount)
 
         assert ERC20(_coin).transfer(
             receiver, _amount, default_return_value=True
@@ -444,12 +449,7 @@ def _balances() -> uint256[N_COINS]:
     """
     result: uint256[N_COINS] = empty(uint256[N_COINS])
     for i in range(N_COINS):
-
-        if coins[i] == WETH20:
-            result[i] = self.balance - self.admin_balances[i]
-
-        else:
-            result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
+        result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
 
     return result
 
@@ -615,15 +615,89 @@ def add_liquidity(
     @param _receiver Address that owns the minted LP tokens
     @return Amount of LP tokens received by depositing
     """
-    return self._add_liquidity(
-        msg.sender,
-        _amounts,
-        _min_mint_amount,
-        _use_eth,
-        _receiver,
-        msg.value,
-        False,  # <--------------------- Does not expect optimistic transfers.
-    )
+    amp: uint256 = self._A()
+    old_balances: uint256[N_COINS] = self._balances()
+    rates: uint256[N_COINS] = self._stored_rates()
+
+    # Initial invariant
+    D0: uint256 = self.get_D_mem(rates, old_balances, amp)
+
+    total_supply: uint256 = self.totalSupply
+    new_balances: uint256[N_COINS] = old_balances
+
+    # -------------------------- Do Transfers In -----------------------------
+
+    for i in range(N_COINS_128):
+
+        if _amounts[i] > 0:
+
+            new_balances[i] += self._transfer_in(
+                i,
+                _amounts[i],
+                0,
+                msg.value,
+                empty(address),
+                empty(bytes32),
+                msg.sender,
+                empty(address),
+                _use_eth,
+                False,  # expect_optimistic_transfer
+            )
+
+        else:
+
+            assert total_supply != 0  # dev: initial deposit requires all coins
+
+    # Add incoming balance
+    self._increase_balances(new_balances)
+
+    # ------------------------------------------------------------------------
+
+    # Invariant after change
+    D1: uint256 = self.get_D_mem(rates, new_balances, amp)
+    assert D1 > D0
+
+    # We need to recalculate the invariant accounting for fees
+    # to calculate fair user's share
+    fees: uint256[N_COINS] = empty(uint256[N_COINS])
+    mint_amount: uint256 = 0
+
+    if total_supply > 0:
+
+        # Only account for fees if we are not the first to deposit
+        base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
+        for i in range(N_COINS):
+            ideal_balance: uint256 = D1 * old_balances[i] / D0
+            difference: uint256 = 0
+            new_balance: uint256 = new_balances[i]
+            if ideal_balance > new_balance:
+                difference = ideal_balance - new_balance
+            else:
+                difference = new_balance - ideal_balance
+            fees[i] = base_fee * difference / FEE_DENOMINATOR
+            self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
+            new_balances[i] -= fees[i]
+
+        xp: uint256[N_COINS] = self._xp_mem(rates, new_balances)
+        D2: uint256 = self.get_D(xp, amp)
+        mint_amount = total_supply * (D2 - D0) / D0
+        self.save_p(xp, amp, D2)
+
+    else:
+
+        mint_amount = D1  # Take the dust if there was any
+
+    assert mint_amount >= _min_mint_amount, "Slippage screwed you"
+
+    # Mint pool tokens
+    total_supply += mint_amount
+    self.balanceOf[_receiver] += mint_amount
+    self.totalSupply = total_supply
+    log Transfer(empty(address), _receiver, mint_amount)
+
+    log AddLiquidity(msg.sender, _amounts, fees, D1, total_supply)
+
+    return mint_amount
 
 
 @external
@@ -795,7 +869,7 @@ def _exchange(
     receiver: address,
     callbacker: address,
     callback_sig: bytes32,
-    expect_optimistic_transfer: bool = False
+    expect_optimistic_transfer: bool
 ) -> uint256:
 
     assert i != j  # dev: coin index out of range
@@ -807,22 +881,19 @@ def _exchange(
 
     # --------------------------- Do Transfer in -----------------------------
 
-    dx: uint256 = 0
-
-    if expect_optimistic_transfer:
-
-        # This branch is never reached for rebasing tokens
-        dx = ERC20(coins[i]).balanceOf(self) - self.stored_balances[i]
-        assert dx == _dx, "Pool did not receive tokens for swap"
-
-    else:
-
-        # `dx` is whatever the pool received after ERC20 transfer:
-        dx = self._transfer_in(
-            coins[i], _dx, _min_dy, mvalue,
-            callbacker, callback_sig,
-            sender, receiver, use_eth
-        )
+    # `dx` is whatever the pool received after ERC20 transfer:
+    dx: uint256 = self._transfer_in(
+        i,
+        _dx,
+        _min_dy,
+        mvalue,
+        callbacker,
+        callback_sig,
+        sender,
+        receiver,
+        use_eth,
+        expect_optimistic_transfer
+    )
 
     # Update stored balances
     self.stored_balances[i] += dx
@@ -864,153 +935,6 @@ def _exchange(
     log TokenExchange(msg.sender, i, _dx, j, dy)
 
     return dy
-
-
-@internal
-def _add_liquidity(
-    sender: address,
-    amounts: uint256[N_COINS],
-    min_mint_amount: uint256,
-    use_eth: bool,
-    receiver: address,
-    mvalue: uint256,
-    expect_optimistic_transfer: bool = False,
-) -> uint256:
-
-    amp: uint256 = self._A()
-    old_balances: uint256[N_COINS] = self._balances()
-    rates: uint256[N_COINS] = self._stored_rates()
-
-    # Initial invariant
-    D0: uint256 = self.get_D_mem(rates, old_balances, amp)
-
-    total_supply: uint256 = self.totalSupply
-    new_balances: uint256[N_COINS] = old_balances
-
-    # -------------------------- Do Transfers In -----------------------------
-
-    if expect_optimistic_transfer:
-
-        dx: uint256 = 0
-        assert mvalue == 0  # dev: not supported
-
-        for i in range(N_COINS):
-
-            if amounts[i] > 0:
-
-                # This branch is never reached for rebasing tokens
-                pool_x_balance: uint256 = ERC20(coins[i]).balanceOf(self)
-                dx = pool_x_balance - self.stored_balances[i]
-
-                assert dx == amounts[i], "Pool did not receive tokens for adding liquidity"
-
-                new_balances[i] += dx
-
-            else:
-
-                assert total_supply != 0  # dev: initial deposit requires all coins
-
-    else:
-
-        for i in range(N_COINS):
-
-            if amounts[i] > 0:
-
-                if coins[i] == WETH20:
-
-                    _amount: uint256 = amounts[i]
-
-                    if use_eth:
-                        assert _amount == 0  # dev: only eth, no WETH should be sent
-                        _amount = mvalue
-
-                    else:
-                        assert mvalue == 0  # dev: only WETH should be sent
-
-                    new_balances[i] += self._transfer_in(
-                        coins[i],
-                        _amount,
-                        0,
-                        mvalue,
-                        empty(address),
-                        empty(bytes32),
-                        sender,
-                        empty(address),
-                        use_eth
-                    )
-
-                else:
-
-                    # fix: this is workaround
-                    if coins[0] != WETH20:
-                        assert mvalue == 0
-
-                    new_balances[i] += self._transfer_in(
-                        coins[i],
-                        amounts[i],
-                        0,
-                        0,
-                        empty(address),
-                        empty(bytes32),
-                        sender,
-                        empty(address),
-                        False
-                    )
-
-            else:
-
-                assert total_supply != 0  # dev: initial deposit requires all coins
-
-    # Add incoming balance
-    self._increase_balances(new_balances)
-
-    # ------------------------------------------------------------------------
-
-    # Invariant after change
-    D1: uint256 = self.get_D_mem(rates, new_balances, amp)
-    assert D1 > D0
-
-    # We need to recalculate the invariant accounting for fees
-    # to calculate fair user's share
-    fees: uint256[N_COINS] = empty(uint256[N_COINS])
-    mint_amount: uint256 = 0
-
-    if total_supply > 0:
-
-        # Only account for fees if we are not the first to deposit
-        base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-        for i in range(N_COINS):
-            ideal_balance: uint256 = D1 * old_balances[i] / D0
-            difference: uint256 = 0
-            new_balance: uint256 = new_balances[i]
-            if ideal_balance > new_balance:
-                difference = ideal_balance - new_balance
-            else:
-                difference = new_balance - ideal_balance
-            fees[i] = base_fee * difference / FEE_DENOMINATOR
-            self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
-            new_balances[i] -= fees[i]
-
-        xp: uint256[N_COINS] = self._xp_mem(rates, new_balances)
-        D2: uint256 = self.get_D(xp, amp)
-        mint_amount = total_supply * (D2 - D0) / D0
-        self.save_p(xp, amp, D2)
-
-    else:
-
-        mint_amount = D1  # Take the dust if there was any
-
-    assert mint_amount >= min_mint_amount, "Slippage screwed you"
-
-    # Mint pool tokens
-    total_supply += mint_amount
-    self.balanceOf[receiver] += mint_amount
-    self.totalSupply = total_supply
-    log Transfer(empty(address), receiver, mint_amount)
-
-    log AddLiquidity(sender, amounts, fees, D1, total_supply)
-
-    return mint_amount
 
 
 @internal
