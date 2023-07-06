@@ -123,18 +123,17 @@ MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
 # ---------------------------- Pool Variables --------------------------------
 
 WETH20: immutable(address)
-N_COINS: constant(uint256) = 2
-N_COINS_128: constant(int128) = 2
+N_COINS: immutable(uint256)
 PRECISION: constant(uint256) = 10 ** 18
-IS_REBASING: immutable(bool[N_COINS])
-PERMISSIONED: public(constant(bool)) = False  # Implementation contains permissionless tokens
+IS_REBASING: immutable(DynArray[bool, MAX_COINS])
+PERMISSIONED: public(constant(bool)) = False  # Implementation does not impose transfer restrictions
 
 # to denote that it is a plain pool:
 BASE_POOL: public(constant(address)) = 0x0000000000000000000000000000000000000000
 
 factory: public(immutable(Factory))
-coins: public(immutable(address[N_COINS]))
-stored_balances: uint256[N_COINS]
+coins: public(immutable(DynArray[address, MAX_COINS]))
+stored_balances: DynArray[uint256, MAX_COINS]
 fee: public(uint256)  # fee * 1e10
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
@@ -154,13 +153,13 @@ future_A_time: public(uint256)
 ADMIN_FEE: constant(uint256) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
-admin_balances: public(uint256[N_COINS])
+admin_balances: public(DynArray[uint256, MAX_COINS])
 
 # ----------------------- Oracle Specific vars -------------------------------
 
-rate_multipliers: uint256[N_COINS]
+rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
-oracles: uint256[N_COINS]
+oracles: DynArray[uint256, MAX_COINS]
 
 last_prices_packed: uint256  #  [last_price, ma_price]
 ma_exp_time: public(uint256)
@@ -200,15 +199,15 @@ CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 def __init__(
     _name: String[32],
     _symbol: String[10],
-    _coins: address[MAX_COINS],
-    _rate_multipliers: uint256[MAX_COINS],
     _A: uint256,
     _fee: uint256,
-    _weth: address,
     _ma_exp_time: uint256,
-    _method_ids: bytes4[MAX_COINS],
-    _oracles: address[MAX_COINS],
-    _is_rebasing: bool[MAX_COINS]
+    _weth: address,
+    _coins: DynArray[address, MAX_COINS],
+    _rate_multipliers: DynArray[uint256, MAX_COINS],
+    _method_ids: DynArray[bytes4, MAX_COINS],
+    _oracles: DynArray[address, MAX_COINS],
+    _is_rebasing: DynArray[bool, MAX_COINS],
 ):
     """
     @notice Initialize the pool contract
@@ -235,24 +234,28 @@ def __init__(
     """
 
     WETH20 = _weth
-    IS_REBASING = [_is_rebasing[0], _is_rebasing[1]]
+    IS_REBASING = _is_rebasing
 
     name = _name
     symbol = _symbol
     factory = Factory(msg.sender)
-    coins = [_coins[0], _coins[1]]
+    coins = _coins
+    N_COINS = len(_coins)
+    __rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
 
-    for i in range(N_COINS):
+    for i in range(MAX_COINS):
 
-        if _coins[i] == empty(address):
+        if i == N_COINS:
             break
 
         # Enforce native token as coin[0] (makes integrators happy)
-        if _coins[i] == WETH20 and i > 0:
-            raise "ETH must be at index 0"
+        if _coins[i] == WETH20:
+            assert i == 0, "ETH must be at index 0"
 
-        self.rate_multipliers[i] = _rate_multipliers[i]
+        __rate_multipliers[i] = _rate_multipliers[i]
         self.oracles[i] = convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256)
+
+    rate_multipliers = __rate_multipliers
 
     A: uint256 = _A * A_PRECISION
     self.initial_A = A
@@ -261,7 +264,7 @@ def __init__(
 
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
-    self.last_prices_packed = self.pack_prices(10**18, 10**18)  # TODO: check if this line is correct
+    self.last_prices_packed = self.pack_prices(10**18, 10**18)
     self.ma_last_time = block.timestamp
 
     # EIP712
@@ -329,57 +332,58 @@ def _transfer_in(
     @params use_eth True if the transfer is ETH, False otherwise.
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
-    coin: address = coins[coin_idx]
     is_rebasing: bool = True in IS_REBASING
+    _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
 
-    if use_eth and coin == WETH20:  # <----------- Pool receives native token.
+    # ------------------------- Handle Transfers -----------------------------
 
-        assert mvalue == dx  # dev: incorrect eth amount
-        WETH(WETH20).deposit(value=dx)  # <--- deposit incoming native token.
+    if use_eth and coins[coin_idx] == WETH20:
 
-        return dx
+        _dx = mvalue
+        WETH(WETH20).deposit(value=dx)
 
-    if expect_optimistic_transfer:  # <---- Pool expects _dx of coin transferred to it by the user.
+    elif expect_optimistic_transfer:
 
         assert not is_rebasing
+        _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
-        assert ERC20(coin).balanceOf(self) - self.stored_balances[coin_idx] == dx, "Pool did not receive tokens for swap"
-
-        return dx
-
-    # ---- For normal ERC20 token handling: with callbacks!
-
-    _dx: uint256 = ERC20(coin).balanceOf(self)
-
-    if callback_sig != empty(bytes32):  # <---- ERC20 token transfer is handled by callback.
+    elif callback_sig != empty(bytes32):
 
         raw_call(
                 callbacker,
                 concat(
                     slice(callback_sig, 0, 4),
-                    _abi_encode(sender, receiver, coin, dx, dy)
+                    _abi_encode(sender, receiver, coins[coin_idx], dx, dy)
                 )
             )
 
-    else:  # <--- Pool calls ERC20.transferFrom if msg.sender has given approval.
+        _dx = ERC20(coins[coin_idx]).balanceOf(self) - _dx
 
-        assert ERC20(coin).transferFrom(
+    else:
+
+        assert ERC20(coins[coin_idx]).transferFrom(
             sender, self, dx, default_return_value=True
         )
 
-    # Check if the pool received tokens at all. _dx == dx if coins are not rebasing
-    _dx = ERC20(coin).balanceOf(self) - _dx
-    if is_rebasing:
-        assert _dx > 0  # dev: pool received 0 tokens
-        return _dx
+        _dx = ERC20(coins[coin_idx]).balanceOf(self) - _dx
 
-    assert dx == _dx
+    # --------------------------- Check Transfer -----------------------------
+
+    if is_rebasing:
+        assert _dx > 0, "Pool did not receive tokens for swap"
+    else:
+        assert dx == _dx, "Pool did not receive tokens for swap"
+
+    # ----------------------- Update Stored Balances -------------------------
+
+    self.stored_balances += _dx
+
     return _dx
 
 
 @internal
 def _transfer_out(
-    _coin: address, _amount: uint256, use_eth: bool, receiver: address
+    _coin_idx: int128, _amount: uint256, use_eth: bool, receiver: address
 ):
     """
     @notice Transfer a single token from the pool to receiver.
@@ -391,16 +395,22 @@ def _transfer_out(
     @params receiver Address to send the tokens to
     """
 
-    if use_eth and _coin == WETH20:
+    # ------------------------- Handle Transfers -----------------------------
+
+    if use_eth and coins[_coin_idx] == WETH20:
 
         WETH(WETH20).withdraw(_amount)
         raw_call(receiver, b"", value=_amount)
 
     else:
 
-        assert ERC20(_coin).transfer(
+        assert ERC20(coins[_coin_idx]).transfer(
             receiver, _amount, default_return_value=True
         )
+
+    # ----------------------- Update Stored Balances -------------------------
+
+    self.stored_balances[_coin_idx] -= _amount
 
 
 # -------------------------- AMM Special Methods -----------------------------
@@ -408,18 +418,20 @@ def _transfer_out(
 
 @view
 @internal
-def _stored_rates() -> uint256[N_COINS]:
+def _stored_rates() -> DynArray[uint256, MAX_COINS]:
     """
     @notice Gets rate multipliers for each coin.
     @dev If the coin has a rate oracle that has been properly initialised,
          this method queries that rate by static-calling an external
          contract.
     """
+    rates: DynArray[uint256, MAX_COINS] = rate_multipliers
+    oracles: DynArray[uint256, MAX_COINS] = self.oracles
 
-    rates: uint256[N_COINS] = self.rate_multipliers
-    oracles: uint256[N_COINS] = self.oracles
+    for i in range(MAX_COINS):
 
-    for i in range(N_COINS):
+        if i == N_COINS:
+            break
 
         if oracles[i] == 0:
             continue
@@ -440,42 +452,16 @@ def _stored_rates() -> uint256[N_COINS]:
 
 @view
 @internal
-def _balances() -> uint256[N_COINS]:
+def _balances() -> DynArray[uint256, MAX_COINS]:
     """
     @notice Calculates the pool's balances _excluding_ the admin's balances.
     @dev This method ensures LPs keep all rebases and admin only claims swap fees.
     """
-    result: uint256[N_COINS] = empty(uint256[N_COINS])
+    result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(N_COINS):
         result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
 
     return result
-
-
-@internal
-def _increase_balances(balances: uint256[N_COINS]):
-    """
-    @notice Increases self.stored_balances by `balances` amount
-    @dev This is an internal accounting method and must be called whenever there
-         is an ERC20 token transfer into the pool.
-    """
-    stored_balances: uint256[N_COINS] = self.stored_balances
-    for i in range(N_COINS):
-        stored_balances[i] += balances[i]
-    self.stored_balances = stored_balances
-
-
-@internal
-def _decrease_balances(balances: uint256[N_COINS]):
-    """
-    @notice Decreases self.stored_balances by `balances` amount
-    @dev This is an internal accounting method and must be called whenever there
-         is an ERC20 token transfer out of the pool.
-    """
-    stored_balances: uint256[N_COINS] = self.stored_balances
-    for i in range(N_COINS):
-        stored_balances[i] -= balances[i]
-    self.stored_balances = stored_balances
 
 
 # -------------------------- AMM Main Functions ------------------------------
@@ -581,7 +567,6 @@ def exchange_received(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
-    assert not IS_REBASING[i], "Call disabled if IS_REBASING[i] is True"
     return self._exchange(
         msg.sender,
         0,
