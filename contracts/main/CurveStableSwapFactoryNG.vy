@@ -41,19 +41,12 @@ interface CurvePool:
     def balances(i: uint256) -> uint256: view
     def admin_balances(i: uint256) -> uint256: view
     def get_virtual_price() -> uint256: view
-    def initialize(
-        _name: String[32],
-        _symbol: String[10],
-        _coin: address,
-        _rate_multiplier: uint256,
-        _A: uint256,
-        _fee: uint256,
-    ): nonpayable
-    def exchange(  # TODO: change this!
+    def exchange(
         i: int128,
         j: int128,
         dx: uint256,
         min_dy: uint256,
+        _use_eth: bool,
         _receiver: address,
     ) -> uint256: nonpayable
 
@@ -884,5 +877,5 @@ def convert_metapool_fees() -> bool:
     amount: uint256 = ERC20(coin).balanceOf(self)
     receiver: address = self.base_pool_data[base_pool].fee_receiver
 
-    CurvePool(msg.sender).exchange(0, 1, amount, 0, receiver)
+    CurvePool(msg.sender).exchange(0, 1, amount, 0, False, receiver)
     return True
