@@ -124,13 +124,15 @@ MAX_COINS_128: constant(int128) = 8
 # ---------------------------- Pool Variables --------------------------------
 
 WETH20: immutable(address)
-N_COINS: immutable(uint256)
+N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
 IS_REBASING: immutable(DynArray[bool, MAX_COINS])
-PERMISSIONED: public(constant(bool)) = False  # Implementation does not impose transfer restrictions
 
-# to denote that it is a plain pool:
+# Implementation does not impose transfer restrictions:
+PERMISSIONED: public(constant(bool)) = False
+
+# To denote that it is a plain pool:
 BASE_POOL: public(constant(address)) = 0x0000000000000000000000000000000000000000
 
 factory: public(immutable(Factory))
