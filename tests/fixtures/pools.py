@@ -68,6 +68,7 @@ def swap(
         base_pool = request.getfixturevalue("base_pool")
         underlying_tokens = request.getfixturevalue("underlying_tokens")
         amm_interface_meta = request.getfixturevalue("amm_interface_meta")
+        _ = request.getfixturevalue("add_base_pool")
         _ = request.getfixturevalue("set_meta_implementations")
 
         A = 2000
@@ -109,7 +110,6 @@ def swap(
             866,
             method_id,
             oracle,
-            asset_type,
             0,
             is_rebasing,
         )
@@ -121,7 +121,7 @@ def swap(
 
 
 # <---------------------   Metapool configuration   --------------------->
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base_pool_lp_token, zero_address):
     with boa.env.prank(deployer):
         base_pool = boa.load(

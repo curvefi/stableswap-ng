@@ -637,6 +637,7 @@ def deploy_metapool(
     """
     assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
     assert _fee <= 100000000, "Invalid fee"
+    assert self.base_pool_data[_base_pool].coins[0] != empty(address), "Base pool is not added"
 
     implementation: address = self.metapool_implementations[_implementation_idx]
     assert implementation != empty(address), "Invalid implementation index"

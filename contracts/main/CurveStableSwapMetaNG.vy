@@ -230,7 +230,7 @@ def __init__(
     _ma_exp_time: uint256,
     _method_id: bytes4,
     _oracle: address,
-    _is_rebasing: bool[MAX_COINS],  # [_coin, False, base_coin_0, base_coin_1, ...]
+    _is_rebasing: bool[MAX_COINS],  # [_coin, base_coin_0, base_coin_1, ...]
     _base_pool: address,
     _base_lp_token: address,
     _base_coins: address[MAX_COINS],  # base pool can have maximally (MAX_COINS - 1) coins

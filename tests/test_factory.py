@@ -1,11 +1,9 @@
-# import itertools
+import itertools
 
 import boa
 import pytest
 
 MAX_COINS = 8
-
-# TODO: ADD meta
 
 
 class TestFactory:
@@ -67,63 +65,47 @@ class TestFactory:
         def test_fee_receiver(self, factory, swap, fee_receiver):
             assert factory.get_fee_receiver(swap.address) == fee_receiver
 
-    # @pytest.mark.only_for_pool_type(1)
-    # class TestMeta:
-    #     # TODO: replace with meta implementation
-    #     @pytest.fixture
-    #     def new_factory_setup(
-    #         self,
-    #         new_factory,
-    #         amm_implementation_plain,
-    #         pool_size,
-    #         alice,
-    #         fee_receiver,
-    #     ):
-    #         with boa.env.prank(alice):
-    #             new_factory.set_plain_implementations(pool_size, 0, amm_implementation_plain.address)
-    #
-    #     def test_factory(self, factory, swap):
-    #         assert factory.get_meta_n_coins(swap) == [2, 4]
-    #
-    # def test_get_underlying_coins(self, factory, swap, underlying_coins, pool_size, zero_address):
-    #     assert factory.get_underlying_coins(swap) == underlying_coins + [zero_address] * (
-    #             4 - pool_size
-    #     )
-    #
-    # def test_get_underlying_decimals(self, factory, swap, underlying_decimals):
-    #     assert factory.get_underlying_decimals(swap) == underlying_decimals + [0] * (
-    #             4 - len(underlying_decimals)
-    #     )
-    #
-    # @pytest.mark.parametrize("idx", range(1, 4))
-    # def test_find_pool_for_coins_underlying(self, factory, swap, underlying_coins, idx):
-    #     assert factory.find_pool_for_coins(underlying_coins[0], underlying_coins[idx]) == swap
-    #     assert factory.find_pool_for_coins(underlying_coins[idx], underlying_coins[0]) == swap
-    #
-    # def test_get_metapool_rates(self, factory, swap, base_pool):
-    #     assert factory.get_metapool_rates(swap) == [10 ** 18, base_pool.get_virtual_price()]
-    #
-    # @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(1, 4), 2))
-    # def test_find_pool_underlying_base_pool_only(self, factory, underlying_coins, sending, receiving, zero_address):
-    #     assert (
-    #         factory.find_pool_for_coins(underlying_coins[sending], underlying_coins[receiving])
-    #         == zero_address
-    #     )
-    #
-    # @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(1, 4), 2))
-    # def test_get_coin_indices_underlying(factory, swap, sending, receiving, underlying_coins):
-    #     i, j, is_underlying = factory.get_coin_indices(
-    #         swap, underlying_coins[sending], underlying_coins[receiving]
-    #     )
-    #     assert i == sending
-    #     assert j == receiving
-    #     assert is_underlying is False
-    #
-    # @pytest.mark.parametrize("idx", range(1, 4))
-    # def test_get_coin_indices_reverts(self, factory, swap, base_lp_token, underlying_coins, idx):
-    #     with boa.reverts():
-    #         factory.get_coin_indices(swap, base_lp_token, underlying_coins[idx])
-    #
+    @pytest.mark.only_for_pool_type(1)
+    class TestMeta:
+        def test_factory(self, factory, swap):
+            assert factory.get_meta_n_coins(swap) == [2, 4]
+
+        def test_get_underlying_coins(self, factory, swap, underlying_tokens, pool_size, zero_address):
+            assert factory.get_underlying_coins(swap) == underlying_tokens + [zero_address] * (MAX_COINS - pool_size)
+
+        def test_get_underlying_decimals(self, factory, swap, base_pool_decimals):
+            assert factory.get_underlying_decimals(swap) == base_pool_decimals + [0] * (
+                MAX_COINS - len(base_pool_decimals)
+            )
+
+        @pytest.mark.parametrize("idx", range(1, 4))
+        def test_find_pool_for_coins_underlying(self, factory, swap, underlying_coins, idx):
+            assert factory.find_pool_for_coins(underlying_coins[0], underlying_coins[idx]) == swap
+            assert factory.find_pool_for_coins(underlying_coins[idx], underlying_coins[0]) == swap
+
+        def test_get_metapool_rates(self, factory, swap, base_pool):
+            assert factory.get_metapool_rates(swap) == [10**18, base_pool.get_virtual_price()]
+
+        @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(1, 4), 2))
+        def test_find_pool_underlying_base_pool_only(
+            self, factory, underlying_tokens, sending, receiving, zero_address
+        ):
+            assert factory.find_pool_for_coins(underlying_tokens[sending], underlying_tokens[receiving]) == zero_address
+
+        @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(1, 4), 2))
+        def test_get_coin_indices_underlying(self, factory, swap, sending, receiving, underlying_tokens):
+            i, j, is_underlying = factory.get_coin_indices(
+                swap, underlying_tokens[sending], underlying_tokens[receiving]
+            )
+            assert i == sending
+            assert j == receiving
+            assert is_underlying is False
+
+        @pytest.mark.parametrize("idx", range(1, 4))
+        def test_get_coin_indices_reverts(self, factory, swap, base_lp_token, underlying_tokens, idx):
+            with boa.reverts():
+                factory.get_coin_indices(swap, base_lp_token, underlying_tokens[idx])
+
     # @pytest.mark.usefixtures("forked_chain")
     # @pytest.mark.only_for_pool_type(0)
     # class TestFactoryAddPools:

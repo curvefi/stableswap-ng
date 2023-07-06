@@ -86,11 +86,10 @@ def add_base_pool(
             base_pool.address,
             base_pool_lp_token.address,
             fee_receiver,
-            [t.address for t in base_pool_tokens],
+            [t.address for t in base_pool_tokens] + [zero_address] * (8 - len(base_pool_tokens)),
             0,
             len(base_pool_tokens),
-            [False] * len(base_pool_tokens),
-            [zero_address] * len((base_pool_tokens)),
+            [False] * 8,
         )
 
 
