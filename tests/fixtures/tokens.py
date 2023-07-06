@@ -96,20 +96,19 @@ def base_pool_lp_token(deployer):
 def underlying_tokens(
     pool_token_types, plain_tokens, weth, oracle_tokens, rebase_tokens, base_pool_tokens, base_pool_lp_token
 ):
-    pool_tokens = []
     metapool_token_type = pool_token_types[0]
     if metapool_token_type == 0:
-        pool_tokens.append(plain_tokens[0])
+        pool_token = plain_tokens[0]
     elif metapool_token_type == 1:
-        pool_tokens = pool_tokens.append(weth)
+        pool_token = weth
     elif metapool_token_type == 2:
-        pool_tokens.append(oracle_tokens[0])
+        pool_token = oracle_tokens[0]
     elif metapool_token_type == 3:
-        pool_tokens.append(rebase_tokens[0])
+        pool_token = rebase_tokens[0]
     else:
         raise ValueError("Wrong pool token type")
 
-    return pool_tokens + [base_pool_lp_token.address, *[t.address for t in base_pool_tokens]]
+    return [pool_token] + [base_pool_lp_token, *base_pool_tokens]
 
 
 # <---------------------   Gauge rewards  --------------------->

@@ -73,15 +73,15 @@ class TestFactory:
         def test_get_underlying_coins(self, factory, swap, underlying_tokens, pool_size, zero_address):
             assert factory.get_underlying_coins(swap) == underlying_tokens + [zero_address] * (MAX_COINS - pool_size)
 
-        def test_get_underlying_decimals(self, factory, swap, base_pool_decimals):
+        def test_get_underlying_decimals(self, factory, swap, base_pool_decimals, pool_type):
             assert factory.get_underlying_decimals(swap) == base_pool_decimals + [0] * (
                 MAX_COINS - len(base_pool_decimals)
             )
 
         @pytest.mark.parametrize("idx", range(1, 4))
-        def test_find_pool_for_coins_underlying(self, factory, swap, underlying_coins, idx):
-            assert factory.find_pool_for_coins(underlying_coins[0], underlying_coins[idx]) == swap
-            assert factory.find_pool_for_coins(underlying_coins[idx], underlying_coins[0]) == swap
+        def test_find_pool_for_coins_underlying(self, factory, swap, underlying_tokens, idx):
+            assert factory.find_pool_for_coins(underlying_tokens[0], underlying_tokens[idx]) == swap
+            assert factory.find_pool_for_coins(underlying_tokens[idx], underlying_tokens[0]) == swap
 
         def test_get_metapool_rates(self, factory, swap, base_pool):
             assert factory.get_metapool_rates(swap) == [10**18, base_pool.get_virtual_price()]

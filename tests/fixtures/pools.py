@@ -75,36 +75,36 @@ def swap(
         fee = 1000000
         method_id = bytes(b"")
         oracle = zero_address
-        asset_type = 0  # 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
+        # asset_type = 0  # 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
         is_rebasing = False
         metapool_token_type = pool_token_types[0]
 
         if metapool_token_type == 0:
             A = 2000
             fee = 1000000
-            asset_type = 0
+            # asset_type = 0
         elif metapool_token_type == 1:
             A = 1000
             fee = 3000000
-            asset_type = 1
+            # asset_type = 1
         elif metapool_token_type == 2:
             A = 1000
             fee = 3000000
-            asset_type = 1
+            # asset_type = 1
             method_id = oracle_method_id
             oracle = underlying_tokens[0].address
 
         elif metapool_token_type == 3:
             A = 500
             fee = 4000000
-            asset_type = 1
+            # asset_type = 1
             is_rebasing = True
 
         pool = factory.deploy_metapool(
             base_pool.address,
             "test",
             "test",
-            pool_tokens[0].address,
+            underlying_tokens[0].address,
             A,
             fee,
             866,
