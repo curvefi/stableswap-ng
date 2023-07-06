@@ -668,7 +668,7 @@ def deploy_metapool(
         _ma_exp_time,
         _method_id,
         _oracle,
-        _is_rebasing,
+        is_rebasing,
         _base_pool,
         self.base_pool_data[_base_pool].lp_token,
         self.base_pool_data[_base_pool].coins,
