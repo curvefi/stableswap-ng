@@ -13,7 +13,7 @@ struct PoolArray:
     coins: address[MAX_COINS]
     decimals: uint256[MAX_COINS]
     n_coins: uint256
-    asset_type: uint256
+    asset_types: uint256[MAX_COINS]
 
 struct BasePoolArray:
     lp_token: address
@@ -22,7 +22,7 @@ struct BasePoolArray:
     is_rebasing: bool[MAX_COINS]
     decimals: uint256
     n_coins: uint256
-    asset_type: uint256
+    asset_types: uint256[MAX_COINS]
 
 
 interface AddressProvider:
@@ -449,7 +449,7 @@ def is_meta(_pool: address) -> bool:
 
 @view
 @external
-def get_pool_asset_type(_pool: address) -> uint256:
+def get_pool_asset_types(_pool: address) -> uint256[MAX_COINS]:
     """
     @notice Query the asset type of `_pool`
     @dev 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
@@ -458,9 +458,9 @@ def get_pool_asset_type(_pool: address) -> uint256:
     """
     base_pool: address = self.pool_data[_pool].base_pool
     if base_pool == empty(address):
-        return self.pool_data[_pool].asset_type
+        return self.pool_data[_pool].asset_types
     else:
-        return self.base_pool_data[base_pool].asset_type
+        return self.base_pool_data[base_pool].asset_types
 
 
 @view
@@ -485,7 +485,7 @@ def deploy_plain_pool(
     _ma_exp_time: uint256,
     _method_ids: bytes4[MAX_COINS] = empty(bytes4[MAX_COINS]),
     _oracles: address[MAX_COINS] = empty(address[MAX_COINS]),
-    _asset_type: uint256 = 0,
+    _asset_types: uint256[MAX_COINS] = empty(uint256[MAX_COINS]),
     _implementation_idx: uint256 = 0,
     _is_rebasing: bool[MAX_COINS] = empty(bool[MAX_COINS])
 ) -> address:
@@ -510,8 +510,8 @@ def deploy_plain_pool(
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
-    @param _asset_type Asset type for pool, as an integer
-                       0 = USD, 1 = ETH, 2 = BTC, 3 = Other
+    @param _asset_types Asset types for pool, as an integer
+                       0 = PLAIN, 1 = ETH, 2 = ORACLE, 3 = REBASING
     @param _implementation_idx Index of the implementation to use. All possible
                 implementations for a pool of N_COINS can be publicly accessed
                 via `plain_implementations(N_COINS)`
@@ -570,8 +570,7 @@ def deploy_plain_pool(
     self.pool_data[pool].n_coins = n_coins
     self.pool_data[pool].base_pool = empty(address)
     self.pool_data[pool].implementation = implementation
-    if _asset_type != 0:
-        self.pool_data[pool].asset_type = _asset_type
+    self.pool_data[pool].asset_types = _asset_types
 
     for i in range(MAX_COINS):
         coin: address = _coins[i]
@@ -736,7 +735,7 @@ def add_base_pool(
     _base_lp_token: address,
     _fee_receiver: address,
     _coins: address[MAX_COINS],
-    _asset_type: uint256,
+    _asset_types: uint256[MAX_COINS],
     _n_coins: uint256,
     _is_rebasing: bool[MAX_COINS],
 ):
@@ -745,7 +744,7 @@ def add_base_pool(
     @dev Only callable by admin
     @param _base_pool Pool address to add
     @param _fee_receiver Admin fee receiver address for metapools using this base pool
-    @param _asset_type Asset type for pool, as an integer  0 = USD, 1 = ETH, 2 = BTC, 3 = Other
+    @param _asset_types Asset type for pool, as an integer  0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
     @param _is_rebasing Array of booleans: _is_rebasing[i] is True if basepool coin[i] is rebasing
     """
     assert msg.sender == self.admin  # dev: admin-only function
@@ -759,8 +758,7 @@ def add_base_pool(
     self.base_pool_data[_base_pool].lp_token = _base_lp_token
     self.base_pool_data[_base_pool].n_coins = _n_coins
     self.base_pool_data[_base_pool].fee_receiver = _fee_receiver
-    if _asset_type != 0:
-        self.base_pool_data[_base_pool].asset_type = _asset_type
+    self.base_pool_data[_base_pool].asset_types = _asset_types
 
     decimals: uint256 = 0
     coins: address[MAX_COINS] = _coins
@@ -831,17 +829,17 @@ def set_views_implementation(_views_implementation: address):
 
 
 @external
-def batch_set_pool_asset_type(_pools: address[32], _asset_types: uint256[32]):
+def batch_set_pool_asset_types(_pools: address[32], _asset_types: uint256[MAX_COINS][32]):
     """
     @notice Batch set the asset type for factory pools
     @dev Used to modify asset types that were set incorrectly at deployment
     """
-    assert msg.sender in [self.admin]  # dev: admin-only function
+    assert msg.sender == self.admin  # dev: admin-only function
 
     for i in range(32):
         if _pools[i] == empty(address):
             break
-        self.pool_data[_pools[i]].asset_type = _asset_types[i]
+        self.pool_data[_pools[i]].asset_types = _asset_types[i]
 
 
 @external
