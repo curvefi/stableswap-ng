@@ -52,14 +52,14 @@ def swap(
             pool = factory.deploy_plain_pool(
                 "test",
                 "test",
-                [pool_tokens[0].address, pool_tokens[1].address, *[zero_address] * 6],
+                [t.address for t in pool_tokens],
                 A,
                 fee,
                 866,
+                0,
                 method_ids,
                 oracles,
-                asset_type + [0] * (8 - len(asset_type)),
-                0,
+                asset_type,
                 is_rebasing,
             )
         return amm_interface_plain.at(pool)
