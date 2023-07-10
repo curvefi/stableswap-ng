@@ -38,7 +38,7 @@ implements: ERC20
 # ------------------------------- Interfaces ---------------------------------
 
 interface Factory:
-    def get_fee_receiver(_pool: address) -> address: view
+    def get_fee_receiver() -> address: view
     def admin() -> address: view
     def views_implementation() -> address: view
 
@@ -67,6 +67,10 @@ interface StableSwap3:
 interface StableSwap4:
     def add_liquidity(amounts: uint256[4], min_mint_amount: uint256): nonpayable
 
+interface StableSwap:
+    def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uint256): nonpayable
+    def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256): nonpayable
+
 # --------------------------------- Events -----------------------------------
 
 event Transfer:
@@ -80,6 +84,13 @@ event Approval:
     value: uint256
 
 event TokenExchange:
+    buyer: indexed(address)
+    sold_id: int128
+    tokens_sold: uint256
+    bought_id: int128
+    tokens_bought: uint256
+
+event TokenExchangeUnderlying:
     buyer: indexed(address)
     sold_id: int128
     tokens_sold: uint256
@@ -137,7 +148,6 @@ WETH20: immutable(address)
 N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
-IS_REBASING: immutable(DynArray[bool, MAX_COINS])
 
 # Implementation does not impose transfer restrictions:
 PERMISSIONED: public(constant(bool)) = False
@@ -145,12 +155,14 @@ PERMISSIONED: public(constant(bool)) = False
 # To denote that it is a plain pool:
 BASE_POOL: public(immutable(address))
 BASE_N_COINS: public(immutable(uint256))
-BASE_COINS: public(immutable(address[MAX_COINS]))
+BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
 
 factory: public(immutable(Factory))
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
 fee: public(uint256)  # fee * 1e10
+is_rebasing: HashMap[address, bool]
+
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
 # ---------------------- Pool Amplification Parameters -----------------------
@@ -220,9 +232,8 @@ def __init__(
     _ma_exp_time: uint256,
     _weth: address,
     _base_pool: address,
-    _base_lp_token: address,
-    _base_coins: DynArray[address, MAX_COINS],  # base pool can have maximally (MAX_COINS - 1) coins
     _coins: DynArray[address, MAX_COINS],
+    _base_coins: DynArray[address, MAX_COINS],
     _rate_multipliers: DynArray[uint256, MAX_COINS],
     _method_ids: DynArray[bytes4, MAX_COINS],
     _oracles: DynArray[address, MAX_COINS],
@@ -252,32 +263,36 @@ def __init__(
            a rebasing token: fee-on-transfer, tokens with slashing, positive rebasing, etc.
     """
 
+    WETH20 = _weth
     BASE_POOL = _base_pool
     BASE_COINS = _base_coins
-    BASE_N_COINS = len(_base_coins)
-
-    WETH20 = _weth
-    IS_REBASING = _is_rebasing
-
     coins = _coins
+
     __n_coins: uint256 = len(_coins)
+    __base_n_coins: uint256 = len(_base_coins)
+
+    BASE_N_COINS = __base_n_coins
+
+    if BASE_POOL != empty(address):
+
+        assert __n_coins == 2  # dev: metapools can only have 2 coins
+
+        self.is_rebasing[_coins[0]] = _is_rebasing[0]
+        for i in range(MAX_COINS):
+            if i == __base_n_coins:
+                break
+            self.is_rebasing[_base_coins[i]] = _is_rebasing[i+1]
+
+        self.last_prices_packed = self.pack_prices(10**18, 10**18)  # <--- TODO: check this!
+
+    else:
+
+        __n_coins = len(_coins)
+        self.last_prices_packed = self.pack_prices(10**18, 10**18)  # TODO: fix this!
+
+
     N_COINS = __n_coins
     N_COINS_128 = convert(__n_coins, int128)
-    __rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
-
-        # Enforce native token as coin[0] (makes integrators happy)
-        if _coins[i] == WETH20:
-            assert i == 0, "ETH must be at index 0"
-
-        __rate_multipliers[i] = _rate_multipliers[i]
-        self.oracles[i] = convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256)
-
-    rate_multipliers = __rate_multipliers
 
     # ----------------- Parameters independent of pool type ------------------
 
@@ -292,10 +307,26 @@ def __init__(
 
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
-    self.last_prices_packed = self.pack_prices(10**18, 10**18)
     self.ma_last_time = block.timestamp
 
-    # EIP712
+    # Rate Multipliers -----------------
+    __rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    for i in range(MAX_COINS_128):
+
+        if i == N_COINS_128:
+            break
+
+        # Enforce native token as coin[0] (makes integrators happy)
+        if _coins[i] == WETH20:
+            assert i == 0, "ETH must be at index 0"
+
+        __rate_multipliers[i] = _rate_multipliers[i]
+        self.oracles[i] = convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256)
+        self.admin_balances[i] = 0
+
+    rate_multipliers = __rate_multipliers
+
+    # EIP712 related params -----------------
     NAME_HASH = keccak256(name)
     salt = block.prevhash
     CACHED_CHAIN_ID = chain.id
@@ -310,7 +341,8 @@ def __init__(
         )
     )
 
-    # fire a transfer event so block explorers identify the contract as an ERC20
+    # ------------------------ Fire a transfer event -------------------------
+
     log Transfer(empty(address), self, 0)
 
 
@@ -360,8 +392,8 @@ def _transfer_in(
     @params use_eth True if the transfer is ETH, False otherwise.
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
-    is_rebasing: bool = True in IS_REBASING
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
+    incoming_coin_is_rebasing: bool = self.is_rebasing[coins[coin_idx]]
 
     # ------------------------- Handle Transfers -----------------------------
 
@@ -372,7 +404,7 @@ def _transfer_in(
 
     elif expect_optimistic_transfer:
 
-        assert not is_rebasing
+        assert not incoming_coin_is_rebasing, "exchange_received not allowed if incoming token is rebasing"
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
     elif callback_sig != empty(bytes32):
@@ -397,8 +429,8 @@ def _transfer_in(
 
     # --------------------------- Check Transfer -----------------------------
 
-    if is_rebasing:
-        assert _dx > 0, "Pool did not receive tokens for swap"
+    if incoming_coin_is_rebasing:
+        assert _dx > 0, "Pool did not receive tokens for swap"  # TODO: Check this!!
     else:
         assert dx == _dx, "Pool did not receive tokens for swap"
 
@@ -981,7 +1013,6 @@ def _exchange_underlying(
 ) -> uint256:
 
     assert BASE_POOL != empty(address)  # dev: pool is not a metapool
-    assert N_COINS == 2  # dev: only N_COINS = 2 supported for metapools
 
     rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
@@ -1027,17 +1058,21 @@ def _exchange_underlying(
             assert dx_w_fee == _dx
             self.stored_balances[meta_i] += dx_w_fee
 
+    elif callback_sig != empty(bytes32):
+
+        raw_call(
+                callbacker,
+                concat(
+                    slice(callback_sig, 0, 4),
+                    _abi_encode(sender, receiver, input_coin, _dx, _min_dy)
+                )
+            )
+
     else:
 
-        dx_w_fee = self._transfer_in(
-            input_coin,
-            _dx,
-            _min_dy,
-            callbacker,
-            callback_sig,
-            sender,
-            receiver,
-        )
+        assert ERC20(input_coin).transferFrom(sender, self, _dx, default_return_value=True)
+
+    dx_w_fee = ERC20(input_coin).balanceOf(self) - _dx
 
     # ------------------------------------------------------------------------
 
@@ -1053,12 +1088,12 @@ def _exchange_underlying(
             x = dx_w_fee * rates[MAX_METAPOOL_COINS_128] / PRECISION
             x += xp[MAX_METAPOOL_COINS_128]
 
-        dy = self._exchange_core(dx_w_fee, x, xp, rates, meta_i, meta_j)
+        dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
         # Withdraw from the base pool if needed
         if j > 0:
             out_amount: uint256 = ERC20(output_coin).balanceOf(self)
-            Curve(BASE_POOL).remove_liquidity_one_coin(dy, base_j, 0)
+            StableSwap(BASE_POOL).remove_liquidity_one_coin(dy, base_j, 0)
             dy = ERC20(output_coin).balanceOf(self) - out_amount
 
         assert dy >= _min_dy
@@ -1069,7 +1104,7 @@ def _exchange_underlying(
     else:  # base pool swap (user should swap at base pool for better gas)
 
         dy = ERC20(output_coin).balanceOf(self)
-        Curve(BASE_POOL).exchange(base_i, base_j, dx_w_fee, _min_dy)
+        StableSwap(BASE_POOL).exchange(base_i, base_j, dx_w_fee, _min_dy)
         dy = ERC20(output_coin).balanceOf(self) - dy
 
     # --------------------------- Do Transfer out ----------------------------
@@ -1113,11 +1148,10 @@ def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
 @internal
 def _withdraw_admin_fees():
 
-    admin_balances: DynArray[uint256, MAX_COINS] = self.admin_balances
-    fee_receiver: address = factory.get_fee_receiver(self)
-
+    fee_receiver: address = factory.get_fee_receiver()
     assert fee_receiver != empty(address)  # dev: fee receiver not set
 
+    admin_balances: DynArray[uint256, MAX_COINS] = self.admin_balances
     for i in range(MAX_COINS_128):
 
         if i == N_COINS_128:
