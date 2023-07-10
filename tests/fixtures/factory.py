@@ -25,17 +25,6 @@ def amm_implementation_plain(deployer, amm_interface_plain):
 
 
 @pytest.fixture(scope="module")
-def amm_interface_meta():
-    return boa.load_partial("contracts/main/CurveStableSwapMetaNG.vy")
-
-
-@pytest.fixture(scope="module")
-def amm_implementation_meta(deployer, amm_interface_meta):
-    with boa.env.prank(deployer):
-        return amm_interface_meta.deploy_as_blueprint()
-
-
-@pytest.fixture(scope="module")
 def views_implementation(deployer):
     with boa.env.prank(deployer):
         return boa.load("contracts/main/CurveStableSwapNGViews.vy")
@@ -60,33 +49,24 @@ def factory(
 
 # <---------------------   Functions   --------------------->
 @pytest.fixture(scope="module")
-def set_plain_implementations(owner, factory, amm_implementation_plain):
+def set_pool_implementations(owner, factory, amm_implementation_plain):
     with boa.env.prank(owner):
-        factory.set_plain_implementations(0, amm_implementation_plain.address)
-
-
-@pytest.fixture(scope="module")
-def set_meta_implementations(owner, factory, amm_implementation_meta):
-    with boa.env.prank(owner):
-        factory.set_metapool_implementations(0, amm_implementation_meta.address)
+        factory.set_pool_implementations(0, amm_implementation_plain.address)
 
 
 @pytest.fixture(scope="module")
 def add_base_pool(
     owner,
-    fee_receiver,
     factory,
     base_pool,
     base_pool_lp_token,
     base_pool_tokens,
-    zero_address,
 ):
     with boa.env.prank(owner):
         factory.add_base_pool(
             base_pool.address,
             base_pool_lp_token.address,
-            fee_receiver,
-            [t.address for t in base_pool_tokens] + [zero_address] * (8 - len(base_pool_tokens)),
+            [t.address for t in base_pool_tokens],
             0,
             len(base_pool_tokens),
             [False] * 8,
