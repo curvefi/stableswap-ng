@@ -17,7 +17,6 @@ struct PoolArray:
 
 struct BasePoolArray:
     lp_token: address
-    fee_receiver: address
     coins: DynArray[address, MAX_COINS]
     is_rebasing: DynArray[bool, MAX_COINS]
     decimals: uint256
@@ -101,8 +100,8 @@ metapool_implementations: public(HashMap[uint256, address])
 gauge_implementation: public(address)
 views_implementation: public(address)
 
-# fee receiver for plain pools
-fee_receiver: address
+# fee receiver for all pools
+fee_receiver: public(address)
 
 # mapping of coins -> pools for trading
 # a mapping key is generated for each pair of addresses via
@@ -459,16 +458,6 @@ def get_pool_asset_type(_pool: address) -> uint256:
         return self.base_pool_data[base_pool].asset_type
 
 
-@view
-@external
-def get_fee_receiver(_pool: address) -> address:
-    base_pool: address = self.pool_data[_pool].base_pool
-    if base_pool == empty(address):
-        return self.fee_receiver
-    else:
-        return self.base_pool_data[base_pool].fee_receiver
-
-
 # <--- Pool Deployers --->
 
 @external
@@ -729,7 +718,6 @@ def deploy_gauge(_pool: address) -> address:
 def add_base_pool(
     _base_pool: address,
     _base_lp_token: address,
-    _fee_receiver: address,
     _coins: DynArray[address, MAX_COINS],
     _asset_type: uint256,
     _n_coins: uint256,
@@ -739,7 +727,6 @@ def add_base_pool(
     @notice Add a base pool to the registry, which may be used in factory metapools
     @dev Only callable by admin
     @param _base_pool Pool address to add
-    @param _fee_receiver Admin fee receiver address for metapools using this base pool
     @param _asset_type Asset type for pool, as an integer  0 = USD, 1 = ETH, 2 = BTC, 3 = Other
     @param _is_rebasing Array of booleans: _is_rebasing[i] is True if basepool coin[i] is rebasing
     """
@@ -753,7 +740,6 @@ def add_base_pool(
     self.base_pool_count = length + 1
     self.base_pool_data[_base_pool].lp_token = _base_lp_token
     self.base_pool_data[_base_pool].n_coins = _n_coins
-    self.base_pool_data[_base_pool].fee_receiver = _fee_receiver
     if _asset_type != 0:
         self.base_pool_data[_base_pool].asset_type = _asset_type
 
@@ -849,33 +835,11 @@ def accept_transfer_ownership():
 
 
 @external
-def set_fee_receiver(_base_pool: address, _fee_receiver: address):
+def set_fee_receiver(_pool: address, _fee_receiver: address):
     """
-    @notice Set fee receiver for base and plain pools
-    @param _base_pool Address of base pool to set fee receiver for.
-                      For plain pools, leave as `empty(address)`.
+    @notice Set fee receiver for all pools
+    @param _pool Address of  pool to set fee receiver for.
     @param _fee_receiver Address that fees are sent to
     """
     assert msg.sender == self.admin  # dev: admin only
-    if _base_pool == empty(address):
-        self.fee_receiver = _fee_receiver
-    else:
-        self.base_pool_data[_base_pool].fee_receiver = _fee_receiver
-
-
-@external
-def convert_metapool_fees() -> bool:
-    """
-    @notice Convert the fees of a metapool and transfer to
-            the metapool's fee receiver
-    @dev All fees are converted to LP token of base pool
-    """
-    base_pool: address = self.pool_data[msg.sender].base_pool
-    assert base_pool != empty(address)  # dev: sender must be metapool
-    coin: address = self.pool_data[msg.sender].coins[0]
-
-    amount: uint256 = ERC20(coin).balanceOf(self)
-    receiver: address = self.base_pool_data[base_pool].fee_receiver
-
-    CurvePool(msg.sender).exchange(0, 1, amount, 0, False, receiver)
-    return True
+    self.fee_receiver = _fee_receiver
