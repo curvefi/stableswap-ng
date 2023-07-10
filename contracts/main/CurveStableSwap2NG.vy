@@ -70,6 +70,7 @@ interface StableSwap4:
 interface StableSwap:
     def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uint256): nonpayable
     def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256): nonpayable
+    def get_virtual_price() -> uint256: view
 
 # --------------------------------- Events -----------------------------------
 
@@ -274,26 +275,38 @@ def __init__(
 
     # ----------------- Parameters dependent of pool type --------------------
 
+    __rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+
     if BASE_POOL != empty(address):
 
         assert __n_coins == 2  # dev: metapools can only have 2 coins
 
         self.is_rebasing[_coins[0]] = _is_rebasing[0]
+        # self.is_rebasing[_coins[1]] = False is ignored,
+        # because _coins[1] is base_lp_token and that does not rebase.
+
         for i in range(MAX_COINS):
             if i == __base_n_coins:
                 break
             self.is_rebasing[_base_coins[i]] = _is_rebasing[i+1]
 
+            # Approval needed for add_liquidity operation on base pool in _exchange_underlying
+            ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))
+
         self.last_prices_packed = self.pack_prices(10**18, 10**18)  # <--- TODO: check this!
+
+        # Only need rate_multiplier for coin paired against basepool's lp token:
+        __rate_multipliers = [_rate_multipliers[0]]
 
     else:
 
         __n_coins = len(_coins)
-        self.last_prices_packed = self.pack_prices(10**18, 10**18)  # TODO: fix this!
-
+        self.last_prices_packed = self.pack_prices(10**18, 10**18)  # TODO: fix this since there are more than 2 prices!
+        __rate_multipliers = _rate_multipliers
 
     N_COINS = __n_coins
     N_COINS_128 = convert(__n_coins, int128)
+    rate_multipliers = __rate_multipliers
 
     # ----------------- Parameters independent of pool type ------------------
 
@@ -310,22 +323,17 @@ def __init__(
     self.ma_exp_time = _ma_exp_time
     self.ma_last_time = block.timestamp
 
-    # Rate Multipliers -----------------
-    __rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(MAX_COINS_128):
 
         if i == N_COINS_128:
             break
 
-        # Enforce native token as coin[0] (makes integrators happy)
+        # Enforce native token as coin[0]
         if _coins[i] == WETH20:
             assert i == 0, "ETH must be at index 0"
 
-        __rate_multipliers[i] = _rate_multipliers[i]
         self.oracles[i] = convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256)
-        self.admin_balances[i] = 0
-
-    rate_multipliers = __rate_multipliers
+        self.admin_balances[i] = 0  # <--- this initialises storage for admin balances  # TODO: check if this is needed?
 
     # EIP712 related params -----------------
     NAME_HASH = keccak256(name)
@@ -486,7 +494,12 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
          this method queries that rate by static-calling an external
          contract.
     """
-    rates: DynArray[uint256, MAX_COINS] = rate_multipliers
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    if BASE_POOL != empty(address):
+        rates = [rate_multipliers[0], StableSwap(BASE_POOL).get_virtual_price()]
+    else:
+        rates = rate_multipliers
+
     oracles: DynArray[uint256, MAX_COINS] = self.oracles
 
     for i in range(MAX_COINS_128):
