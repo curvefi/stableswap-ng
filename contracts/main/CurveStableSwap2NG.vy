@@ -270,8 +270,9 @@ def __init__(
 
     __n_coins: uint256 = len(_coins)
     __base_n_coins: uint256 = len(_base_coins)
-
     BASE_N_COINS = __base_n_coins
+
+    # ----------------- Parameters dependent of pool type --------------------
 
     if BASE_POOL != empty(address):
 
@@ -1434,7 +1435,7 @@ def _calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256[3]:
 
 @pure
 @internal
-def pack_prices(p1: uint256, p2: uint256) -> uint256:
+def pack_prices(p1: uint256, p2: uint256) -> uint256:  # <---- TODO: how to pack 8 numbers?
     assert p1 < 2**128
     assert p2 < 2**128
     return p1 | (p2 << 128)
@@ -1463,7 +1464,7 @@ def _get_p(
 
 
 @internal
-def save_p_from_price(last_price: uint256):
+def save_p_from_price(last_price: uint256):  # <---- TODO: this should accept last_prices with length MAX_COINS-1
     """
     Saves current price and its EMA
     """
@@ -1483,7 +1484,7 @@ def save_p(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
 
 @internal
 @view
-def _ma_price() -> uint256:
+def _ma_price() -> uint256:  # <---- TODO: this one needs an index!
     ma_last_time: uint256 = self.ma_last_time
 
     pp: uint256 = self.last_prices_packed
@@ -1500,19 +1501,19 @@ def _ma_price() -> uint256:
 
 @view
 @external
-def last_price() -> uint256:
+def last_price() -> uint256:  # <---- TODO: this one needs an index!
     return self.last_prices_packed & (2**128 - 1)
 
 
 @view
 @external
-def ema_price() -> uint256:
+def ema_price() -> uint256:  # <---- TODO: this one needs an index!
     return (self.last_prices_packed >> 128)
 
 
 @external
 @view
-def get_p() -> uint256:
+def get_p() -> uint256:  # <---- TODO: this one needs an index!
     amp: uint256 = self._A()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
         self._stored_rates(), self._balances()
@@ -1524,8 +1525,8 @@ def get_p() -> uint256:
 @external
 @view
 @nonreentrant('lock')
-def price_oracle() -> uint256:
-    return self._ma_price()
+def price_oracle() -> uint256:  # <---- TODO: this one needs an index!
+    return self._ma_price()  # <---- TODO: this one needs an index!
 
 
 # ----------------------------- Math Utils -----------------------------------
