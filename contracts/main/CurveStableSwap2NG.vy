@@ -950,30 +950,11 @@ def _exchange(
         expect_optimistic_transfer
     )
 
-    # ------------------------------------------------------------------------
+    # ------------------------------- Exchange -------------------------------
 
     x: uint256 = xp[i] + dx * rates[i] / PRECISION
-
-    amp: uint256 = self._A()
-    D: uint256 = self.get_D(xp, amp)
-    y: uint256 = self.get_y(i, j, x, xp, amp, D)
-
-    dy: uint256 = xp[j] - y - 1  # -1 just in case there were some rounding errors
-    dy_fee: uint256 = dy * self.fee / FEE_DENOMINATOR
-
-    # Convert all to real units
-    dy = (dy - dy_fee) * PRECISION / rates[j]
+    dy: uint256 = self.__exchange(dx, x, xp, rates, i, j)
     assert dy >= _min_dy, "Exchange resulted in fewer coins than expected"
-
-    self.admin_balances[j] += (
-        dy_fee * ADMIN_FEE / FEE_DENOMINATOR
-    ) * PRECISION / rates[j]
-
-    # xp is not used anymore, so we reuse it for price calc
-    xp[i] = x
-    xp[j] = y
-    # D is not changed because we did not apply a fee
-    self.save_p(xp, amp, D)  # TODO: this needs to be for Dynamic N_COINS
 
     # --------------------------- Do Transfer out ----------------------------
 
