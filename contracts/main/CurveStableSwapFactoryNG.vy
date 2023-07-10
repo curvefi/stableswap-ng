@@ -503,8 +503,12 @@ def deploy_plain_pool(
     @return Address of the deployed pool
     """
     assert _fee <= 100000000, "Invalid fee"
+    assert len(_coins) == len(_method_ids), "All coin arrays should be same length"
+    assert len(_coins) ==  len(_oracles), "All coin arrays should be same length"
+    assert len(_coins) ==  len(_asset_types), "All coin arrays should be same length"
+    assert len(_coins) ==  len(_is_rebasing), "All coin arrays should be same length"
 
-    n_coins: uint256 = 0
+    n_coins: uint256 = len(_coins)
     _rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     decimals: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
 
@@ -514,10 +518,10 @@ def deploy_plain_pool(
 
         coin: address = _coins[i]
 
-        decimals[i] = ERC20(coin).decimals()
+        decimals.append(ERC20(coin).decimals())
         assert decimals[i] < 19, "Max 18 decimals for coins"
 
-        _rate_multipliers[i] = 10 ** (36 - decimals[i])
+        _rate_multipliers.append(10 ** (36 - decimals[i]))
 
         for j in range(i, i + MAX_COINS):
             if (j + 1) == n_coins:

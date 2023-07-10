@@ -10,6 +10,7 @@ def swap(
     deployer,
     factory,
     weth,
+    pool_size,
     pool_type,
     pool_token_types,
     pool_tokens,
@@ -17,15 +18,15 @@ def swap(
 ):
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
     if pool_type == 0:
-        amm_interface_plain = request.getfixturevalue("amm_interface_plain")
-        _ = request.getfixturevalue("set_plain_implementations")
+        amm_interface_plain = request.getfixturevalue("amm_interface")
+        _ = request.getfixturevalue("set_pool_implementations")
 
         A = 2000
         fee = 1000000
-        method_ids = [bytes(b"")] * 8
-        oracles = [zero_address] * 8
+        method_ids = [bytes(b"")] * pool_size
+        oracles = [zero_address] * pool_size
         asset_type = []
-        is_rebasing = [False] * 8
+        is_rebasing = [False] * pool_size
 
         for i, t in enumerate(pool_token_types):
             if t == 0:

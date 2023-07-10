@@ -16,10 +16,10 @@ class TestFactory:
 
         def test_get_admin_balances(self, factory, swap, pool_size):
             balances = [swap.admin_balances(i) for i in range(pool_size)]
-            assert factory.get_admin_balances(swap.address) == balances + [0] * (MAX_COINS - len(balances))
+            assert factory.get_admin_balances(swap.address) == balances
 
-        def test_fee_receiver(self, factory, swap, fee_receiver):
-            assert factory.get_fee_receiver(swap.address) == fee_receiver
+        def test_fee_receiver(self, factory, fee_receiver):
+            assert factory.fee_receiver() == fee_receiver
 
     @pytest.mark.only_for_pool_type(0)
     class TestBasic:
@@ -30,21 +30,17 @@ class TestFactory:
                 == swap.address
             )
 
-        def test_get_n_coins(self, factory, swap, pool_tokens, pool_size, zero_address):
+        def test_get_n_coins(self, factory, swap, pool_tokens, pool_size):
             assert factory.get_n_coins(swap.address) == 2
 
-        def test_get_coins(self, factory, swap, pool_tokens, pool_size, zero_address):
-            assert factory.get_coins(swap.address) == [pt.address for pt in pool_tokens] + [zero_address] * (
-                MAX_COINS - pool_size
-            )
+        def test_get_coins(self, factory, swap, pool_tokens, pool_size):
+            assert factory.get_coins(swap.address) == [pt.address for pt in pool_tokens]
 
         def test_get_decimals(self, factory, swap, decimals):
-            assert factory.get_decimals(swap.address) == decimals + [0] * (MAX_COINS - len(decimals))
+            assert factory.get_decimals(swap.address) == decimals
 
         def test_get_balances(self, factory, swap, pool_size):
-            assert factory.get_balances(swap.address) == [swap.balances(i) for i in range(pool_size)] + [0] * (
-                MAX_COINS - pool_size
-            )
+            assert factory.get_balances(swap.address) == [swap.balances(i) for i in range(pool_size)]
 
         @pytest.mark.only_for_pool_type(0)
         def test_get_underlying_balances(self, factory, swap):
@@ -58,11 +54,6 @@ class TestFactory:
         def test_get_fees(self, factory, swap):
             assert factory.get_fees(swap.address) == (swap.fee(), swap.admin_fee())
 
-        def test_get_admin_balances(self, factory, swap, pool_size):
-            assert factory.get_admin_balances(swap.address) == [swap.admin_balances(i) for i in range(pool_size)] + [
-                0
-            ] * (MAX_COINS - pool_size)
-
         @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
         def test_get_coin_indices(self, factory, swap, sending, receiving, pool_tokens):
             i, j, is_underlying = factory.get_coin_indices(
@@ -71,8 +62,8 @@ class TestFactory:
             assert i == sending
             assert j == receiving
 
-        def test_get_implementation_address(self, factory, swap, amm_implementation_plain):
-            assert factory.get_implementation_address(swap.address) == amm_implementation_plain.address
+        def test_get_implementation_address(self, factory, swap, amm_implementation):
+            assert factory.get_implementation_address(swap.address) == amm_implementation.address
 
         def test_is_meta(self, factory, swap):
             assert factory.is_meta(swap.address) is False
@@ -95,16 +86,12 @@ class TestFactory:
         def test_get_meta_n_coins(self, factory, swap):
             assert factory.get_meta_n_coins(swap.address) == (2, 4)
 
-        def test_get_underlying_coins(self, factory, swap, underlying_tokens, zero_address):
+        def test_get_underlying_coins(self, factory, swap, underlying_tokens):
             tokens = [underlying_tokens[0]] + underlying_tokens[2:]
-            assert factory.get_underlying_coins(swap.address) == [t.address for t in tokens] + [zero_address] * (
-                MAX_COINS - len(tokens)
-            )
+            assert factory.get_underlying_coins(swap.address) == [t.address for t in tokens]
 
         def test_get_underlying_decimals(self, factory, swap, base_pool_decimals, pool_type):
-            assert factory.get_underlying_decimals(swap.address) == [18] + base_pool_decimals + [0] * (
-                MAX_COINS - len(base_pool_decimals) - 1
-            )
+            assert factory.get_underlying_decimals(swap.address) == [18] + base_pool_decimals
 
         def test_get_metapool_rates(self, factory, swap, base_pool):
             assert factory.get_metapool_rates(swap.address) == [10**18, base_pool.get_virtual_price()]
