@@ -1126,8 +1126,9 @@ def _withdraw_admin_fees():
         if admin_balances[i] > 0:
 
             self._transfer_out(i, admin_balances[i], False, fee_receiver)
+            admin_balances[i] = 0
 
-    self.admin_balances = empty(DynArray[uint256, MAX_COINS])
+    self.admin_balances = admin_balances
 
 
 # --------------------------- AMM Math Functions -----------------------------
