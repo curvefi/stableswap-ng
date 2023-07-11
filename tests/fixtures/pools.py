@@ -10,6 +10,7 @@ def swap(
     deployer,
     factory,
     weth,
+    pool_size,
     pool_type,
     pool_token_types,
     pool_tokens,
@@ -17,49 +18,49 @@ def swap(
 ):
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
     if pool_type == 0:
-        amm_interface_plain = request.getfixturevalue("amm_interface_plain")
-        _ = request.getfixturevalue("set_plain_implementations")
+        amm_interface_plain = request.getfixturevalue("amm_interface")
+        _ = request.getfixturevalue("set_pool_implementations")
 
         A = 2000
         fee = 1000000
-        method_ids = [bytes(b"")] * 8
-        oracles = [zero_address] * 8
-        asset_type = 0  # 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
-        is_rebasing = [False] * 8
+        method_ids = [bytes(b"")] * pool_size
+        oracles = [zero_address] * pool_size
+        asset_type = []
+        is_rebasing = [False] * pool_size
 
         for i, t in enumerate(pool_token_types):
             if t == 0:
                 A = 2000
                 fee = 1000000
-                asset_type = 0
+                asset_type.append(0)
             elif t == 1:
                 A = 1000
                 fee = 3000000
-                asset_type = 1
+                asset_type.append(1)
             elif t == 2:
                 A = 1000
                 fee = 3000000
-                asset_type = 1
+                asset_type.append(2)
                 method_ids[i] = oracle_method_id
                 oracles[i] = pool_tokens[i].address
             elif t == 3:
                 A = 500
                 fee = 4000000
-                asset_type = 1
+                asset_type.append(3)
                 is_rebasing[i] = True
 
         with boa.env.prank(deployer):
             pool = factory.deploy_plain_pool(
                 "test",
                 "test",
-                [pool_tokens[0].address, pool_tokens[1].address, *[zero_address] * 6],
+                [t.address for t in pool_tokens],
                 A,
                 fee,
                 866,
+                0,
                 method_ids,
                 oracles,
                 asset_type,
-                0,
                 is_rebasing,
             )
         return amm_interface_plain.at(pool)
@@ -67,14 +68,15 @@ def swap(
     elif pool_type == 1:
         base_pool = request.getfixturevalue("base_pool")
         underlying_tokens = request.getfixturevalue("underlying_tokens")
-        amm_interface_meta = request.getfixturevalue("amm_interface_meta")
-        _ = request.getfixturevalue("set_meta_implementations")
+        amm_interface_meta = request.getfixturevalue("amm_interface")
+        _ = request.getfixturevalue("add_base_pool")
+        _ = request.getfixturevalue("set_pool_implementations")
 
         A = 2000
         fee = 1000000
         method_id = bytes(b"")
         oracle = zero_address
-        asset_type = 0  # 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
+        asset_type = 0  # 0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
         is_rebasing = False
         metapool_token_type = pool_token_types[0]
 
@@ -89,28 +91,28 @@ def swap(
         elif metapool_token_type == 2:
             A = 1000
             fee = 3000000
-            asset_type = 1
+            asset_type = 2
             method_id = oracle_method_id
             oracle = underlying_tokens[0].address
 
         elif metapool_token_type == 3:
             A = 500
             fee = 4000000
-            asset_type = 1
+            asset_type = 3
             is_rebasing = True
 
         pool = factory.deploy_metapool(
             base_pool.address,
             "test",
             "test",
-            pool_tokens[0].address,
+            underlying_tokens[0].address,
             A,
             fee,
             866,
+            0,
+            0,
             method_id,
             oracle,
-            asset_type,
-            0,
             is_rebasing,
         )
 
@@ -121,7 +123,7 @@ def swap(
 
 
 # <---------------------   Metapool configuration   --------------------->
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base_pool_lp_token, zero_address):
     with boa.env.prank(deployer):
         base_pool = boa.load(
