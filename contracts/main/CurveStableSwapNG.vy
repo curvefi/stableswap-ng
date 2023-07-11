@@ -147,7 +147,7 @@ event ApplyNewFee:
 
 MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
 MAX_COINS_128: constant(int128) = 8
-MAX_METAPOOL_COINS_128: constant(int128) = 2
+MAX_METAPOOL_COIN_INDEX: constant(int128) = 1
 
 # ---------------------------- Pool Variables --------------------------------
 
@@ -1166,13 +1166,13 @@ def _exchange_underlying(
     if i == 0:
         input_coin = coins[0]
     else:
-        base_i = i - MAX_METAPOOL_COINS_128  # if i == 1, this reverts
+        base_i = i - MAX_METAPOOL_COIN_INDEX  # if i == 1, this reverts
         meta_i = 1
         input_coin = BASE_COINS[base_i]
     if j == 0:
         output_coin = coins[0]
     else:
-        base_j = j - MAX_METAPOOL_COINS_128  # if j == 1, this reverts
+        base_j = j - MAX_METAPOOL_COIN_INDEX  # if j == 1, this reverts
         meta_j = 1
         output_coin = BASE_COINS[base_j]
 
@@ -1223,8 +1223,8 @@ def _exchange_underlying(
         else:
 
             dx_w_fee = self._meta_add_liquidity(dx_w_fee, base_i)
-            x = dx_w_fee * rates[MAX_METAPOOL_COINS_128] / PRECISION
-            x += xp[MAX_METAPOOL_COINS_128]
+            x = dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX] / PRECISION
+            x += xp[MAX_METAPOOL_COIN_INDEX]
 
         dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
@@ -1259,7 +1259,7 @@ def _exchange_underlying(
 @internal
 def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
 
-    coin_i: address = coins[MAX_METAPOOL_COINS_128]
+    coin_i: address = coins[MAX_METAPOOL_COIN_INDEX]
     x: uint256 = ERC20(coin_i).balanceOf(self)
 
     if BASE_N_COINS == 2:
