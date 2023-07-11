@@ -538,9 +538,7 @@ def deploy_plain_pool(
         _fee,                                           # _fee: uint256
         _ma_exp_time,                                   # _ma_exp_time: uint256
         WETH20,                                         # _weth: address
-        empty(address),                                 # _base_pool: address
         _coins,                                         # _coins: DynArray[address, MAX_COINS]
-        empty(DynArray[address, MAX_COINS]),            # base_coins: DynArray[address, MAX_COINS]
         _rate_multipliers,                              # _rate_multipliers: DynArray[uint256, MAX_COINS]
         _method_ids,                                    # _method_ids: DynArray[bytes4, MAX_COINS]
         _oracles,                                       # _oracles: DynArray[address, MAX_COINS]
