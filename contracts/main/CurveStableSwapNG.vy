@@ -670,6 +670,112 @@ def exchange_received(
     )
 
 
+@external
+@nonreentrant('lock')
+def exchange_underlying(
+    i: int128,
+    j: int128,
+    _dx: uint256,
+    _min_dy: uint256,
+    _use_eth: bool = False,
+    _receiver: address = msg.sender,
+) -> uint256:
+    """
+    @notice Perform an exchange between two underlying coins
+    @dev Even if _use_eth is in the abi, the method does not accept native token
+    @param i Index value for the underlying coin to send
+    @param j Index value of the underlying coin to receive
+    @param _dx Amount of `i` being exchanged
+    @param _min_dy Minimum amount of `j` to receive
+    @param _use_eth Use native token transfers (if pool has WETH20)
+                    For MetaNG: native token wrapping/unwrapping is disabled; this
+                    parameter can be whatever.
+    @param _receiver Address that receives `j`
+    @return Actual amount of `j` received
+    """
+    return self._exchange_underlying(
+        msg.sender,
+        i,
+        j,
+        _dx,
+        _min_dy,
+        _receiver,
+        empty(address),
+        empty(bytes32),
+        False
+    )
+
+
+@external
+@nonreentrant('lock')
+def exchange_underlying_extended(
+    i: int128,
+    j: int128,
+    _dx: uint256,
+    _min_dy: uint256,
+    _use_eth: bool,
+    _receiver: address,
+    _cb: bytes32
+) -> uint256:
+    """
+    @notice Perform an exchange between two underlying coins
+    @dev Even if _use_eth is in the abi, the method does not accept native token
+    @param i Index value for the underlying coin to send
+    @param j Index value of the underlying coin to receive
+    @param _dx Amount of `i` being exchanged
+    @param _min_dy Minimum amount of `j` to receive
+    @param _use_eth Use native token transfers (if pool has WETH20)
+    @param _receiver Address that receives `j`
+    @return Actual amount of `j` received
+    """
+    assert _cb != empty(bytes32)  # dev: no callback specified
+    return self._exchange_underlying(
+        msg.sender,
+        i,
+        j,
+        _dx,
+        _min_dy,
+        _receiver,
+        msg.sender,
+        _cb,
+        False
+    )
+
+
+@external
+@nonreentrant('lock')
+def exchange_underlying_received(
+    i: int128,
+    j: int128,
+    _dx: uint256,
+    _min_dy: uint256,
+    _use_eth: bool,
+    _receiver: address,
+) -> uint256:
+    """
+    @notice Perform an exchange between two underlying coins
+    @dev Even if _use_eth is in the abi, the method does not accept native token
+    @param i Index value for the underlying coin to send
+    @param j Index value of the underlying coin to receive
+    @param _dx Amount of `i` being exchanged
+    @param _min_dy Minimum amount of `j` to receive
+    @param _use_eth Use native token transfers (if pool has WETH20)
+    @param _receiver Address that receives `j`
+    @return Actual amount of `j` received
+    """
+    return self._exchange_underlying(
+        msg.sender,
+        i,
+        j,
+        _dx,
+        _min_dy,
+        _receiver,
+        empty(address),
+        empty(bytes32),
+        True
+    )
+
+
 @payable
 @external
 @nonreentrant('lock')
@@ -757,7 +863,7 @@ def add_liquidity(
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
         D2: uint256 = self.get_D(xp, amp)
         mint_amount = total_supply * (D2 - D0) / D0
-        self.save_p(xp, amp, D2)  # TODO: this needs to be for Dynamic N_COINS
+        self.save_p(xp, amp, D2)
 
     else:
 
@@ -868,7 +974,7 @@ def remove_liquidity_imbalance(
 
     D2: uint256 = self.get_D_mem(rates, new_balances, amp)
 
-    self.save_p(new_balances, amp, D2)  # TODO: this needs to be for Dynamic N_COINS
+    self.save_p(new_balances, amp, D2)
 
     total_supply: uint256 = self.totalSupply
     burn_amount: uint256 = ((D0 - D2) * total_supply / D0) + 1
@@ -944,17 +1050,17 @@ def withdraw_admin_fees():
 def __exchange(
     dx: uint256,
     x: uint256,
-    xp: DynArray[uint256, MAX_COINS],
+    _xp: DynArray[uint256, MAX_COINS],
     rates: DynArray[uint256, MAX_COINS],
     i: int128,
     j: int128,
 ) -> uint256:
 
     amp: uint256 = self._A()
-    D: uint256 = self.get_D(xp, amp)
-    y: uint256 = self.get_y(i, j, x, xp, amp, D)
+    D: uint256 = self.get_D(_xp, amp)
+    y: uint256 = self.get_y(i, j, x, _xp, amp, D)
 
-    dy: uint256 = xp[j] - y - 1  # -1 just in case there were some rounding errors
+    dy: uint256 = _xp[j] - y - 1  # -1 just in case there were some rounding errors
     dy_fee: uint256 = dy * self.fee / FEE_DENOMINATOR
 
     # Convert all to real units
@@ -964,8 +1070,12 @@ def __exchange(
         dy_fee * ADMIN_FEE / FEE_DENOMINATOR
     ) * PRECISION / rates[j]
 
+    # Calculate and store state prices:
+    xp: DynArray[uint256, MAX_COINS] = _xp
+    xp[i] = x
+    xp[j] = y
     # D is not changed because we did not apply a fee
-    self.save_p([x, y], amp, D)  # TODO: this needs to be for Dynamic N_COINS
+    self.save_p(xp, amp, D)
 
     return dy
 
@@ -1070,6 +1180,7 @@ def _exchange_underlying(
 
     dx_w_fee: uint256 = 0
 
+    # for exchange_underlying, optimistic transfers need to be handled differently
     if expect_optimistic_transfer:
 
         assert self.is_rebasing[input_coin]  # dev: rebasing coins not supported
@@ -1084,21 +1195,22 @@ def _exchange_underlying(
             assert dx_w_fee == _dx
             self.stored_balances[meta_i] += dx_w_fee
 
-    elif callback_sig != empty(bytes32):
-
-        raw_call(
-                callbacker,
-                concat(
-                    slice(callback_sig, 0, 4),
-                    _abi_encode(sender, receiver, input_coin, _dx, _min_dy)
-                )
-            )
+        dx_w_fee = ERC20(input_coin).balanceOf(self) - _dx
 
     else:
 
-        assert ERC20(input_coin).transferFrom(sender, self, _dx, default_return_value=True)
-
-    dx_w_fee = ERC20(input_coin).balanceOf(self) - _dx
+        dx_w_fee = self._transfer_in(
+            i,
+            _dx,
+            _min_dy,
+            0,  # msg.value is always 0 for exchange_underlying
+            callbacker,
+            callback_sig,
+            sender,
+            receiver,
+            False,  # use_eth = False
+            False,  # expect_optimistic_transfer = False
+        )
 
     # ------------------------------------------------------------------------
 
@@ -1465,7 +1577,7 @@ def _calc_withdraw_one_coin(
 
 @pure
 @internal
-def pack_prices(p1: uint256, p2: uint256) -> uint256:  # <---- TODO: how to pack 8 numbers?
+def pack_prices(p1: uint256, p2: uint256) -> uint256:
     assert p1 < 2**128
     assert p2 < 2**128
     return p1 | (p2 << 128)
