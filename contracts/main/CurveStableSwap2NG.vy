@@ -538,7 +538,7 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
         if i == N_COINS_128:
             break
 
-        result[i] = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
+        result.append(ERC20(coins[i]).balanceOf(self) - self.admin_balances[i])
 
     return result
 

@@ -273,8 +273,8 @@ def get_balances(_pool: address) -> DynArray[uint256, MAX_COINS]:
     balances: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
 
     if self.pool_data[_pool].base_pool != empty(address):
-        balances[0] = CurvePool(_pool).balances(0)
-        balances[1] = CurvePool(_pool).balances(1)
+        balances.append(CurvePool(_pool).balances(0))
+        balances.append(CurvePool(_pool).balances(1))
         return balances
 
     n_coins: uint256 = self.pool_data[_pool].n_coins
@@ -283,7 +283,7 @@ def get_balances(_pool: address) -> DynArray[uint256, MAX_COINS]:
         if i == n_coins:
             break
 
-        balances[i] = CurvePool(_pool).balances(i)
+        balances.append(CurvePool(_pool).balances(i))
 
 
     return balances
@@ -351,7 +351,7 @@ def get_admin_balances(_pool: address) -> DynArray[uint256, MAX_COINS]:
     for i in range(MAX_COINS):
         if i == n_coins:
             break
-        admin_balances[i] = CurvePool(_pool).admin_balances(i)
+        admin_balances.append(CurvePool(_pool).admin_balances(i))
     return admin_balances
 
 
@@ -575,7 +575,7 @@ def deploy_plain_pool(
         for j in range(i, i + MAX_COINS):
             if (j + 1) == n_coins:
                 break
-            swappable_coin: address = _coins[j]
+            swappable_coin: address = _coins[j + 1]
             key: uint256 = (convert(coin, uint256) ^ convert(swappable_coin, uint256))
             length = self.market_counts[key]
             self.markets[key][length] = pool
