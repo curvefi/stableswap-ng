@@ -677,7 +677,6 @@ def exchange_underlying(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender,
 ) -> uint256:
     """
@@ -713,7 +712,6 @@ def exchange_underlying_extended(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool,
     _receiver: address,
     _cb: bytes32
 ) -> uint256:
@@ -749,7 +747,6 @@ def exchange_underlying_received(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool,
     _receiver: address,
 ) -> uint256:
     """
@@ -1607,7 +1604,8 @@ def _get_p(
     for i in range(1, MAX_COINS):
         if i == N_COINS:
             break
-        p[i-1] = 10**18 * (ANN * xp[0] / A_PRECISION + Dr * xp[0] / xp[i]) / (ANN * xp[0] / A_PRECISION + Dr)
+
+        p[i - 1] = 10**18 * (ANN * xp[0] / A_PRECISION + Dr * xp[0] / xp[i]) / (ANN * xp[0] / A_PRECISION + Dr)
 
     return p
 
@@ -1620,7 +1618,7 @@ def save_p_from_price(last_prices: DynArray[uint256, MAX_COINS]):
     ma_last_time: uint256 = self.ma_last_time
 
     for i in range(MAX_COINS):
-        if i == N_COINS:
+        if i == N_COINS - 1:
             break
 
         if last_prices[i] != 0:
@@ -2030,9 +2028,7 @@ def get_balances() -> DynArray[uint256, MAX_COINS]:
 @view
 @external
 def oracle(_idx: uint256) -> address:
-    if _idx < N_COINS:
-        return convert(self.oracles[_idx] % 2**160, address)
-    return empty(address)
+    return convert(self.oracles[_idx] % 2**160, address)
 
 
 @view

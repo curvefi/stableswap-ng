@@ -15,7 +15,7 @@ def gauge_implementation(deployer, gauge_interface):
 
 @pytest.fixture(scope="module")
 def amm_interface():
-    return boa.load_partial("contracts/main/CurveStableSwap2NG.vy")
+    return boa.load_partial("contracts/main/CurveStableSwapNG.vy")
 
 
 @pytest.fixture(scope="module")
