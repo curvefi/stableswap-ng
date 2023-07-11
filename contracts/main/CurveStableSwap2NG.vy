@@ -288,7 +288,7 @@ def __init__(
         for i in range(MAX_COINS):
             if i == __base_n_coins:
                 break
-            self.is_rebasing[_base_coins[i]] = _is_rebasing[i+1]
+            self.is_rebasing[_base_coins[i]] = _is_rebasing[i+2]
 
             # Approval needed for add_liquidity operation on base pool in _exchange_underlying
             ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))

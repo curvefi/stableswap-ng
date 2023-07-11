@@ -68,37 +68,37 @@ def swap(
     elif pool_type == 1:
         base_pool = request.getfixturevalue("base_pool")
         underlying_tokens = request.getfixturevalue("underlying_tokens")
-        amm_interface_meta = request.getfixturevalue("amm_interface_meta")
+        amm_interface_meta = request.getfixturevalue("amm_interface")
         _ = request.getfixturevalue("add_base_pool")
-        _ = request.getfixturevalue("set_meta_implementations")
+        _ = request.getfixturevalue("set_pool_implementations")
 
         A = 2000
         fee = 1000000
         method_id = bytes(b"")
         oracle = zero_address
-        # asset_type = 0  # 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
+        asset_type = 0  # 0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
         is_rebasing = False
         metapool_token_type = pool_token_types[0]
 
         if metapool_token_type == 0:
             A = 2000
             fee = 1000000
-            # asset_type = 0
+            asset_type = 0
         elif metapool_token_type == 1:
             A = 1000
             fee = 3000000
-            # asset_type = 1
+            asset_type = 1
         elif metapool_token_type == 2:
             A = 1000
             fee = 3000000
-            # asset_type = 1
+            asset_type = 2
             method_id = oracle_method_id
             oracle = underlying_tokens[0].address
 
         elif metapool_token_type == 3:
             A = 500
             fee = 4000000
-            # asset_type = 1
+            asset_type = 3
             is_rebasing = True
 
         pool = factory.deploy_metapool(
@@ -109,9 +109,10 @@ def swap(
             A,
             fee,
             866,
+            0,
+            0,
             method_id,
             oracle,
-            0,
             is_rebasing,
         )
 

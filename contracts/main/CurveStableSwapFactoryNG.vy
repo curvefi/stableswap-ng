@@ -233,17 +233,16 @@ def get_underlying_decimals(_pool: address) -> DynArray[uint256, MAX_COINS]:
     pool_decimals: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     pool_decimals = self.pool_data[_pool].decimals
     decimals: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    decimals[0] = pool_decimals[0]
+    decimals.append(pool_decimals[0])
     base_pool: address = self.pool_data[_pool].base_pool
     packed_decimals: uint256 = self.base_pool_data[base_pool].decimals
 
     for i in range(MAX_COINS):
-
         unpacked: uint256 = (packed_decimals >> 8 * i) % 256
         if unpacked == 0:
             break
 
-        decimals[i+1] = unpacked
+        decimals.append(unpacked)
 
     return decimals
 
@@ -595,6 +594,7 @@ def deploy_metapool(
     _fee: uint256,
     _ma_exp_time: uint256,
     _implementation_idx: uint256 = 0,
+    _asset_type: uint8 = 0,
     _method_id: bytes4 = empty(bytes4),
     _oracle: address = empty(address),
     _is_rebasing: bool = False
@@ -624,7 +624,9 @@ def deploy_metapool(
     """
     assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
     assert _fee <= 100000000, "Invalid fee"
-    assert self.base_pool_data[_base_pool].coins[0] != empty(address), "Base pool is not added"
+
+    base_pool_n_coins: uint256 = len(self.base_pool_data[_base_pool].coins)
+    assert base_pool_n_coins != 0, "Base pool is not added"
 
     implementation: address = self.pool_implementations[_implementation_idx]
     assert implementation != empty(address), "Invalid implementation index"
@@ -635,20 +637,22 @@ def deploy_metapool(
 
     # combine _coins's _is_rebasing and basepool coins _is_rebasing:
     base_pool_is_rebasing: DynArray[bool, MAX_COINS] = self.base_pool_data[_base_pool].is_rebasing
-    is_rebasing: DynArray[bool, MAX_COINS]  = empty(DynArray[bool, MAX_COINS] )
-    is_rebasing[0] = _is_rebasing
-    for i in range(1, MAX_COINS):
+    is_rebasing: DynArray[bool, MAX_COINS]  = [_is_rebasing, False]
 
-        if i == MAX_COINS:
+    base_pool_asset_types: DynArray[uint8, MAX_COINS] = self.base_pool_data[_base_pool].asset_types
+    asset_types: DynArray[uint8, MAX_COINS]  = [_asset_type, 0]
+
+    for i in range(0, MAX_COINS):
+        if i == base_pool_n_coins:
             break
 
-        # is_rebasing[1] is for base_pool's coin[0]
-        is_rebasing[i] = base_pool_is_rebasing[i - 1]
+        is_rebasing.append(base_pool_is_rebasing[i])
+        asset_types.append(base_pool_asset_types[i])
 
     _coins: DynArray[address, MAX_COINS] = [_coin, self.base_pool_data[_base_pool].lp_token]
-    _rate_multipliers: DynArray[uint256, MAX_COINS] = [10 ** (36 - decimals)]
-    _method_ids: DynArray[bytes4, MAX_COINS] = [_method_id]
-    _oracles: DynArray[address, MAX_COINS] = [_oracle]
+    _rate_multipliers: DynArray[uint256, MAX_COINS] = [10 ** (36 - decimals), 10 ** 18]
+    _method_ids: DynArray[bytes4, MAX_COINS] = [_method_id, empty(bytes4)]
+    _oracles: DynArray[address, MAX_COINS] = [_oracle, empty(address)]
 
     pool: address = create_from_blueprint(
         implementation,
@@ -664,7 +668,7 @@ def deploy_metapool(
         _rate_multipliers,                              # _rate_multipliers: DynArray[uint256, MAX_COINS]
         _method_ids,                                    # _method_ids: DynArray[bytes4, MAX_COINS]
         _oracles,                                       # _oracles: DynArray[address, MAX_COINS]
-        _is_rebasing,                                   # _is_rebasing: DynArray[bool, MAX_COINS]
+        is_rebasing,                                    # is_rebasing: DynArray[bool, MAX_COINS]
         code_offset=3
     )
 
@@ -680,14 +684,15 @@ def deploy_metapool(
     self.pool_data[pool].decimals = [decimals, 0, 0, 0, 0, 0, 0, 0]
     self.pool_data[pool].n_coins = 2
     self.pool_data[pool].base_pool = _base_pool
-    self.pool_data[pool].coins[0] = _coin
-    self.pool_data[pool].coins[1] = self.base_pool_data[_base_pool].lp_token
+    self.pool_data[pool].coins = [_coin, self.base_pool_data[_base_pool].lp_token]
     self.pool_data[pool].implementation = implementation
 
     is_finished: bool = False
+    swappable_coin: address = empty(address)
     for i in range(MAX_COINS):
-        swappable_coin: address = self.base_pool_data[_base_pool].coins[i]
-        if swappable_coin == empty(address):
+        if i < len(self.base_pool_data[_base_pool].coins):
+            swappable_coin = self.base_pool_data[_base_pool].coins[i]
+        else:
             is_finished = True
             swappable_coin = base_lp_token
 
@@ -695,6 +700,7 @@ def deploy_metapool(
         length = self.market_counts[key]
         self.markets[key][length] = pool
         self.market_counts[key] = length + 1
+
         if is_finished:
             break
 
@@ -740,7 +746,7 @@ def add_base_pool(
     @param _is_rebasing Array of booleans: _is_rebasing[i] is True if basepool coin[i] is rebasing
     """
     assert msg.sender == self.admin  # dev: admin-only function
-    assert self.base_pool_data[_base_pool].coins[0] == empty(address)  # dev: pool exists
+    assert len(self.base_pool_data[_base_pool].coins) == 0  # dev: pool exists
     assert _n_coins < MAX_COINS  # dev: base pool can only have (MAX_COINS - 1) coins.
 
     # add pool to pool_list
@@ -757,8 +763,9 @@ def add_base_pool(
         if i == _n_coins:
             break
         coin: address = coins[i]
-        self.base_pool_data[_base_pool].coins[i] = coin
-        self.base_pool_data[_base_pool].is_rebasing[i] = _is_rebasing[i]
+        self.base_pool_data[_base_pool].coins.append(coin)
+        self.base_pool_data[_base_pool].asset_types.append(_asset_types[i])
+        self.base_pool_data[_base_pool].is_rebasing.append(_is_rebasing[i])
         self.base_pool_assets[coin] = True
         decimals += (ERC20(coin).decimals() << i*8)
     self.base_pool_data[_base_pool].decimals = decimals
