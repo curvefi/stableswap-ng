@@ -262,7 +262,7 @@ def __init__(
     for i in range(MAX_COINS):
         if i == __n_coins:
             break
-        self.last_prices_packed[i] = self.pack_prices(10**18, 10**18)
+        self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
     __rate_multipliers = _rate_multipliers
 
     rate_multipliers = __rate_multipliers
