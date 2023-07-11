@@ -1890,60 +1890,60 @@ def stored_rates(i: uint256) -> uint256:
 # --------------------------- AMM Admin Functions ----------------------------
 
 
-# @external
-# def ramp_A(_future_A: uint256, _future_time: uint256):
-#     assert msg.sender == factory.admin()  # dev: only owner
-#     assert block.timestamp >= self.initial_A_time + MIN_RAMP_TIME
-#     assert _future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
+@external
+def ramp_A(_future_A: uint256, _future_time: uint256):
+    assert msg.sender == factory.admin()  # dev: only owner
+    assert block.timestamp >= self.initial_A_time + MIN_RAMP_TIME
+    assert _future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
 
-#     _initial_A: uint256 = self._A()
-#     _future_A_p: uint256 = _future_A * A_PRECISION
+    _initial_A: uint256 = self._A()
+    _future_A_p: uint256 = _future_A * A_PRECISION
 
-#     assert _future_A > 0 and _future_A < MAX_A
-#     if _future_A_p < _initial_A:
-#         assert _future_A_p * MAX_A_CHANGE >= _initial_A
-#     else:
-#         assert _future_A_p <= _initial_A * MAX_A_CHANGE
+    assert _future_A > 0 and _future_A < MAX_A
+    if _future_A_p < _initial_A:
+        assert _future_A_p * MAX_A_CHANGE >= _initial_A
+    else:
+        assert _future_A_p <= _initial_A * MAX_A_CHANGE
 
-#     self.initial_A = _initial_A
-#     self.future_A = _future_A_p
-#     self.initial_A_time = block.timestamp
-#     self.future_A_time = _future_time
+    self.initial_A = _initial_A
+    self.future_A = _future_A_p
+    self.initial_A_time = block.timestamp
+    self.future_A_time = _future_time
 
-#     log RampA(_initial_A, _future_A_p, block.timestamp, _future_time)
-
-
-# @external
-# def stop_ramp_A():
-#     assert msg.sender == factory.admin()  # dev: only owner
-
-#     current_A: uint256 = self._A()
-#     self.initial_A = current_A
-#     self.future_A = current_A
-#     self.initial_A_time = block.timestamp
-#     self.future_A_time = block.timestamp
-#     # now (block.timestamp < t1) is always False, so we return saved A
-
-#     log StopRampA(current_A, block.timestamp)
+    log RampA(_initial_A, _future_A_p, block.timestamp, _future_time)
 
 
-# @external
-# def apply_new_fee(_new_fee: uint256):
+@external
+def stop_ramp_A():
+    assert msg.sender == factory.admin()  # dev: only owner
 
-#     assert msg.sender == factory.admin()
-#     assert _new_fee <= MAX_FEE
-#     self.fee = _new_fee
+    current_A: uint256 = self._A()
+    self.initial_A = current_A
+    self.future_A = current_A
+    self.initial_A_time = block.timestamp
+    self.future_A_time = block.timestamp
+    # now (block.timestamp < t1) is always False, so we return saved A
 
-#     log ApplyNewFee(_new_fee)
+    log StopRampA(current_A, block.timestamp)
 
 
-# @external
-# def set_ma_exp_time(_ma_exp_time: uint256):
-#     """
-#     @notice Set the moving average window of the price oracle.
-#     @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
-#     """
-#     assert msg.sender == factory.admin()  # dev: only owner
-#     assert _ma_exp_time != 0
+@external
+def apply_new_fee(_new_fee: uint256):
 
-#     self.ma_exp_time = _ma_exp_time
+    assert msg.sender == factory.admin()
+    assert _new_fee <= MAX_FEE
+    self.fee = _new_fee
+
+    log ApplyNewFee(_new_fee)
+
+
+@external
+def set_ma_exp_time(_ma_exp_time: uint256):
+    """
+    @notice Set the moving average window of the price oracle.
+    @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
+    """
+    assert msg.sender == factory.admin()  # dev: only owner
+    assert _ma_exp_time != 0
+
+    self.ma_exp_time = _ma_exp_time
