@@ -18,7 +18,6 @@ struct PoolArray:
 struct BasePoolArray:
     lp_token: address
     coins: DynArray[address, MAX_COINS]
-    is_rebasing: DynArray[bool, MAX_COINS]
     decimals: uint256
     n_coins: uint256
     asset_types: DynArray[uint8, MAX_COINS]
@@ -467,10 +466,9 @@ def deploy_plain_pool(
     _fee: uint256,
     _ma_exp_time: uint256,
     _implementation_idx: uint256 = 0,
+    _asset_types: DynArray[uint8, MAX_COINS] = empty(DynArray[uint8, MAX_COINS]),
     _method_ids: DynArray[bytes4, MAX_COINS] = empty(DynArray[bytes4, MAX_COINS]),
     _oracles: DynArray[address, MAX_COINS] = empty(DynArray[address, MAX_COINS]),
-    _asset_types: DynArray[uint8, MAX_COINS] = empty(DynArray[uint8, MAX_COINS]),
-    _is_rebasing: DynArray[bool, MAX_COINS] = empty(DynArray[bool, MAX_COINS])
 ) -> address:
     """
     @notice Deploy a new plain pool
@@ -489,23 +487,19 @@ def deploy_plain_pool(
                 50% of the fee is distributed to veCRV holders.
     @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
+    @param _implementation_idx Index of the implementation to use
+    @param _asset_types Asset types for pool, as an integer
+                       0 = PLAIN, 1 = ETH, 2 = ORACLE, 3 = REBASING
     @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
-    @param _asset_types Asset types for pool, as an integer
-                       0 = PLAIN, 1 = ETH, 2 = ORACLE, 3 = REBASING
-    @param _implementation_idx Index of the implementation to use. All possible
-                implementations for a pool of N_COINS can be publicly accessed
-                via `plain_implementations(N_COINS)`
-    @param _is_rebasing If any of the coins rebases, then this should be set to True.
     @return Address of the deployed pool
     """
     assert _fee <= 100000000, "Invalid fee"
     assert len(_coins) == len(_method_ids), "All coin arrays should be same length"
     assert len(_coins) ==  len(_oracles), "All coin arrays should be same length"
     assert len(_coins) ==  len(_asset_types), "All coin arrays should be same length"
-    assert len(_coins) ==  len(_is_rebasing), "All coin arrays should be same length"
 
     n_coins: uint256 = len(_coins)
     _rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -540,9 +534,9 @@ def deploy_plain_pool(
         WETH20,                                         # _weth: address
         _coins,                                         # _coins: DynArray[address, MAX_COINS]
         _rate_multipliers,                              # _rate_multipliers: DynArray[uint256, MAX_COINS]
+        _asset_types,                                   # _asset_types: DynArray[uint8, MAX_COINS]
         _method_ids,                                    # _method_ids: DynArray[bytes4, MAX_COINS]
         _oracles,                                       # _oracles: DynArray[address, MAX_COINS]
-        _is_rebasing,                                   # _is_rebasing: DynArray[bool, MAX_COINS]
         code_offset=3
     )
 
@@ -595,7 +589,6 @@ def deploy_metapool(
     _asset_type: uint8 = 0,
     _method_id: bytes4 = empty(bytes4),
     _oracle: address = empty(address),
-    _is_rebasing: bool = False
 ) -> address:
     """
     @notice Deploy a new metapool
@@ -617,7 +610,15 @@ def deploy_metapool(
     @param _implementation_idx Index of the implementation to use. All possible
                 implementations for a BASE_POOL can be publicly accessed
                 via `metapool_implementations(BASE_POOL)`
-    @param _is_rebasing If _coin rebases, then this should be set to True.
+    @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
+                        Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
+    @param _implementation_idx Index of the implementation to use
+    @param _asset_type Asset type for token, as an integer
+                       0 = PLAIN, 1 = ETH, 2 = ORACLE, 3 = REBASING
+    @param _method_id  First four bytes of the Keccak-256 hash of the function signatures
+                       of the oracle addresses that gives rate oracles.
+                       Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
+    @param _oracle Rate oracle address.
     @return Address of the deployed pool
     """
     assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
@@ -633,18 +634,13 @@ def deploy_metapool(
     decimals: uint256 = ERC20(_coin).decimals()
     assert decimals < 19, "Max 18 decimals for coins"
 
-    # combine _coins's _is_rebasing and basepool coins _is_rebasing:
-    base_pool_is_rebasing: DynArray[bool, MAX_COINS] = self.base_pool_data[_base_pool].is_rebasing
-    is_rebasing: DynArray[bool, MAX_COINS]  = [_is_rebasing, False]
-
+    # combine _coins's _asset_type and basepool coins _asset_types:
     base_pool_asset_types: DynArray[uint8, MAX_COINS] = self.base_pool_data[_base_pool].asset_types
     asset_types: DynArray[uint8, MAX_COINS]  = [_asset_type, 0]
 
     for i in range(0, MAX_COINS):
         if i == base_pool_n_coins:
             break
-
-        is_rebasing.append(base_pool_is_rebasing[i])
         asset_types.append(base_pool_asset_types[i])
 
     _coins: DynArray[address, MAX_COINS] = [_coin, self.base_pool_data[_base_pool].lp_token]
@@ -652,6 +648,7 @@ def deploy_metapool(
     _method_ids: DynArray[bytes4, MAX_COINS] = [_method_id, empty(bytes4)]
     _oracles: DynArray[address, MAX_COINS] = [_oracle, empty(address)]
 
+    # TODO: fix meta
     pool: address = create_from_blueprint(
         implementation,
         _name,                                          # _name: String[32]
@@ -664,9 +661,9 @@ def deploy_metapool(
         _coins,                                         # _coins: DynArray[address, MAX_COINS]
         self.base_pool_data[_base_pool].coins,          # base_coins: DynArray[address, MAX_COINS]
         _rate_multipliers,                              # _rate_multipliers: DynArray[uint256, MAX_COINS]
+        asset_types,                                    # asset_types: DynArray[uint8, MAX_COINS]
         _method_ids,                                    # _method_ids: DynArray[bytes4, MAX_COINS]
         _oracles,                                       # _oracles: DynArray[address, MAX_COINS]
-        is_rebasing,                                    # is_rebasing: DynArray[bool, MAX_COINS]
         code_offset=3
     )
 
@@ -734,14 +731,12 @@ def add_base_pool(
     _coins: DynArray[address, MAX_COINS],
     _asset_types: DynArray[uint8, MAX_COINS],
     _n_coins: uint256,
-    _is_rebasing: DynArray[bool, MAX_COINS],
 ):
     """
     @notice Add a base pool to the registry, which may be used in factory metapools
     @dev Only callable by admin
     @param _base_pool Pool address to add
     @param _asset_types Asset type for pool, as an integer  0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
-    @param _is_rebasing Array of booleans: _is_rebasing[i] is True if basepool coin[i] is rebasing
     """
     assert msg.sender == self.admin  # dev: admin-only function
     assert len(self.base_pool_data[_base_pool].coins) == 0  # dev: pool exists
@@ -763,7 +758,6 @@ def add_base_pool(
         coin: address = coins[i]
         self.base_pool_data[_base_pool].coins.append(coin)
         self.base_pool_data[_base_pool].asset_types.append(_asset_types[i])
-        self.base_pool_data[_base_pool].is_rebasing.append(_is_rebasing[i])
         self.base_pool_assets[coin] = True
         decimals += (ERC20(coin).decimals() << i*8)
     self.base_pool_data[_base_pool].decimals = decimals

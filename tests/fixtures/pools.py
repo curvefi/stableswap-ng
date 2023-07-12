@@ -25,43 +25,33 @@ def swap(
         fee = 1000000
         method_ids = [bytes(b"")] * pool_size
         oracles = [zero_address] * pool_size
-        asset_type = []
+        asset_types = []
         is_rebasing = [False] * pool_size
 
         for i, t in enumerate(pool_token_types):
             if t == 0:
                 A = 2000
                 fee = 1000000
-                asset_type.append(0)
+                asset_types.append(0)
             elif t == 1:
                 A = 1000
                 fee = 3000000
-                asset_type.append(1)
+                asset_types.append(1)
             elif t == 2:
                 A = 1000
                 fee = 3000000
-                asset_type.append(2)
+                asset_types.append(2)
                 method_ids[i] = oracle_method_id
                 oracles[i] = pool_tokens[i].address
             elif t == 3:
                 A = 500
                 fee = 4000000
-                asset_type.append(3)
+                asset_types.append(3)
                 is_rebasing[i] = True
 
         with boa.env.prank(deployer):
             pool = factory.deploy_plain_pool(
-                "test",
-                "test",
-                [t.address for t in pool_tokens],
-                A,
-                fee,
-                866,
-                0,
-                method_ids,
-                oracles,
-                asset_type,
-                is_rebasing,
+                "test", "test", [t.address for t in pool_tokens], A, fee, 866, 0, asset_types, method_ids, oracles
             )
         return amm_interface_plain.at(pool)
 
@@ -76,29 +66,29 @@ def swap(
         fee = 1000000
         method_id = bytes(b"")
         oracle = zero_address
-        asset_type = 0  # 0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
+        asset_types = 0  # 0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
         is_rebasing = False
         metapool_token_type = pool_token_types[0]
 
         if metapool_token_type == 0:
             A = 2000
             fee = 1000000
-            asset_type = 0
+            asset_types = 0
         elif metapool_token_type == 1:
             A = 1000
             fee = 3000000
-            asset_type = 1
+            asset_types = 1
         elif metapool_token_type == 2:
             A = 1000
             fee = 3000000
-            asset_type = 2
+            asset_types = 2
             method_id = oracle_method_id
             oracle = underlying_tokens[0].address
 
         elif metapool_token_type == 3:
             A = 500
             fee = 4000000
-            asset_type = 3
+            asset_types = 3
             is_rebasing = True
 
         pool = factory.deploy_metapool(

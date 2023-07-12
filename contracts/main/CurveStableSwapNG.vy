@@ -5,11 +5,15 @@
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
 @notice Stableswap implementation for up to 8 coins with no rehypothecation,
         i.e. tokens are not deposited into other contracts. Supports only
-        token pairs that are similarly priced. This contract also
-        supports metapools (2-coin pools where the second coin is an LP token).
+        token pairs that are similarly priced.
         The Pool contract also records exponential moving averages for coins
         1, 2 and 3 relative to coin 0.
-@dev Supports:
+@dev Asset Types:
+        0. Basic ERC20 token with no additional features
+        1. WETH - can we directly converted to/from ETH
+        2. Oracle - token with rate oracle
+        3. Rebasing - token with rebase (e.g. stETH)
+     Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
         3. ERC20 tokens that rebase (either positive or fee on transfer)
@@ -27,9 +31,9 @@
         6. Adds feature: `exchange_received`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
-           Note: a. If pool contains rebasing tokens and `IS_REBASING` is True
+           Note: a. If pool contains rebasing tokens and one of the `asset_types` is 3 (Rebasing)
                     then calling `exchange_received` will REVERT.
-                 b. If pool contains rebasing token and `IS_REBASING` is False
+                 b. If pool contains rebasing token and `asset_types` does not contain 3 (Rebasing)
                     then this is an incorrect implementation and rebases can be
                     stolen.
         7. Adds `get_dx`: Similar to `get_dy` which returns an expected output
@@ -145,14 +149,11 @@ N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
 
-# To denote that it is a plain pool:
-BASE_POOL: public(constant(address)) = 0x0000000000000000000000000000000000000000
-
 factory: public(immutable(Factory))
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
 fee: public(uint256)  # fee * 1e10
-is_rebasing: HashMap[address, bool]
+asset_types: public(DynArray[uint8, MAX_COINS])
 
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
@@ -224,9 +225,9 @@ def __init__(
     _weth: address,
     _coins: DynArray[address, MAX_COINS],
     _rate_multipliers: DynArray[uint256, MAX_COINS],
+    _asset_types: DynArray[uint8, MAX_COINS],
     _method_ids: DynArray[bytes4, MAX_COINS],
     _oracles: DynArray[address, MAX_COINS],
-    _is_rebasing: DynArray[bool, MAX_COINS],
 ):
     """
     @notice Initialize the pool contract
@@ -244,12 +245,11 @@ def __init__(
                 50% of the fee is distributed to veCRV holders.
     @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
+    @param _asset_types Array of uint8 representing tokens in pool
     @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
-    @param _is_rebasing Array of booleans where _is_rebasing[i] is True if _coins[i] is
-           a rebasing token: fee-on-transfer, tokens with slashing, positive rebasing, etc.
     """
 
     WETH20 = _weth
@@ -258,14 +258,13 @@ def __init__(
     N_COINS = __n_coins
     N_COINS_128 = convert(__n_coins, int128)
 
-    __rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(MAX_COINS):
         if i == __n_coins:
             break
         self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
-    __rate_multipliers = _rate_multipliers
 
-    rate_multipliers = __rate_multipliers
+    rate_multipliers = _rate_multipliers
+    self.asset_types = _asset_types
 
     factory = Factory(msg.sender)
 
@@ -362,7 +361,7 @@ def _transfer_in(
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
-    incoming_coin_is_rebasing: bool = self.is_rebasing[coins[coin_idx]]
+    _incoming_coin_asset_type: uint8 = self.asset_types[coin_idx]
 
     # ------------------------- Handle Transfers -----------------------------
 
@@ -373,7 +372,7 @@ def _transfer_in(
 
     elif expect_optimistic_transfer:
 
-        assert not incoming_coin_is_rebasing, "exchange_received not allowed if incoming token is rebasing"
+        assert _incoming_coin_asset_type != 3, "exchange_received not allowed if incoming token is rebasing"
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
     elif callback_sig != empty(bytes32):
@@ -398,7 +397,7 @@ def _transfer_in(
 
     # --------------------------- Check Transfer -----------------------------
 
-    if incoming_coin_is_rebasing:
+    if _incoming_coin_asset_type == 3:
         assert _dx > 0, "Pool did not receive tokens for swap"  # TODO: Check this!!
     else:
         assert dx == _dx, "Pool did not receive tokens for swap"
