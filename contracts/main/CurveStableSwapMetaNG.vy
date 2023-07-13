@@ -157,7 +157,6 @@ MAX_METAPOOL_COIN_INDEX: constant(int128) = 1
 
 # ---------------------------- Pool Variables --------------------------------
 
-WETH20: immutable(address)
 N_COINS: public(constant(uint256)) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
@@ -240,7 +239,6 @@ def __init__(
     _A: uint256,
     _fee: uint256,
     _ma_exp_time: uint256,
-    _weth: address,
     _base_pool: address,
     _coins: DynArray[address, MAX_COINS],
     _base_coins: DynArray[address, MAX_COINS],
@@ -272,7 +270,6 @@ def __init__(
     @param _oracles Array of rate oracle addresses.
     """
 
-    WETH20 = _weth
     BASE_POOL = _base_pool
     BASE_COINS = _base_coins
     BASE_N_COINS = len(_base_coins)
@@ -301,10 +298,6 @@ def __init__(
     self.ma_last_time = block.timestamp
 
     for i in range(N_COINS_128):
-
-        # Enforce native token as coin[0]
-        if _coins[i] == WETH20:
-            assert i == 0, "ETH must be at index 0"
 
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
         self.admin_balances.append(0)  # <--- this initialises storage for admin balances  # TODO: check if this is needed?
@@ -337,19 +330,11 @@ def __init__(
 # ------------------ Token transfers in and out of the AMM -------------------
 
 
-@payable
-@external
-def __default__():
-    if msg.value > 0:
-        assert WETH20 in coins
-
-
 @internal
 def _transfer_in(
     coin_idx: int128,
     dx: uint256,
     dy: uint256,
-    mvalue: uint256,
     callbacker: address,
     callback_sig: bytes32,
     sender: address,
@@ -372,7 +357,6 @@ def _transfer_in(
     @params _coin address of the coin to transfer in.
     @params dx amount of `_coin` to transfer into the pool.
     @params dy amount of `_coin` to transfer out of the pool.
-    @params mvalue msg.value if the transfer is ETH, 0 otherwise.
     @params callbacker address to call `callback_sig` on.
     @params callback_sig signature of the callback function.
     @params sender address to transfer `_coin` from.
@@ -385,12 +369,7 @@ def _transfer_in(
 
     # ------------------------- Handle Transfers -----------------------------
 
-    if use_eth and coins[coin_idx] == WETH20:
-
-        _dx = mvalue
-        WETH(WETH20).deposit(value=dx)
-
-    elif expect_optimistic_transfer:
+    if expect_optimistic_transfer:
 
         assert _incoming_coin_asset_type != 3, "exchange_received not allowed if incoming token is rebasing"
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
@@ -445,16 +424,9 @@ def _transfer_out(
 
     # ------------------------- Handle Transfers -----------------------------
 
-    if use_eth and coins[_coin_idx] == WETH20:
-
-        WETH(WETH20).withdraw(_amount)
-        raw_call(receiver, b"", value=_amount)
-
-    else:
-
-        assert ERC20(coins[_coin_idx]).transfer(
-            receiver, _amount, default_return_value=True
-        )
+    assert ERC20(coins[_coin_idx]).transfer(
+        receiver, _amount, default_return_value=True
+    )
 
     # ----------------------- Update Stored Balances -------------------------
 
@@ -508,7 +480,6 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
     @dev This method ensures LPs keep all rebases and admin only claims swap fees.
     """
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-
     for i in range(N_COINS_128):
         result.append(ERC20(coins[i]).balanceOf(self) - self.admin_balances[i])
 
@@ -518,7 +489,6 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
 # -------------------------- AMM Main Functions ------------------------------
 
 
-@payable
 @external
 @nonreentrant('lock')
 def exchange(
@@ -542,7 +512,6 @@ def exchange(
     """
     return self._exchange(
         msg.sender,
-        msg.value,
         i,
         j,
         _dx,
@@ -581,7 +550,6 @@ def exchange_extended(
     assert _cb != empty(bytes32)  # dev: No callback specified
     return self._exchange(
         _sender,
-        0,  # mvalue is zero here
         i,
         j,
         _dx,
@@ -620,7 +588,6 @@ def exchange_received(
     """
     return self._exchange(
         msg.sender,
-        0,
         i,
         j,
         _dx,
@@ -736,7 +703,6 @@ def exchange_underlying_received(
     )
 
 
-@payable
 @external
 @nonreentrant('lock')
 def add_liquidity(
@@ -772,7 +738,6 @@ def add_liquidity(
                 i,
                 _amounts[i],
                 0,
-                msg.value,
                 empty(address),
                 empty(bytes32),
                 msg.sender,
@@ -1022,7 +987,6 @@ def __exchange(
 @internal
 def _exchange(
     sender: address,
-    mvalue: uint256,
     i: int128,
     j: int128,
     _dx: uint256,
@@ -1048,7 +1012,6 @@ def _exchange(
         i,
         _dx,
         _min_dy,
-        mvalue,
         callbacker,
         callback_sig,
         sender,
@@ -1142,7 +1105,6 @@ def _exchange_underlying(
             i,
             _dx,
             _min_dy,
-            0,  # msg.value is always 0 for exchange_underlying
             callbacker,
             callback_sig,
             sender,
