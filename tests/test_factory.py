@@ -128,154 +128,164 @@ class TestFactory:
         def test_is_meta(self, factory, swap):
             assert factory.is_meta(swap.address) is True
 
-    # @pytest.mark.usefixtures("forked_chain")
-    # @pytest.mark.only_for_pool_type(0)
-    # class TestFactoryAddPools:
-    #     def test_add_base_pool(self, factory, alice, fee_receiver, implementation_usd):
-    #         susd_pool = "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD"
-    #         factory.add_base_pool(
-    #             susd_pool, fee_receiver, 0, [implementation_usd] + [ZERO_ADDRESS] * 9, {"from": alice}
-    #         )
-    #         assert factory.base_pool_count() == 3
-    #         assert factory.base_pool_list(2) == susd_pool
-    #         assert factory.get_fee_receiver(susd_pool) == fee_receiver
-    #
-    #     def test_add_base_pool_already_exists(self, factory, base_pool, alice, fee_receiver, implementation_usd):
-    #         with boa.reverts("dev: pool exists"):
-    #             factory.add_base_pool(
-    #                 base_pool, fee_receiver, 0, [implementation_usd] + [ZERO_ADDRESS] * 9, {"from": alice}
-    #             )
-    #
-    #     def test_add_base_pool_only_admin(factory, base_pool, bob, fee_receiver, implementation_usd):
-    #         with brownie.reverts("dev: admin-only function"):
-    #             factory.add_base_pool(
-    #                 "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD",
-    #                 fee_receiver,
-    #                 0,
-    #                 [implementation_usd] + [ZERO_ADDRESS] * 9,
-    #                 {"from": bob},
-    #             )
-    #
-    #     @pytest.mark.skip
-    #     def test_deploy_metapool(MetaUSD, new_factory, new_factory_setup, base_pool, bob):
-    #         coin = ERC20(decimals=7)
-    #
-    #         tx = new_factory.deploy_metapool(
-    #             base_pool, "Name", "SYM", coin, 12345, 50000000, 0, {"from": bob}
-    #         )
-    #         assert tx.return_value == tx.new_contracts[0]
-    #         swap = MetaUSD.at(tx.return_value)
-    #
-    #         assert swap.coins(0) == coin
-    #         assert swap.A() == 12345
-    #         assert swap.fee() == 50000000
-    #
-    #         assert new_factory.pool_count() == 1
-    #         assert new_factory.pool_list(0) == swap
-    #         assert new_factory.get_decimals(swap) == [7, 18, 0, 0]
-    #
-    #
-    #     @pytest.mark.skip
-    #     def test_add_existing_metapools(
-    #         factory, new_factory, fee_receiver, implementation_usd, base_pool, alice
-    #     ):
-    #         assert new_factory.pool_count() == 0
-    #         # add existing USD pools to new factory
-    #         new_factory.add_base_pool(
-    #             base_pool, fee_receiver, 0, [implementation_usd] + [ZERO_ADDRESS] * 9, {"from": alice}
-    #         )
-    #         new_factory.add_existing_metapools(
-    #             ["0x5a6A4D54456819380173272A5E8E9B9904BdF41B", "0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c"]
-    #             + [ZERO_ADDRESS] * 8
-    #         )
-    #         assert new_factory.pool_count() == 2
-    #         assert new_factory.pool_list(0) == "0x5a6A4D54456819380173272A5E8E9B9904BdF41B"
-    #         assert new_factory.pool_list(1) == "0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c"
-    #         assert (
-    #             new_factory.get_implementation_address("0x5a6A4D54456819380173272A5E8E9B9904BdF41B")
-    #             == "0x5F890841f657d90E081bAbdB532A05996Af79Fe6"
-    #         )
-    #
-    #
-    #     @pytest.mark.skip
-    #     def test_add_existing_metapools_unknown_pool(swap, new_factory):
-    #         with brownie.reverts("dev: pool not in old factory"):
-    #             new_factory.add_existing_metapools([swap] + [ZERO_ADDRESS] * 9)
-    #
-    #
-    #     @pytest.mark.skip
-    #     def test_add_existing_metapools_duplicate_pool(
-    #         new_factory, base_pool, implementation_usd, fee_receiver, alice
-    #     ):
-    #         new_factory.add_base_pool(
-    #             base_pool, fee_receiver, 0, [implementation_usd] + [ZERO_ADDRESS] * 9, {"from": alice}
-    #         )
-    #         new_factory.add_existing_metapools(
-    #             ["0x5a6A4D54456819380173272A5E8E9B9904BdF41B"] + [ZERO_ADDRESS] * 9
-    #         )
-    #         with brownie.reverts("dev: pool already exists"):
-    #             new_factory.add_existing_metapools(
-    #                 ["0x5a6A4D54456819380173272A5E8E9B9904BdF41B"] + [ZERO_ADDRESS] * 9
-    #             )
-    #
-    #
-    #     def test_deploy_plain_pool(
-    #         new_factory_setup, new_factory, decimals, bob, plain_basic, project, coins
-    #     ):
-    #
-    #         tx = new_factory.deploy_plain_pool(
-    #             "Test Plain",
-    #             "TST",
-    #             coins + [ZERO_ADDRESS] * (4 - len(coins)),
-    #             12345,
-    #             50000000,
-    #             0,
-    #             0,
-    #             {"from": bob},
-    #         )
-    #         assert tx.return_value == tx.new_contracts[0]
-    #         swap = getattr(project, plain_basic._name).at(tx.return_value)
-    #
-    #         assert swap.coins(0) == coins[0]
-    #         assert swap.coins(1) == coins[1]
-    #
-    #         assert swap.A() == 12345
-    #         assert swap.fee() == 50000000
-    #
-    #         assert new_factory.pool_count() == 1
-    #         assert new_factory.pool_list(0) == swap
-    #         assert new_factory.get_decimals(swap) == decimals + [0] * (4 - len(decimals))
-    #
-    #
-    #     @pytest.mark.skip
-    #     def test_pool_count(new_factory, coins, new_factory_setup, bob, base_pool):
-    #
-    #         tx = new_factory.deploy_plain_pool(
-    #             "Test Plain", "TST", coins, 12345, 50000000, 0, 0, {"from": bob}
-    #         )
-    #         assert tx.return_value == tx.new_contracts[0]
-    #         assert new_factory.pool_count() == 1
-    #
-    #         coin = ERC20(decimals=7)
-    #         tx = new_factory.deploy_metapool(
-    #             base_pool, "Name", "SYM", coin, 12345, 50000000, 0, {"from": bob}
-    #         )
-    #         assert tx.return_value == tx.new_contracts[0]
-    #         assert new_factory.pool_count() == 2
-    #
-    #         coin = ERC20(decimals=7)
-    #         pool = Contract("0x7fC77b5c7614E1533320Ea6DDc2Eb61fa00A9714")
-    #         tx = new_factory.deploy_metapool(pool, "Name", "SYM", coin, 123456, 50000000, 0, {"from": bob})
-    #         assert new_factory.pool_count() == 3
-    #
-    #
-    #     @pytest.mark.skip
-    #     def test_deploy_plain_pool_revert(base_pool, new_factory, new_factory_setup, bob):
-    #         coin = ERC20(decimals=7)
-    #         new_factory.deploy_metapool(base_pool, "Name", "SYM", coin, 12345, 50000000, 0, {"from": bob})
-    #         existing_coin = base_pool.coins(0)
-    #         assert new_factory.base_pool_assets(existing_coin)
-    #         coins = [existing_coin, ERC20(decimals=9), ZERO_ADDRESS, ZERO_ADDRESS]
-    #         # should revert because a metapool already exists for one of the coins
-    #         with brownie.reverts("Invalid asset, deploy a metapool"):
-    #             new_factory.deploy_plain_pool("Test Plain", "TST", coins, 12345, 50000000, {"from": bob})
+    @pytest.mark.usefixtures("forked_chain")
+    @pytest.mark.only_for_pool_type(0)
+    class TestFactoryAddPools:
+        def test_add_base_pool(self, factory, owner, add_base_pool):
+            susd_pool = "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD"
+            lp_token = "0xC25a3A3b969415c80451098fa907EC722572917F"
+            coins = [
+                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
+            ]
+
+            factory.add_base_pool(susd_pool, lp_token, coins, [0] * len(coins), len(coins), sender=owner)
+            assert factory.base_pool_count() == 2
+            assert factory.base_pool_list(1) == susd_pool
+
+        def test_add_base_pool_already_exists(
+            self,
+            owner,
+            factory,
+            add_base_pool,
+            base_pool,
+            base_pool_lp_token,
+            base_pool_tokens,
+        ):
+            with boa.reverts():
+                factory.add_base_pool(
+                    base_pool.address,
+                    base_pool_lp_token.address,
+                    [t.address for t in base_pool_tokens],
+                    [0] * len(base_pool_tokens),
+                    len(base_pool_tokens),
+                    sender=owner,
+                )
+
+        def test_add_base_pool_only_admin(
+            self,
+            factory,
+            bob,
+            base_pool,
+            base_pool_lp_token,
+            base_pool_tokens,
+        ):
+            with boa.reverts():
+                factory.add_base_pool(
+                    base_pool.address,
+                    base_pool_lp_token.address,
+                    [t.address for t in base_pool_tokens],
+                    [0] * len(base_pool_tokens),
+                    len(base_pool_tokens),
+                    sender=bob,
+                )
+
+        # @pytest.mark.skip
+        # def test_deploy_metapool(MetaUSD, new_factory, new_factory_setup, base_pool, bob):
+        #     coin = ERC20(decimals=7)
+        #
+        #     tx = new_factory.deploy_metapool(base_pool, "Name", "SYM", coin, 12345, 50000000, 0, {"from": bob})
+        #     assert tx.return_value == tx.new_contracts[0]
+        #     swap = MetaUSD.at(tx.return_value)
+        #
+        #     assert swap.coins(0) == coin
+        #     assert swap.A() == 12345
+        #     assert swap.fee() == 50000000
+        #
+        #     assert new_factory.pool_count() == 1
+        #     assert new_factory.pool_list(0) == swap
+        #     assert new_factory.get_decimals(swap) == [7, 18, 0, 0]
+        #
+        # @pytest.mark.skip
+        # def test_add_existing_metapools(factory, new_factory, fee_receiver, implementation_usd, base_pool, alice):
+        #     assert new_factory.pool_count() == 0
+        #     # add existing USD pools to new factory
+        #     new_factory.add_base_pool(
+        #         base_pool, fee_receiver, 0, [implementation_usd] + [ZERO_ADDRESS] * 9, {"from": alice}
+        #     )
+        #     new_factory.add_existing_metapools(
+        #         ["0x5a6A4D54456819380173272A5E8E9B9904BdF41B", "0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c"]
+        #         + [ZERO_ADDRESS] * 8
+        #     )
+        #     assert new_factory.pool_count() == 2
+        #     assert new_factory.pool_list(0) == "0x5a6A4D54456819380173272A5E8E9B9904BdF41B"
+        #     assert new_factory.pool_list(1) == "0x43b4FdFD4Ff969587185cDB6f0BD875c5Fc83f8c"
+        #     assert (
+        #         new_factory.get_implementation_address("0x5a6A4D54456819380173272A5E8E9B9904BdF41B")
+        #         == "0x5F890841f657d90E081bAbdB532A05996Af79Fe6"
+        #     )
+        #
+        # @pytest.mark.skip
+        # def test_add_existing_metapools_unknown_pool(swap, new_factory):
+        #     with brownie.reverts("dev: pool not in old factory"):
+        #         new_factory.add_existing_metapools([swap] + [ZERO_ADDRESS] * 9)
+        #
+        # @pytest.mark.skip
+        # def test_add_existing_metapools_duplicate_pool(new_factory, base_pool, implementation_usd, fee_receiver,
+        # alice):
+        #     new_factory.add_base_pool(
+        #         base_pool, fee_receiver, 0, [implementation_usd] + [ZERO_ADDRESS] * 9, {"from": alice}
+        #     )
+        #     new_factory.add_existing_metapools(["0x5a6A4D54456819380173272A5E8E9B9904BdF41B"] + [ZERO_ADDRESS] * 9)
+        #     with brownie.reverts("dev: pool already exists"):
+        #         new_factory.add_existing_metapools(
+        #         ["0x5a6A4D54456819380173272A5E8E9B9904BdF41B"] + [ZERO_ADDRESS] * 9
+        #         )
+
+        def test_deploy_plain_pool(
+            self, factory, amm_interface, set_pool_implementations, pool_tokens, pool_size, zero_address
+        ):
+            swap_address = factory.deploy_plain_pool(
+                "test",
+                "test",
+                [t.address for t in pool_tokens],
+                2000,
+                1000000,
+                866,
+                0,
+                [0] * pool_size,
+                [bytes(b"")] * pool_size,
+                [zero_address] * pool_size,
+            )
+            assert swap_address != zero_address
+
+            swap = amm_interface.at(swap_address)
+            assert swap.coins(0) == pool_tokens[0].address
+            assert swap.coins(1) == pool_tokens[1].address
+
+            assert swap.A() == 2000
+            assert swap.fee() == 1000000
+
+            assert factory.pool_count() == 1
+            assert factory.pool_list(0) == swap.address
+            assert factory.get_decimals(swap) == [t.decimals() for t in pool_tokens]
+
+        @pytest.mark.skip
+        def test_pool_count(
+            self,
+            factory,
+            swap,
+            add_base_pool,
+            amm_interface,
+            set_pool_implementations,
+            pool_tokens,
+            pool_size,
+            zero_address,
+        ):
+            assert factory.pool_count() == 2
+
+            _ = factory.deploy_plain_pool(
+                "test",
+                "test",
+                [t.address for t in pool_tokens],
+                2000,
+                1000000,
+                866,
+                0,
+                [0] * pool_size,
+                [bytes(b"")] * pool_size,
+                [zero_address] * pool_size,
+            )
+            assert factory.pool_count() == 3
