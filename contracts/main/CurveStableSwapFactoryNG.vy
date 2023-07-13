@@ -95,6 +95,7 @@ base_pool_assets: public(HashMap[address, bool])
 
 # index -> implementation address
 pool_implementations: public(HashMap[uint256, address])
+metapool_implementations: public(HashMap[uint256, address])
 gauge_implementation: public(address)
 views_implementation: public(address)
 
@@ -627,7 +628,7 @@ def deploy_metapool(
     base_pool_n_coins: uint256 = len(self.base_pool_data[_base_pool].coins)
     assert base_pool_n_coins != 0, "Base pool is not added"
 
-    implementation: address = self.pool_implementations[_implementation_idx]
+    implementation: address = self.metapool_implementations[_implementation_idx]
     assert implementation != empty(address), "Invalid implementation index"
 
     # things break if a token has >18 decimals
@@ -648,7 +649,6 @@ def deploy_metapool(
     _method_ids: DynArray[bytes4, MAX_COINS] = [_method_id, empty(bytes4)]
     _oracles: DynArray[address, MAX_COINS] = [_oracle, empty(address)]
 
-    # TODO: fix meta
     pool: address = create_from_blueprint(
         implementation,
         _name,                                          # _name: String[32]
@@ -778,6 +778,21 @@ def set_pool_implementations(
     """
     assert msg.sender == self.admin  # dev: admin-only function
     self.pool_implementations[_implementation_index] = _implementation
+
+
+@external
+def set_metapool_implementations(
+    _implementation_index: uint256,
+    _implementation: address,
+):
+    """
+    @notice Set implementation contracts for metapools
+    @dev Only callable by admin
+    @param _implementation_index Implementation index where implementation is stored
+    @param _implementation Implementation address to use when deploying meta pools
+    """
+    assert msg.sender == self.admin  # dev: admin-only function
+    self.metapool_implementations[_implementation_index] = _implementation
 
 
 @external

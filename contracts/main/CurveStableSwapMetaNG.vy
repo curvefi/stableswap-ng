@@ -10,6 +10,12 @@
         The Pool contract also records exponential moving averages for coins
         1, 2 and 3 relative to coin 0.
 @dev Supports:
+@dev Asset Types:
+        0. Basic ERC20 token with no additional features
+        1. WETH - can we directly converted to/from ETH
+        2. Oracle - token with rate oracle
+        3. Rebasing - token with rebase (e.g. stETH)
+     Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
         3. ERC20 tokens that rebase (either positive or fee on transfer)
@@ -27,9 +33,9 @@
         6. Adds feature: `exchange_received`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
-           Note: a. If pool contains rebasing tokens and `IS_REBASING` is True
+           Note: a. If pool contains rebasing tokens and one of the `asset_types` is 3 (Rebasing)
                     then calling `exchange_received` will REVERT.
-                 b. If pool contains rebasing token and `IS_REBASING` is False
+                 b. If pool contains rebasing token and `asset_types` does not contain 3 (Rebasing)
                     then this is an incorrect implementation and rebases can be
                     stolen.
         7. Adds `get_dx`: Similar to `get_dy` which returns an expected output
@@ -39,6 +45,7 @@
 
 from vyper.interfaces import ERC20
 
+implements: ERC20
 
 # ------------------------------- Interfaces ---------------------------------
 
@@ -51,10 +58,8 @@ interface WETH:
     def deposit(): payable
     def withdraw(_amount: uint256): nonpayable
 
-interface CurveLPToken:
-    def totalSupply() -> uint256: view
-    def mint(_to: address, _value: uint256) -> bool: nonpayable
-    def burnFrom(_to: address, _value: uint256) -> bool: nonpayable
+interface ERC1271:
+    def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
 
 interface StableSwapViews:
     def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
@@ -156,7 +161,6 @@ WETH20: immutable(address)
 N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
-lp_token: public(immutable(CurveLPToken))
 
 # To denote that it is a plain pool:
 BASE_POOL: public(immutable(address))
@@ -167,7 +171,7 @@ factory: public(immutable(Factory))
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
 fee: public(uint256)  # fee * 1e10
-is_rebasing: HashMap[address, bool]
+asset_types: public(DynArray[uint8, MAX_COINS])
 
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
@@ -202,6 +206,29 @@ ma_last_time: public(uint256)
 # shift(2**32 - 1, 224)
 ORACLE_BIT_MASK: constant(uint256) = (2**32 - 1) * 256**28
 
+# --------------------------- ERC20 Specific Vars ----------------------------
+
+name: public(immutable(String[64]))
+symbol: public(immutable(String[32]))
+decimals: public(constant(uint8)) = 18
+version: public(constant(String[8])) = "v7.0.0"
+
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+totalSupply: public(uint256)
+nonces: public(HashMap[address, uint256])
+
+# keccak256("isValidSignature(bytes32,bytes)")[:4] << 224
+ERC1271_MAGIC_VAL: constant(bytes32) = 0x1626ba7e00000000000000000000000000000000000000000000000000000000
+EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract,bytes32 salt)")
+EIP2612_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
+
+VERSION_HASH: constant(bytes32) = keccak256(version)
+NAME_HASH: immutable(bytes32)
+CACHED_CHAIN_ID: immutable(uint256)
+salt: public(immutable(bytes32))
+CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
+
 
 # ------------------------------ AMM Setup -----------------------------------
 
@@ -215,13 +242,12 @@ def __init__(
     _ma_exp_time: uint256,
     _weth: address,
     _base_pool: address,
-    _lp_token_implementation: address,
     _coins: DynArray[address, MAX_COINS],
     _base_coins: DynArray[address, MAX_COINS],
     _rate_multipliers: DynArray[uint256, MAX_COINS],
+    _asset_types: DynArray[uint8, MAX_COINS],
     _method_ids: DynArray[bytes4, MAX_COINS],
     _oracles: DynArray[address, MAX_COINS],
-    _is_rebasing: DynArray[bool, MAX_COINS],
 ):
     """
     @notice Initialize the pool contract
@@ -239,12 +265,11 @@ def __init__(
                 50% of the fee is distributed to veCRV holders.
     @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
+    @param _asset_types Array of uint8 representing tokens in pool
     @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
-    @param _is_rebasing Array of booleans where _is_rebasing[i] is True if _coins[i] is
-           a rebasing token: fee-on-transfer, tokens with slashing, positive rebasing, etc.
     """
 
     WETH20 = _weth
@@ -255,44 +280,20 @@ def __init__(
     __n_coins: uint256 = len(_coins)
     __base_n_coins: uint256 = len(_base_coins)
     BASE_N_COINS = __base_n_coins
+    assert __n_coins == 2  # dev: metapools can only have 2 coins
 
-    # ----------------- Parameters dependent of pool type --------------------
+    for i in range(MAX_COINS):
+        if i < __base_n_coins:
+            # Approval needed for add_liquidity operation on base pool in _exchange_underlying
+            ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))
 
-    __rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-
-    if BASE_POOL != empty(address):
-
-        assert __n_coins == 2  # dev: metapools can only have 2 coins
-
-        self.is_rebasing[_coins[0]] = _is_rebasing[0]
-        # self.is_rebasing[_coins[1]] = False is ignored,
-        # because _coins[1] is base_lp_token and that does not rebase.
-
-        for i in range(MAX_COINS):
-            if i < __base_n_coins:
-                self.is_rebasing[_base_coins[i]] = _is_rebasing[i+2]
-
-                # Approval needed for add_liquidity operation on base pool in _exchange_underlying
-                ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))
-
-            if i < __n_coins:
-                self.last_prices_packed[i] = self.pack_prices(10**18, 10**18)  # <--- TODO: check this!
-
-        # Only need rate_multiplier for coin paired against basepool's lp token:
-        __rate_multipliers = [_rate_multipliers[0]]
-
-    else:
-
-        __n_coins = len(_coins)
-        for i in range(MAX_COINS):
-            if i == __n_coins:
-                break
-            self.last_prices_packed[i] = self.pack_prices(10**18, 10**18)
-        __rate_multipliers = _rate_multipliers
+        if i < __n_coins:
+            self.last_prices_packed.append(self.pack_prices(10**18, 10**18))  # <--- TODO: check this!
 
     N_COINS = __n_coins
     N_COINS_128 = convert(__n_coins, int128)
-    rate_multipliers = __rate_multipliers
+    rate_multipliers = _rate_multipliers
+    self.asset_types = _asset_types
 
     # ----------------- Parameters independent of pool type ------------------
 
@@ -319,11 +320,29 @@ def __init__(
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
         self.admin_balances.append(0)  # <--- this initialises storage for admin balances  # TODO: check if this is needed?
 
-    # --------------------------- Create LP Token ----------------------------
+    # --------------------------- ERC20 stuff ----------------------------
 
-    lp_token = CurveLPToken(
-        create_from_blueprint(_lp_token_implementation, _name, _symbol)
+    name = _name
+    symbol = _symbol
+
+    # EIP712 related params -----------------
+    NAME_HASH = keccak256(name)
+    salt = block.prevhash
+    CACHED_CHAIN_ID = chain.id
+    CACHED_DOMAIN_SEPARATOR = keccak256(
+        _abi_encode(
+            EIP712_TYPEHASH,
+            NAME_HASH,
+            VERSION_HASH,
+            chain.id,
+            self,
+            salt,
+        )
     )
+
+    # ------------------------ Fire a transfer event -------------------------
+
+    log Transfer(empty(address), msg.sender, 0)
 
 
 # ------------------ Token transfers in and out of the AMM -------------------
@@ -373,7 +392,7 @@ def _transfer_in(
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
-    incoming_coin_is_rebasing: bool = self.is_rebasing[coins[coin_idx]]
+    _incoming_coin_asset_type: uint8 = self.asset_types[coin_idx]
 
     # ------------------------- Handle Transfers -----------------------------
 
@@ -384,7 +403,7 @@ def _transfer_in(
 
     elif expect_optimistic_transfer:
 
-        assert not incoming_coin_is_rebasing, "exchange_received not allowed if incoming token is rebasing"
+        assert _incoming_coin_asset_type != 3, "exchange_received not allowed if incoming token is rebasing"
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
     elif callback_sig != empty(bytes32):
@@ -409,7 +428,7 @@ def _transfer_in(
 
     # --------------------------- Check Transfer -----------------------------
 
-    if incoming_coin_is_rebasing:
+    if _incoming_coin_asset_type == 3:
         assert _dx > 0, "Pool did not receive tokens for swap"  # TODO: Check this!!
     else:
         assert dx == _dx, "Pool did not receive tokens for swap"
@@ -758,7 +777,7 @@ def add_liquidity(
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
 
-    total_supply: uint256 = lp_token.totalSupply()
+    total_supply: uint256 = self.totalSupply
     new_balances: DynArray[uint256, MAX_COINS] = old_balances
 
     # -------------------------- Do Transfers In -----------------------------
@@ -832,7 +851,9 @@ def add_liquidity(
 
     # Mint pool tokens
     total_supply += mint_amount
-    lp_token.mint(msg.sender, mint_amount)
+    self.balanceOf[_receiver] += mint_amount
+    self.totalSupply = total_supply
+    log Transfer(empty(address), _receiver, mint_amount)
 
     log AddLiquidity(msg.sender, _amounts, fees, D1, total_supply)
 
@@ -864,13 +885,13 @@ def remove_liquidity_one_coin(
 
     self.admin_balances[i] += fee * ADMIN_FEE / FEE_DENOMINATOR
 
-    lp_token.burnFrom(msg.sender, _burn_amount)
+    self._burnFrom(msg.sender, _burn_amount)
 
     log Transfer(msg.sender, empty(address), _burn_amount)
 
     self._transfer_out(i, dy, _use_eth, _receiver)
 
-    log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, lp_token.totalSupply())
+    log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, self.totalSupply)
 
     self.save_p_from_price(p)
 
@@ -932,12 +953,12 @@ def remove_liquidity_imbalance(
 
     self.save_p(new_balances, amp, D2)
 
-    total_supply: uint256 = lp_token.totalSupply()
+    total_supply: uint256 = self.totalSupply
     burn_amount: uint256 = ((D0 - D2) * total_supply / D0) + 1
     assert burn_amount > 1  # dev: zero tokens burned
     assert burn_amount <= _max_burn_amount, "Slippage screwed you"
 
-    lp_token.burnFrom(msg.sender, burn_amount)
+    self._burnFrom(msg.sender, burn_amount)
 
     log RemoveLiquidityImbalance(msg.sender, _amounts, fees, D1, total_supply)
 
@@ -961,7 +982,7 @@ def remove_liquidity(
     @param _receiver Address that receives the withdrawn coins
     @return List of amounts of coins that were withdrawn
     """
-    total_supply: uint256 = lp_token.totalSupply()
+    total_supply: uint256 = self.totalSupply
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
 
@@ -975,7 +996,7 @@ def remove_liquidity(
         amounts[i] = value
         self._transfer_out(i, value, _use_eth, _receiver)
 
-    lp_token.burnFrom(msg.sender, _burn_amount)  # dev: insufficient funds
+    self._burnFrom(msg.sender, _burn_amount)  # dev: insufficient funds
 
     log RemoveLiquidity(msg.sender, amounts, empty(DynArray[uint256, MAX_COINS]), total_supply)  # TODO: check this!
 
@@ -1134,7 +1155,7 @@ def _exchange_underlying(
     # for exchange_underlying, optimistic transfers need to be handled differently
     if expect_optimistic_transfer:
 
-        assert self.is_rebasing[input_coin]  # dev: rebasing coins not supported
+        assert self.asset_types[i] != 3  # dev: rebasing coins not supported
 
         # This branch is never reached for rebasing tokens
         if input_coin == BASE_COINS[base_i]:
@@ -1495,7 +1516,7 @@ def _calc_withdraw_one_coin(
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, self._balances())
     D0: uint256 = self.get_D(xp, amp)
 
-    total_supply: uint256 = lp_token.totalSupply()
+    total_supply: uint256 = self.totalSupply
     D1: uint256 = D0 - _burn_amount * D0 / total_supply
     new_y: uint256 = self.get_y_D(amp, i, xp, D1)
 
@@ -1723,6 +1744,151 @@ def exp(x: int256) -> uint256:
     return unsafe_mul(convert(convert(r, bytes32), uint256), 3822833074963236453042738258902158003155416615667) >> convert(unsafe_sub(195, k), uint256)
 
 
+# ---------------------------- ERC20 Utils -----------------------------------
+
+
+@view
+@internal
+def _domain_separator() -> bytes32:
+    if chain.id != CACHED_CHAIN_ID:
+        return keccak256(
+            _abi_encode(
+                EIP712_TYPEHASH,
+                NAME_HASH,
+                VERSION_HASH,
+                chain.id,
+                self,
+                salt,
+            )
+        )
+    return CACHED_DOMAIN_SEPARATOR
+
+
+@internal
+def _transfer(_from: address, _to: address, _value: uint256):
+    # # NOTE: vyper does not allow underflows
+    # #       so the following subtraction would revert on insufficient balance
+    self.balanceOf[_from] -= _value
+    self.balanceOf[_to] += _value
+
+    log Transfer(_from, _to, _value)
+
+
+@internal
+def _burnFrom(_from: address, _burn_amount: uint256):
+
+    self.totalSupply -= _burn_amount
+    self.balanceOf[_from] -= _burn_amount
+    log Transfer(_from, empty(address), _burn_amount)
+
+
+@external
+def transfer(_to : address, _value : uint256) -> bool:
+    """
+    @dev Transfer token for a specified address
+    @param _to The address to transfer to.
+    @param _value The amount to be transferred.
+    """
+    self._transfer(msg.sender, _to, _value)
+    return True
+
+
+@external
+def transferFrom(_from : address, _to : address, _value : uint256) -> bool:
+    """
+     @dev Transfer tokens from one address to another.
+     @param _from address The address which you want to send tokens from
+     @param _to address The address which you want to transfer to
+     @param _value uint256 the amount of tokens to be transferred
+    """
+    self._transfer(_from, _to, _value)
+
+    _allowance: uint256 = self.allowance[_from][msg.sender]
+    if _allowance != max_value(uint256):
+        self.allowance[_from][msg.sender] = _allowance - _value
+
+    return True
+
+
+@external
+def approve(_spender : address, _value : uint256) -> bool:
+    """
+    @notice Approve the passed address to transfer the specified amount of
+            tokens on behalf of msg.sender
+    @dev Beware that changing an allowance via this method brings the risk that
+         someone may use both the old and new allowance by unfortunate transaction
+         ordering: https://github.com/ethereum/EIPs/issues/20#issuecomment-263524729
+    @param _spender The address which will transfer the funds
+    @param _value The amount of tokens that may be transferred
+    @return bool success
+    """
+    self.allowance[msg.sender][_spender] = _value
+
+    log Approval(msg.sender, _spender, _value)
+    return True
+
+
+@external
+def permit(
+    _owner: address,
+    _spender: address,
+    _value: uint256,
+    _deadline: uint256,
+    _v: uint8,
+    _r: bytes32,
+    _s: bytes32
+) -> bool:
+    """
+    @notice Approves spender by owner's signature to expend owner's tokens.
+        See https://eips.ethereum.org/EIPS/eip-2612.
+    @dev Inspired by https://github.com/yearn/yearn-vaults/blob/main/contracts/Vault.vy#L753-L793
+    @dev Supports smart contract wallets which implement ERC1271
+        https://eips.ethereum.org/EIPS/eip-1271
+    @param _owner The address which is a source of funds and has signed the Permit.
+    @param _spender The address which is allowed to spend the funds.
+    @param _value The amount of tokens to be spent.
+    @param _deadline The timestamp after which the Permit is no longer valid.
+    @param _v The bytes[64] of the valid secp256k1 signature of permit by owner
+    @param _r The bytes[0:32] of the valid secp256k1 signature of permit by owner
+    @param _s The bytes[32:64] of the valid secp256k1 signature of permit by owner
+    @return True, if transaction completes successfully
+    """
+    assert _owner != empty(address)
+    assert block.timestamp <= _deadline
+
+    nonce: uint256 = self.nonces[_owner]
+    digest: bytes32 = keccak256(
+        concat(
+            b"\x19\x01",
+            self._domain_separator(),
+            keccak256(_abi_encode(EIP2612_TYPEHASH, _owner, _spender, _value, nonce, _deadline))
+        )
+    )
+
+    if _owner.is_contract:
+        sig: Bytes[65] = concat(_abi_encode(_r, _s), slice(convert(_v, bytes32), 31, 1))
+        # reentrancy not a concern since this is a staticcall
+        assert ERC1271(_owner).isValidSignature(digest, sig) == ERC1271_MAGIC_VAL
+    else:
+        assert ecrecover(digest, convert(_v, uint256), convert(_r, uint256), convert(_s, uint256)) == _owner
+
+    self.allowance[_owner][_spender] = _value
+    self.nonces[_owner] = nonce + 1
+
+    log Approval(_owner, _spender, _value)
+    return True
+
+
+@view
+@external
+def DOMAIN_SEPARATOR() -> bytes32:
+    """
+    @notice EIP712 domain separator.
+    @return bytes32 Domain Separator set for the current chain.
+    """
+    return self._domain_separator()
+
+
 # ------------------------- AMM View Functions -------------------------------
 
 
@@ -1780,7 +1946,7 @@ def get_virtual_price() -> uint256:
     D: uint256 = self.get_D(xp, amp)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
-    return D * PRECISION / lp_token.totalSupply()
+    return D * PRECISION / self.totalSupply
 
 
 @view

@@ -26,7 +26,6 @@ def swap(
         method_ids = [bytes(b"")] * pool_size
         oracles = [zero_address] * pool_size
         asset_types = []
-        is_rebasing = [False] * pool_size
 
         for i, t in enumerate(pool_token_types):
             if t == 0:
@@ -47,7 +46,6 @@ def swap(
                 A = 500
                 fee = 4000000
                 asset_types.append(3)
-                is_rebasing[i] = True
 
         with boa.env.prank(deployer):
             pool = factory.deploy_plain_pool(
@@ -58,38 +56,36 @@ def swap(
     elif pool_type == 1:
         base_pool = request.getfixturevalue("base_pool")
         underlying_tokens = request.getfixturevalue("underlying_tokens")
-        amm_interface_meta = request.getfixturevalue("amm_interface")
+        amm_interface_meta = request.getfixturevalue("amm_interface_meta")
         _ = request.getfixturevalue("add_base_pool")
-        _ = request.getfixturevalue("set_pool_implementations")
+        _ = request.getfixturevalue("set_metapool_implementations")
 
         A = 2000
         fee = 1000000
         method_id = bytes(b"")
         oracle = zero_address
-        asset_types = 0  # 0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
-        is_rebasing = False
+        asset_type = 0  # 0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
         metapool_token_type = pool_token_types[0]
 
         if metapool_token_type == 0:
             A = 2000
             fee = 1000000
-            asset_types = 0
+            asset_type = 0
         elif metapool_token_type == 1:
             A = 1000
             fee = 3000000
-            asset_types = 1
+            asset_type = 1
         elif metapool_token_type == 2:
             A = 1000
             fee = 3000000
-            asset_types = 2
+            asset_type = 2
             method_id = oracle_method_id
             oracle = underlying_tokens[0].address
 
         elif metapool_token_type == 3:
             A = 500
             fee = 4000000
-            asset_types = 3
-            is_rebasing = True
+            asset_type = 3
 
         pool = factory.deploy_metapool(
             base_pool.address,
@@ -100,10 +96,9 @@ def swap(
             fee,
             866,
             0,
-            0,
+            asset_type,
             method_id,
             oracle,
-            is_rebasing,
         )
 
         return amm_interface_meta.at(pool)
