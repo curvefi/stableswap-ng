@@ -449,11 +449,7 @@ def get_pool_asset_types(_pool: address) -> DynArray[uint8, MAX_COINS]:
     @param _pool Pool Address
     @return Integer indicating the pool asset type
     """
-    base_pool: address = self.pool_data[_pool].base_pool
-    if base_pool == empty(address):
-        return self.pool_data[_pool].asset_types
-    else:
-        return self.base_pool_data[base_pool].asset_types
+    return self.pool_data[_pool].asset_types
 
 
 # <--- Pool Deployers --->
@@ -815,16 +811,6 @@ def set_views_implementation(_views_implementation: address):
     """
     assert msg.sender == self.admin  # dev: admin-only function
     self.views_implementation = _views_implementation
-
-
-@external
-def set_pool_asset_types(_pool: address, _asset_types: DynArray[uint8, MAX_COINS]):
-    """
-    @notice Set the asset type for factory pools
-    @dev Used to modify asset types that were set incorrectly at deployment
-    """
-    assert msg.sender == self.admin  # dev: admin-only function
-    self.pool_data[_pool].asset_types = _asset_types
 
 
 @external

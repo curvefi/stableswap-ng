@@ -287,7 +287,10 @@ def __init__(
             assert i == 0, "ETH must be at index 0"
 
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
-        self.admin_balances.append(0)  # <--- this initialises storage for admin balances  # TODO: check if this is needed?
+
+        #  --------------------------- initialize storage ---------------------------
+        self.stored_balances.append(0)
+        self.admin_balances.append(0)
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -1195,7 +1198,7 @@ def _xp_mem(
         if i == N_COINS_128:
             break
 
-        result[i] = _rates[i] * _balances[i] / PRECISION
+        result.append(_rates[i] * _balances[i] / PRECISION)
 
     return result
 
