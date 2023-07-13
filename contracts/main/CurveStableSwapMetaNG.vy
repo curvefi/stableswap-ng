@@ -158,8 +158,8 @@ MAX_METAPOOL_COIN_INDEX: constant(int128) = 1
 # ---------------------------- Pool Variables --------------------------------
 
 WETH20: immutable(address)
-N_COINS: public(immutable(uint256))
-N_COINS_128: immutable(int128)
+N_COINS: public(constant(uint256)) = 2
+N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 
 # To denote that it is a plain pool:
@@ -171,7 +171,7 @@ factory: public(immutable(Factory))
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
 fee: public(uint256)  # fee * 1e10
-asset_types: public(DynArray[uint8, MAX_COINS])
+asset_types: public(immutable(DynArray[uint8, MAX_COINS]))
 
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
@@ -275,25 +275,17 @@ def __init__(
     WETH20 = _weth
     BASE_POOL = _base_pool
     BASE_COINS = _base_coins
+    BASE_N_COINS = len(_base_coins)
     coins = _coins
-
-    __n_coins: uint256 = len(_coins)
-    __base_n_coins: uint256 = len(_base_coins)
-    BASE_N_COINS = __base_n_coins
-    assert __n_coins == 2  # dev: metapools can only have 2 coins
+    rate_multipliers = _rate_multipliers
+    asset_types = _asset_types  # contains asset types for all pool tokens including base pool tokens
 
     for i in range(MAX_COINS):
-        if i < __base_n_coins:
+        if i < BASE_N_COINS:
             # Approval needed for add_liquidity operation on base pool in _exchange_underlying
             ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))
 
-        if i < __n_coins:
-            self.last_prices_packed.append(self.pack_prices(10**18, 10**18))  # <--- TODO: check this!
-
-    N_COINS = __n_coins
-    N_COINS_128 = convert(__n_coins, int128)
-    rate_multipliers = _rate_multipliers
-    self.asset_types = _asset_types
+    self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
 
     # ----------------- Parameters independent of pool type ------------------
 
@@ -308,10 +300,7 @@ def __init__(
     self.ma_exp_time = _ma_exp_time
     self.ma_last_time = block.timestamp
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128):
 
         # Enforce native token as coin[0]
         if _coins[i] == WETH20:
@@ -392,7 +381,7 @@ def _transfer_in(
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
-    _incoming_coin_asset_type: uint8 = self.asset_types[coin_idx]
+    _incoming_coin_asset_type: uint8 = asset_types[coin_idx]
 
     # ------------------------- Handle Transfers -----------------------------
 
@@ -492,10 +481,7 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
 
     oracles: DynArray[uint256, MAX_COINS] = self.oracles
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128):
 
         if oracles[i] == 0:
             continue
@@ -523,11 +509,7 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
     """
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
-
+    for i in range(N_COINS_128):
         result.append(ERC20(coins[i]).balanceOf(self) - self.admin_balances[i])
 
     return result
@@ -782,10 +764,7 @@ def add_liquidity(
 
     # -------------------------- Do Transfers In -----------------------------
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128):
 
         if _amounts[i] > 0:
 
@@ -821,10 +800,7 @@ def add_liquidity(
 
         # Only account for fees if we are not the first to deposit
         base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-        for i in range(MAX_COINS_128):
-
-            if i == N_COINS_128:
-                break
+        for i in range(N_COINS_128):
 
             ideal_balance: uint256 = D1 * old_balances[i] / D0
             difference: uint256 = 0
@@ -919,10 +895,7 @@ def remove_liquidity_imbalance(
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
     new_balances: DynArray[uint256, MAX_COINS] = old_balances
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128):
 
         if _amounts[i] != 0:
             new_balances[i] -= _amounts[i]
@@ -932,10 +905,7 @@ def remove_liquidity_imbalance(
     fees: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128):
 
         ideal_balance: uint256 = D1 * old_balances[i] / D0
         difference: uint256 = 0
@@ -986,10 +956,7 @@ def remove_liquidity(
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128):
 
         value: uint256 = balances[i] * _burn_amount / total_supply
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
@@ -1155,7 +1122,7 @@ def _exchange_underlying(
     # for exchange_underlying, optimistic transfers need to be handled differently
     if expect_optimistic_transfer:
 
-        assert self.asset_types[i] != 3  # dev: rebasing coins not supported
+        assert asset_types[i] != 3  # dev: rebasing coins not supported
 
         # This branch is never reached for rebasing tokens
         if input_coin == BASE_COINS[base_i]:
@@ -1262,10 +1229,7 @@ def _withdraw_admin_fees():
     assert fee_receiver != empty(address)  # dev: fee receiver not set
 
     admin_balances: DynArray[uint256, MAX_COINS] = self.admin_balances
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128):
 
         if admin_balances[i] > 0:
 
@@ -1318,10 +1282,7 @@ def get_y(
     c: uint256 = D
     Ann: uint256 = amp * N_COINS
 
-    for _i in range(MAX_COINS_128):
-
-        if _i == N_COINS_128:
-            break
+    for _i in range(N_COINS_128):
 
         if _i == i:
             _x = x
@@ -1417,10 +1378,7 @@ def get_y_D(
     c: uint256 = D
     Ann: uint256 = A * N_COINS
 
-    for _i in range(MAX_COINS_128):
-
-        if _i == N_COINS_128:
-            break
+    for _i in range(N_COINS_128):
 
         if _i != i:
             _x = xp[_i]
@@ -1477,10 +1435,7 @@ def _xp_mem(
 
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128):
 
         result[i] = _rates[i] * _balances[i] / PRECISION
 
@@ -1523,10 +1478,7 @@ def _calc_withdraw_one_coin(
     base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
     xp_reduced: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
 
-    for j in range(MAX_COINS_128):
-
-        if j == N_COINS_128:
-            break
+    for j in range(N_COINS_128):
 
         dx_expected: uint256 = 0
         xp_j: uint256 = xp[j]
@@ -1570,20 +1522,12 @@ def _get_p(
     ANN: uint256 = unsafe_mul(amp, N_COINS)
     Dr: uint256 = unsafe_div(D, pow_mod256(N_COINS, N_COINS))
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
-
+    for i in range(N_COINS_128):
         Dr = Dr * D / xp[i]
 
     p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     xp0_A: uint256 = ANN * xp[0] / A_PRECISION
-    for i in range(1, MAX_COINS):
-        if i == N_COINS:
-            break
-
-        p[i - 1] = 10**18 * (xp0_A + Dr * xp[0] / xp[i]) / (xp0_A + Dr)
+    p.append(10**18 * (xp0_A + Dr * xp[0] / xp[1]) / (xp0_A + Dr))
 
     return p
 
@@ -1593,20 +1537,14 @@ def save_p_from_price(last_prices: DynArray[uint256, MAX_COINS]):
     """
     Saves current price and its EMA
     """
-    ma_last_time: uint256 = self.ma_last_time
+    if last_prices[0] != 0:
 
-    for i in range(MAX_COINS):
-        if i == N_COINS - 1:
-            break
+        # Upate packed prices -----------------
+        self.last_prices_packed[0] = self.pack_prices(last_prices[0], self._ma_price())
 
-        if last_prices[i] != 0:
-
-            # Upate packed prices -----------------
-            self.last_prices_packed[i] = self.pack_prices(last_prices[i], self._ma_price(i))
-
-            # Update ma_last_time ------------------
-            if ma_last_time < block.timestamp:
-                self.ma_last_time = block.timestamp
+        # Update ma_last_time ------------------
+        if self.ma_last_time < block.timestamp:
+            self.ma_last_time = block.timestamp
 
 
 @internal
@@ -1619,10 +1557,10 @@ def save_p(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
 
 @internal
 @view
-def _ma_price(i: uint256) -> uint256:
+def _ma_price() -> uint256:
     ma_last_time: uint256 = self.ma_last_time
 
-    pp: uint256 = self.last_prices_packed[i]
+    pp: uint256 = self.last_prices_packed[0]
     last_price: uint256 = pp & (2**128 - 1)
     last_ema_price: uint256 = (pp >> 128)
 
@@ -1637,13 +1575,13 @@ def _ma_price(i: uint256) -> uint256:
 @view
 @external
 def last_price(i: uint256) -> uint256:
-    return self.last_prices_packed[i] & (2**128 - 1)
+    return self.last_prices_packed[0] & (2**128 - 1)
 
 
 @view
 @external
 def ema_price(i: uint256) -> uint256:
-    return (self.last_prices_packed[i] >> 128)
+    return (self.last_prices_packed[0] >> 128)
 
 
 @external
@@ -1660,14 +1598,14 @@ def get_p(i: uint256) -> uint256:
         self._stored_rates(), self._balances()
     )
     D: uint256 = self.get_D(xp, amp)
-    return self._get_p(xp, amp, D)[i]
+    return self._get_p(xp, amp, D)[0]
 
 
 @external
 @view
 @nonreentrant('lock')
 def price_oracle(i: uint256) -> uint256:
-    return self._ma_price(i)
+    return self._ma_price()
 
 
 # ----------------------------- Math Utils -----------------------------------
@@ -1961,17 +1899,8 @@ def calc_token_amount(
     @param _is_deposit set True for deposits, False for withdrawals
     @return Expected amount of LP tokens received
     """
-    amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
-
-        amounts[i] = _amounts[i]
-
     views: address = factory.views_implementation()
-    return StableSwapViews(views).calc_token_amount(amounts, _is_deposit, self)
+    return StableSwapViews(views).calc_token_amount(_amounts, _is_deposit, self)
 
 
 @view
@@ -2013,7 +1942,7 @@ def get_balances() -> DynArray[uint256, MAX_COINS]:
 @view
 @external
 def oracle(_idx: uint256) -> address:
-    return convert(self.oracles[_idx] % 2**160, address)
+    return convert(self.oracles[0] % 2**160, address)
 
 
 @view
