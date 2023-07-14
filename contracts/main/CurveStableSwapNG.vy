@@ -586,8 +586,8 @@ def exchange_received(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool = False,
-    _receiver: address = msg.sender,
+    _use_eth: bool,
+    _receiver: address,
 ) -> uint256:
     """
     @notice Perform an exchange between two coins without transferring token in

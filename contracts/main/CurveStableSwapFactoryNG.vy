@@ -96,6 +96,7 @@ base_pool_assets: public(HashMap[address, bool])
 # index -> implementation address
 pool_implementations: public(HashMap[uint256, address])
 metapool_implementations: public(HashMap[uint256, address])
+math_implementation: public(address)
 gauge_implementation: public(address)
 views_implementation: public(address)
 
@@ -789,6 +790,17 @@ def set_metapool_implementations(
     """
     assert msg.sender == self.admin  # dev: admin-only function
     self.metapool_implementations[_implementation_index] = _implementation
+
+
+@external
+def set_math_implementation(_math_implementation: address):
+    """
+    @notice Set implementation contracts for StableSwap Math
+    @dev Only callable by admin
+    @param _implementation Implementation address to use when stableswap pools
+    """
+    assert msg.sender == self.admin  # dev: admin-only function
+    self.math_implementation = _math_implementation
 
 
 @external

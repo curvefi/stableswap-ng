@@ -1,14 +1,13 @@
 # @version 0.3.9
 """
-@title CurveStableSwapNG
+@title CurveStableSwapNGMath
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
-@notice Math for StableSwapMetaNG implementation (since not enough bytecode space)
+@notice Math for StableSwapMetaNG implementation
 """
 
 MAX_COINS: constant(uint256) = 8
-N_COINS: constant(uint256) = 2
-N_COINS_128: constant(int128) = 2
+MAX_COINS_128: constant(int128) = 8
 A_PRECISION: constant(uint256) = 100
 
 
@@ -20,7 +19,8 @@ def get_y(
     x: uint256,
     xp: DynArray[uint256, MAX_COINS],
     _amp: uint256,
-    _D: uint256
+    _D: uint256,
+    _n_coins: uint256
 ) -> uint256:
     """
     Calculate x[j] if one makes x[i] = x
@@ -33,26 +33,31 @@ def get_y(
     """
     # x in the input is converted to the same price/precision
 
+    n_coins_128: int128 = convert(_n_coins, int128)
+
     assert i != j       # dev: same coin
     assert j >= 0       # dev: j below zero
-    assert j < N_COINS_128  # dev: j above N_COINS
+    assert j < n_coins_128  # dev: j above N_COINS
 
     # should be unreachable, but good for safety
     assert i >= 0
-    assert i < N_COINS_128
+    assert i < n_coins_128
 
     amp: uint256 = _amp
     D: uint256 = _D
-    # if _D == 0:  # TODO: figure out why this even exists?
+    # if _D == 0:  # TODO: why this even exists?
     #     amp = self._A()
     #     D = self.get_D(xp, amp)
     S_: uint256 = 0
     _x: uint256 = 0
     y_prev: uint256 = 0
     c: uint256 = D
-    Ann: uint256 = amp * N_COINS
+    Ann: uint256 = amp * _n_coins
 
-    for _i in range(N_COINS_128):
+    for _i in range(MAX_COINS_128):
+
+        if _i == n_coins_128:
+            break
 
         if _i == i:
             _x = x
@@ -62,9 +67,9 @@ def get_y(
             continue
 
         S_ += _x
-        c = c * D / (_x * N_COINS)
+        c = c * D / (_x * _n_coins)
 
-    c = c * D * A_PRECISION / (Ann * N_COINS)
+    c = c * D * A_PRECISION / (Ann * _n_coins)
     b: uint256 = S_ + D * A_PRECISION / Ann  # - D
     y: uint256 = D
 
@@ -83,7 +88,11 @@ def get_y(
 
 @external
 @pure
-def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
+def get_D(
+    _xp: DynArray[uint256, MAX_COINS],
+    _amp: uint256,
+    _n_coins: uint256
+) -> uint256:
     """
     D invariant calculation in non-overflowing integer operations
     iteratively
@@ -100,14 +109,14 @@ def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
         return 0
 
     D: uint256 = S
-    Ann: uint256 = _amp * N_COINS
+    Ann: uint256 = _amp * _n_coins
     D_P: uint256 = 0
     Dprev: uint256 = 0
 
     for i in range(255):
-        D_P = D * D / _xp[0] * D / _xp[1] / pow_mod256(N_COINS, N_COINS)
+        D_P = D * D / _xp[0] * D / _xp[1] / pow_mod256(_n_coins, _n_coins)
         Dprev = D
-        D = (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
+        D = (Ann * S / A_PRECISION + D_P * _n_coins) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (_n_coins + 1) * D_P)
         # Equality with the precision of 1
         if D > Dprev:
             if D - Dprev <= 1:
@@ -126,7 +135,8 @@ def get_y_D(
     A: uint256,
     i: int128,
     xp: DynArray[uint256, MAX_COINS],
-    D: uint256
+    D: uint256,
+    _n_coins: uint256
 ) -> uint256:
     """
     Calculate x[i] if one reduces D from being calculated for xp to D
@@ -139,25 +149,30 @@ def get_y_D(
     """
     # x in the input is converted to the same price/precision
 
+    n_coins_128: int128 = convert(_n_coins, int128)
+
     assert i >= 0  # dev: i below zero
-    assert i < N_COINS_128  # dev: i above N_COINS
+    assert i < n_coins_128  # dev: i above N_COINS
 
     S_: uint256 = 0
     _x: uint256 = 0
     y_prev: uint256 = 0
     c: uint256 = D
-    Ann: uint256 = A * N_COINS
+    Ann: uint256 = A * _n_coins
 
-    for _i in range(N_COINS_128):
+    for _i in range(MAX_COINS_128):
+
+        if _i == n_coins_128:
+            break
 
         if _i != i:
             _x = xp[_i]
         else:
             continue
         S_ += _x
-        c = c * D / (_x * N_COINS)
+        c = c * D / (_x * _n_coins)
 
-    c = c * D * A_PRECISION / (Ann * N_COINS)
+    c = c * D * A_PRECISION / (Ann * _n_coins)
     b: uint256 = S_ + D * A_PRECISION / Ann
     y: uint256 = D
 

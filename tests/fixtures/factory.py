@@ -42,6 +42,12 @@ def views_implementation(deployer):
 
 
 @pytest.fixture(scope="module")
+def math_implementation(deployer):
+    with boa.env.prank(deployer):
+        return boa.load("contracts/main/CurveStableSwapNGMath.vy")
+
+
+@pytest.fixture(scope="module")
 def factory(
     deployer,
     fee_receiver,
@@ -99,6 +105,12 @@ def set_gauge_implementation(owner, factory, gauge_implementation):
 def set_views_implementation(owner, factory, views_implementation):
     with boa.env.prank(owner):
         factory.set_views_implementation(views_implementation.address)
+
+
+@pytest.fixture(scope="module")
+def set_math_implementation(owner, factory, math_implementation):
+    with boa.env.prank(owner):
+        factory.set_math_implementation(math_implementation.address)
 
 
 @pytest.fixture(scope="module")
