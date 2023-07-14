@@ -34,8 +34,8 @@ jobs:
           source .venv/bin/activate
           pytest tests/test_token.py --pool-size=2 --pool-type=basic --token-types=plain --decimals=18,18 -n auto
 
-#       TODO: uncomment after meta fix
-#      - name: Run Test Meta
-#        run: |
-#          source .venv/bin/activate
-#          pytest tests/test_token.py --pool-size=2 --pool-type=meta --token-types=plain --decimals=18 -n auto
+      TODO: uncomment after meta fix
+     - name: Run Test Meta
+       run: |
+         source .venv/bin/activate
+         pytest tests/test_token.py --pool-size=2 --pool-type=meta --token-types=plain --decimals=18 -n auto

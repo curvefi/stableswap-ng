@@ -84,6 +84,24 @@ interface StableSwap:
     def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256): nonpayable
     def get_virtual_price() -> uint256: view
 
+interface Math:
+    def get_y(
+        i: int128,
+        j: int128,
+        x: uint256,
+        xp: DynArray[uint256, MAX_COINS],
+        _amp: uint256,
+        _D: uint256
+    ) -> uint256: view
+    def get_y_D(
+        A: uint256,
+        i: int128,
+        xp: DynArray[uint256, MAX_COINS],
+        D: uint256
+    ) -> uint256: view
+    def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256: view
+    def exp(x: int256) -> uint256: view
+
 # --------------------------------- Events -----------------------------------
 
 event Transfer:
@@ -166,6 +184,7 @@ BASE_POOL: public(immutable(address))
 BASE_N_COINS: public(immutable(uint256))
 BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
 
+math: public(immutable(Math))
 factory: public(immutable(Factory))
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
@@ -239,6 +258,7 @@ def __init__(
     _A: uint256,
     _fee: uint256,
     _ma_exp_time: uint256,
+    _math_implementation: address,
     _base_pool: address,
     _coins: DynArray[address, MAX_COINS],
     _base_coins: DynArray[address, MAX_COINS],
@@ -270,6 +290,7 @@ def __init__(
     @param _oracles Array of rate oracle addresses.
     """
 
+    math = Math(_math_implementation)
     BASE_POOL = _base_pool
     BASE_COINS = _base_coins
     BASE_N_COINS = len(_base_coins)
@@ -300,7 +321,7 @@ def __init__(
     for i in range(N_COINS_128):
 
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
-        self.admin_balances.append(0)  # <--- this initialises storage for admin balances  # TODO: check if this is needed?
+        self.admin_balances.append(0)  # <--- this initialises storage for admin balances
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -780,7 +801,7 @@ def add_liquidity(
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
-        D2: uint256 = self.get_D(xp, amp)
+        D2: uint256 = math.get_D(xp, amp)
         mint_amount = total_supply * (D2 - D0) / D0
         self.save_p(xp, amp, D2)
 
@@ -961,8 +982,8 @@ def __exchange(
 ) -> uint256:
 
     amp: uint256 = self._A()
-    D: uint256 = self.get_D(_xp, amp)
-    y: uint256 = self.get_y(i, j, x, _xp, amp, D)
+    D: uint256 = math.get_D(_xp, amp)
+    y: uint256 = math.get_y(i, j, x, _xp, amp, D)
 
     dy: uint256 = _xp[j] - y - 1  # -1 just in case there were some rounding errors
     dy_fee: uint256 = dy * self.fee / FEE_DENOMINATOR
@@ -1037,151 +1058,151 @@ def _exchange(
     return dy
 
 
-@internal
-def _exchange_underlying(
-    sender: address,
-    i: int128,
-    j: int128,
-    _dx: uint256,
-    _min_dy: uint256,
-    receiver: address,
-    callbacker: address,
-    callback_sig: bytes32,
-    expect_optimistic_transfer: bool = False
-) -> uint256:
+# @internal
+# def _exchange_underlying(
+#     sender: address,
+#     i: int128,
+#     j: int128,
+#     _dx: uint256,
+#     _min_dy: uint256,
+#     receiver: address,
+#     callbacker: address,
+#     callback_sig: bytes32,
+#     expect_optimistic_transfer: bool = False
+# ) -> uint256:
 
-    assert BASE_POOL != empty(address)  # dev: pool is not a metapool
+#     assert BASE_POOL != empty(address)  # dev: pool is not a metapool
 
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
-    old_balances: DynArray[uint256, MAX_COINS] = self._balances()
-    xp: DynArray[uint256, MAX_COINS]  = self._xp_mem(rates, old_balances)
+#     rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
+#     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
+#     xp: DynArray[uint256, MAX_COINS]  = self._xp_mem(rates, old_balances)
 
-    dy: uint256 = 0
-    base_i: int128 = 0
-    base_j: int128 = 0
-    meta_i: int128 = 0
-    meta_j: int128 = 0
-    x: uint256 = 0
-    input_coin: address = empty(address)
-    output_coin: address = empty(address)
+#     dy: uint256 = 0
+#     base_i: int128 = 0
+#     base_j: int128 = 0
+#     meta_i: int128 = 0
+#     meta_j: int128 = 0
+#     x: uint256 = 0
+#     input_coin: address = empty(address)
+#     output_coin: address = empty(address)
 
-    if i == 0:
-        input_coin = coins[0]
-    else:
-        base_i = i - MAX_METAPOOL_COIN_INDEX  # if i == 1, this reverts
-        meta_i = 1
-        input_coin = BASE_COINS[base_i]
-    if j == 0:
-        output_coin = coins[0]
-    else:
-        base_j = j - MAX_METAPOOL_COIN_INDEX  # if j == 1, this reverts
-        meta_j = 1
-        output_coin = BASE_COINS[base_j]
+#     if i == 0:
+#         input_coin = coins[0]
+#     else:
+#         base_i = i - MAX_METAPOOL_COIN_INDEX  # if i == 1, this reverts
+#         meta_i = 1
+#         input_coin = BASE_COINS[base_i]
+#     if j == 0:
+#         output_coin = coins[0]
+#     else:
+#         base_j = j - MAX_METAPOOL_COIN_INDEX  # if j == 1, this reverts
+#         meta_j = 1
+#         output_coin = BASE_COINS[base_j]
 
-    # --------------------------- Do Transfer in -----------------------------
+#     # --------------------------- Do Transfer in -----------------------------
 
-    dx_w_fee: uint256 = 0
+#     dx_w_fee: uint256 = 0
 
-    # for exchange_underlying, optimistic transfers need to be handled differently
-    if expect_optimistic_transfer:
+#     # for exchange_underlying, optimistic transfers need to be handled differently
+#     if expect_optimistic_transfer:
 
-        assert asset_types[i] != 3  # dev: rebasing coins not supported
+#         assert asset_types[i] != 3  # dev: rebasing coins not supported
 
-        # This branch is never reached for rebasing tokens
-        if input_coin == BASE_COINS[base_i]:
-            # we expect base_coin's balance to be 0. So swap whatever base_coin's
-            # balance the pool has:
-            dx_w_fee = ERC20(input_coin).balanceOf(self)
-        else:
-            dx_w_fee = ERC20(input_coin).balanceOf(self) - self.stored_balances[meta_i]
-            assert dx_w_fee == _dx
-            self.stored_balances[meta_i] += dx_w_fee
+#         # This branch is never reached for rebasing tokens
+#         if input_coin == BASE_COINS[base_i]:
+#             # we expect base_coin's balance to be 0. So swap whatever base_coin's
+#             # balance the pool has:
+#             dx_w_fee = ERC20(input_coin).balanceOf(self)
+#         else:
+#             dx_w_fee = ERC20(input_coin).balanceOf(self) - self.stored_balances[meta_i]
+#             assert dx_w_fee == _dx
+#             self.stored_balances[meta_i] += dx_w_fee
 
-        dx_w_fee = ERC20(input_coin).balanceOf(self) - _dx
+#         dx_w_fee = ERC20(input_coin).balanceOf(self) - _dx
 
-    else:
+#     else:
 
-        dx_w_fee = self._transfer_in(
-            i,
-            _dx,
-            _min_dy,
-            callbacker,
-            callback_sig,
-            sender,
-            receiver,
-            False,  # use_eth = False
-            False,  # expect_optimistic_transfer = False
-        )
+#         dx_w_fee = self._transfer_in(
+#             i,
+#             _dx,
+#             _min_dy,
+#             callbacker,
+#             callback_sig,
+#             sender,
+#             receiver,
+#             False,  # use_eth = False
+#             False,  # expect_optimistic_transfer = False
+#         )
 
-    # ------------------------------------------------------------------------
+#     # ------------------------------------------------------------------------
 
-    if i == 0 or j == 0:  # meta swap
+#     if i == 0 or j == 0:  # meta swap
 
-        if i == 0:
+#         if i == 0:
 
-            x = xp[i] + dx_w_fee * rates[i] / PRECISION
+#             x = xp[i] + dx_w_fee * rates[i] / PRECISION
 
-        else:
+#         else:
 
-            dx_w_fee = self._meta_add_liquidity(dx_w_fee, base_i)
-            x = dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX] / PRECISION
-            x += xp[MAX_METAPOOL_COIN_INDEX]
+#             dx_w_fee = self._meta_add_liquidity(dx_w_fee, base_i)
+#             x = dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX] / PRECISION
+#             x += xp[MAX_METAPOOL_COIN_INDEX]
 
-        dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
+#         dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
-        # Withdraw from the base pool if needed
-        if j > 0:
-            out_amount: uint256 = ERC20(output_coin).balanceOf(self)
-            StableSwap(BASE_POOL).remove_liquidity_one_coin(dy, base_j, 0)
-            dy = ERC20(output_coin).balanceOf(self) - out_amount
+#         # Withdraw from the base pool if needed
+#         if j > 0:
+#             out_amount: uint256 = ERC20(output_coin).balanceOf(self)
+#             StableSwap(BASE_POOL).remove_liquidity_one_coin(dy, base_j, 0)
+#             dy = ERC20(output_coin).balanceOf(self) - out_amount
 
-        assert dy >= _min_dy
+#         assert dy >= _min_dy
 
-        # Adjust stored balances:
-        self.stored_balances[meta_j] -= dy
+#         # Adjust stored balances:
+#         self.stored_balances[meta_j] -= dy
 
-    else:  # base pool swap (user should swap at base pool for better gas)
+#     else:  # base pool swap (user should swap at base pool for better gas)
 
-        dy = ERC20(output_coin).balanceOf(self)
-        StableSwap(BASE_POOL).exchange(base_i, base_j, dx_w_fee, _min_dy)
-        dy = ERC20(output_coin).balanceOf(self) - dy
+#         dy = ERC20(output_coin).balanceOf(self)
+#         StableSwap(BASE_POOL).exchange(base_i, base_j, dx_w_fee, _min_dy)
+#         dy = ERC20(output_coin).balanceOf(self) - dy
 
-    # --------------------------- Do Transfer out ----------------------------
+#     # --------------------------- Do Transfer out ----------------------------
 
-    assert ERC20(output_coin).transfer(receiver, dy, default_return_value=True)
+#     assert ERC20(output_coin).transfer(receiver, dy, default_return_value=True)
 
-    # ------------------------------------------------------------------------
+#     # ------------------------------------------------------------------------
 
-    log TokenExchangeUnderlying(sender, i, _dx, j, dy)  # TODO: check this!
+#     log TokenExchangeUnderlying(sender, i, _dx, j, dy)  # TODO: check this!
 
-    return dy
+#     return dy
 
 
-@internal
-def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
+# @internal
+# def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
 
-    coin_i: address = coins[MAX_METAPOOL_COIN_INDEX]
-    x: uint256 = ERC20(coin_i).balanceOf(self)
+#     coin_i: address = coins[MAX_METAPOOL_COIN_INDEX]
+#     x: uint256 = ERC20(coin_i).balanceOf(self)
 
-    if BASE_N_COINS == 2:
+#     if BASE_N_COINS == 2:
 
-        base_inputs: uint256[2] = empty(uint256[2])
-        base_inputs[base_i] = dx
-        StableSwap2(BASE_POOL).add_liquidity(base_inputs, 0)
+#         base_inputs: uint256[2] = empty(uint256[2])
+#         base_inputs[base_i] = dx
+#         StableSwap2(BASE_POOL).add_liquidity(base_inputs, 0)
 
-    if BASE_N_COINS == 3:
+#     if BASE_N_COINS == 3:
 
-        base_inputs: uint256[3] = empty(uint256[3])
-        base_inputs[base_i] = dx
-        StableSwap3(BASE_POOL).add_liquidity(base_inputs, 0)
+#         base_inputs: uint256[3] = empty(uint256[3])
+#         base_inputs[base_i] = dx
+#         StableSwap3(BASE_POOL).add_liquidity(base_inputs, 0)
 
-    else:
+#     else:
 
-        base_inputs: uint256[4] = empty(uint256[4])
-        base_inputs[base_i] = dx
-        StableSwap4(BASE_POOL).add_liquidity(base_inputs, 0)
+#         base_inputs: uint256[4] = empty(uint256[4])
+#         base_inputs[base_i] = dx
+#         StableSwap4(BASE_POOL).add_liquidity(base_inputs, 0)
 
-    return ERC20(coin_i).balanceOf(self) - x
+#     return ERC20(coin_i).balanceOf(self) - x
 
 
 @internal
@@ -1202,168 +1223,6 @@ def _withdraw_admin_fees():
 
 
 # --------------------------- AMM Math Functions -----------------------------
-
-
-@view
-@internal
-def get_y(
-    i: int128,
-    j: int128,
-    x: uint256,
-    xp: DynArray[uint256, MAX_COINS],
-    _amp: uint256,
-    _D: uint256
-) -> uint256:
-    """
-    Calculate x[j] if one makes x[i] = x
-
-    Done by solving quadratic equation iteratively.
-    x_1**2 + x_1 * (sum' - (A*n**n - 1) * D / (A * n**n)) = D ** (n + 1) / (n ** (2 * n) * prod' * A)
-    x_1**2 + b*x_1 = c
-
-    x_1 = (x_1**2 + c) / (2*x_1 + b)
-    """
-    # x in the input is converted to the same price/precision
-
-    assert i != j       # dev: same coin
-    assert j >= 0       # dev: j below zero
-    assert j < N_COINS_128  # dev: j above N_COINS
-
-    # should be unreachable, but good for safety
-    assert i >= 0
-    assert i < N_COINS_128
-
-    amp: uint256 = _amp
-    D: uint256 = _D
-    if _D == 0:
-        amp = self._A()
-        D = self.get_D(xp, amp)
-    S_: uint256 = 0
-    _x: uint256 = 0
-    y_prev: uint256 = 0
-    c: uint256 = D
-    Ann: uint256 = amp * N_COINS
-
-    for _i in range(N_COINS_128):
-
-        if _i == i:
-            _x = x
-        elif _i != j:
-            _x = xp[_i]
-        else:
-            continue
-
-        S_ += _x
-        c = c * D / (_x * N_COINS)
-
-    c = c * D * A_PRECISION / (Ann * N_COINS)
-    b: uint256 = S_ + D * A_PRECISION / Ann  # - D
-    y: uint256 = D
-
-    for _i in range(255):
-        y_prev = y
-        y = (y*y + c) / (2 * y + b - D)
-        # Equality with the precision of 1
-        if y > y_prev:
-            if y - y_prev <= 1:
-                return y
-        else:
-            if y_prev - y <= 1:
-                return y
-    raise
-
-
-@pure
-@internal
-def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
-    """
-    D invariant calculation in non-overflowing integer operations
-    iteratively
-
-    A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
-
-    Converging solution:
-    D[j+1] = (A * n**n * sum(x_i) - D[j]**(n+1) / (n**n prod(x_i))) / (A * n**n - 1)
-    """
-    S: uint256 = 0
-    for x in _xp:
-        S += x
-    if S == 0:
-        return 0
-
-    D: uint256 = S
-    Ann: uint256 = _amp * N_COINS
-    D_P: uint256 = 0
-    Dprev: uint256 = 0
-
-    for i in range(255):
-        D_P = D * D / _xp[0] * D / _xp[1] / pow_mod256(N_COINS, N_COINS)
-        Dprev = D
-        D = (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
-        # Equality with the precision of 1
-        if D > Dprev:
-            if D - Dprev <= 1:
-                return D
-        else:
-            if Dprev - D <= 1:
-                return D
-    # convergence typically occurs in 4 rounds or less, this should be unreachable!
-    # if it does happen the pool is borked and LPs can withdraw via `remove_liquidity`
-    raise
-
-
-@pure
-@internal
-def get_y_D(
-    A: uint256,
-    i: int128,
-    xp: DynArray[uint256, MAX_COINS],
-    D: uint256
-) -> uint256:
-    """
-    Calculate x[i] if one reduces D from being calculated for xp to D
-
-    Done by solving quadratic equation iteratively.
-    x_1**2 + x_1 * (sum' - (A*n**n - 1) * D / (A * n**n)) = D ** (n + 1) / (n ** (2 * n) * prod' * A)
-    x_1**2 + b*x_1 = c
-
-    x_1 = (x_1**2 + c) / (2*x_1 + b)
-    """
-    # x in the input is converted to the same price/precision
-
-    assert i >= 0  # dev: i below zero
-    assert i < N_COINS_128  # dev: i above N_COINS
-
-    S_: uint256 = 0
-    _x: uint256 = 0
-    y_prev: uint256 = 0
-    c: uint256 = D
-    Ann: uint256 = A * N_COINS
-
-    for _i in range(N_COINS_128):
-
-        if _i != i:
-            _x = xp[_i]
-        else:
-            continue
-        S_ += _x
-        c = c * D / (_x * N_COINS)
-
-    c = c * D * A_PRECISION / (Ann * N_COINS)
-    b: uint256 = S_ + D * A_PRECISION / Ann
-    y: uint256 = D
-
-    for _i in range(255):
-        y_prev = y
-        y = (y*y + c) / (2 * y + b - D)
-        # Equality with the precision of 1
-        if y > y_prev:
-            if y - y_prev <= 1:
-                return y
-        else:
-            if y_prev - y <= 1:
-                return y
-    raise
 
 
 @view
@@ -1396,9 +1255,7 @@ def _xp_mem(
 ) -> DynArray[uint256, MAX_COINS]:
 
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-
     for i in range(N_COINS_128):
-
         result[i] = _rates[i] * _balances[i] / PRECISION
 
     return result
@@ -1412,7 +1269,7 @@ def get_D_mem(
     _amp: uint256
 ) -> uint256:
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(_rates, _balances)
-    return self.get_D(xp, _amp)
+    return math.get_D(xp, _amp)
 
 
 @view
@@ -1431,11 +1288,11 @@ def _calc_withdraw_one_coin(
     amp: uint256 = self._A()
     rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, self._balances())
-    D0: uint256 = self.get_D(xp, amp)
+    D0: uint256 = math.get_D(xp, amp)
 
     total_supply: uint256 = self.totalSupply
     D1: uint256 = D0 - _burn_amount * D0 / total_supply
-    new_y: uint256 = self.get_y_D(amp, i, xp, D1)
+    new_y: uint256 = math.get_y_D(amp, i, xp, D1)
 
     base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
     xp_reduced: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -1450,7 +1307,7 @@ def _calc_withdraw_one_coin(
             dx_expected = xp_j - xp_j * D1 / D0
         xp_reduced[j] = xp_j - base_fee * dx_expected / FEE_DENOMINATOR
 
-    dy: uint256 = xp_reduced[i] - self.get_y_D(amp, i, xp_reduced, D1)
+    dy: uint256 = xp_reduced[i] - math.get_y_D(amp, i, xp_reduced, D1)
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
     dy = (dy - 1) * PRECISION / rates[i]  # Withdraw less to account for rounding errors
 
@@ -1527,7 +1384,7 @@ def _ma_price() -> uint256:
     last_ema_price: uint256 = (pp >> 128)
 
     if ma_last_time < block.timestamp:
-        alpha: uint256 = self.exp(- convert((block.timestamp - ma_last_time) * 10**18 / self.ma_exp_time, int256))
+        alpha: uint256 = math.exp(- convert((block.timestamp - ma_last_time) * 10**18 / self.ma_exp_time, int256))
         return (last_price * (10**18 - alpha) + last_ema_price * alpha) / 10**18
 
     else:
@@ -1559,7 +1416,7 @@ def get_p(i: uint256) -> uint256:
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
         self._stored_rates(), self._balances()
     )
-    D: uint256 = self.get_D(xp, amp)
+    D: uint256 = math.get_D(xp, amp)
     return self._get_p(xp, amp, D)[0]
 
 
@@ -1572,76 +1429,6 @@ def price_oracle(i: uint256) -> uint256:
 
 # ----------------------------- Math Utils -----------------------------------
 
-
-@internal
-@pure
-def exp(x: int256) -> uint256:
-
-    """
-    @dev Calculates the natural exponential function of a signed integer with
-         a precision of 1e18.
-    @notice Note that this function consumes about 810 gas units. The implementation
-            is inspired by Remco Bloemen's implementation under the MIT license here:
-            https://xn--2-umb.com/22/exp-ln.
-    @dev This implementation is derived from Snekmate, which is authored
-         by pcaversaccio (Snekmate), distributed under the AGPL-3.0 license.
-         https://github.com/pcaversaccio/snekmate
-    @param x The 32-byte variable.
-    @return int256 The 32-byte calculation result.
-    """
-    value: int256 = x
-
-    # If the result is `< 0.5`, we return zero. This happens when we have the following:
-    # "x <= floor(log(0.5e18) * 1e18) ~ -42e18".
-    if (x <= -42139678854452767551):
-        return empty(uint256)
-
-    # When the result is "> (2 ** 255 - 1) / 1e18" we cannot represent it as a signed integer.
-    # This happens when "x >= floor(log((2 ** 255 - 1) / 1e18) * 1e18) ~ 135".
-    assert x < 135305999368893231589, "wad_exp overflow"
-
-    # `x` is now in the range "(-42, 136) * 1e18". Convert to "(-42, 136) * 2 ** 96" for higher
-    # intermediate precision and a binary base. This base conversion is a multiplication with
-    # "1e18 / 2 ** 96 = 5 ** 18 / 2 ** 78".
-    value = unsafe_div(x << 78, 5 ** 18)
-
-    # Reduce the range of `x` to "(-½ ln 2, ½ ln 2) * 2 ** 96" by factoring out powers of two
-    # so that "exp(x) = exp(x') * 2 ** k", where `k` is a signer integer. Solving this gives
-    # "k = round(x / log(2))" and "x' = x - k * log(2)". Thus, `k` is in the range "[-61, 195]".
-    k: int256 = unsafe_add(unsafe_div(value << 96, 54916777467707473351141471128), 2 ** 95) >> 96
-    value = unsafe_sub(value, unsafe_mul(k, 54916777467707473351141471128))
-
-    # Evaluate using a "(6, 7)"-term rational approximation. Since `p` is monic,
-    # we will multiply by a scaling factor later.
-    y: int256 = unsafe_add(unsafe_mul(unsafe_add(value, 1346386616545796478920950773328), value) >> 96, 57155421227552351082224309758442)
-    p: int256 = unsafe_add(unsafe_mul(unsafe_add(unsafe_mul(unsafe_sub(unsafe_add(y, value), 94201549194550492254356042504812), y) >> 96,\
-                           28719021644029726153956944680412240), value), 4385272521454847904659076985693276 << 96)
-
-    # We leave `p` in the "2 ** 192" base so that we do not have to scale it up
-    # again for the division.
-    q: int256 = unsafe_add(unsafe_mul(unsafe_sub(value, 2855989394907223263936484059900), value) >> 96, 50020603652535783019961831881945)
-    q = unsafe_sub(unsafe_mul(q, value) >> 96, 533845033583426703283633433725380)
-    q = unsafe_add(unsafe_mul(q, value) >> 96, 3604857256930695427073651918091429)
-    q = unsafe_sub(unsafe_mul(q, value) >> 96, 14423608567350463180887372962807573)
-    q = unsafe_add(unsafe_mul(q, value) >> 96, 26449188498355588339934803723976023)
-
-    # The polynomial `q` has no zeros in the range because all its roots are complex.
-    # No scaling is required, as `p` is already "2 ** 96" too large. Also,
-    # `r` is in the range "(0.09, 0.25) * 2**96" after the division.
-    r: int256 = unsafe_div(p, q)
-
-    # To finalise the calculation, we have to multiply `r` by:
-    #   - the scale factor "s = ~6.031367120",
-    #   - the factor "2 ** k" from the range reduction, and
-    #   - the factor "1e18 / 2 ** 96" for the base conversion.
-    # We do this all at once, with an intermediate result in "2**213" base,
-    # so that the final right shift always gives a positive value.
-
-    # Note that to circumvent Vyper's safecast feature for the potentially
-    # negative parameter value `r`, we first convert `r` to `bytes32` and
-    # subsequently to `uint256`. Remember that the EVM default behaviour is
-    # to use two's complement representation to handle signed integers.
-    return unsafe_mul(convert(convert(r, bytes32), uint256), 3822833074963236453042738258902158003155416615667) >> convert(unsafe_sub(195, k), uint256)
 
 
 # ---------------------------- ERC20 Utils -----------------------------------
@@ -1843,7 +1630,7 @@ def get_virtual_price() -> uint256:
     """
     amp: uint256 = self._A()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(self._stored_rates(), self._balances())
-    D: uint256 = self.get_D(xp, amp)
+    D: uint256 = math.get_D(xp, amp)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
     return D * PRECISION / self.totalSupply
