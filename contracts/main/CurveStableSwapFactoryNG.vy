@@ -76,7 +76,6 @@ event LiquidityGaugeDeployed:
 WETH20: public(immutable(address))
 
 MAX_COINS: constant(uint256) = 8
-MAX_METAPOOL_COINS: constant(uint256) = 2
 ADDRESS_PROVIDER: constant(address) = 0x0000000022D53366457F9d5E68Ec105046FC4383
 
 admin: public(address)

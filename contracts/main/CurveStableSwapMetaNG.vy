@@ -486,7 +486,9 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
         )
 
         assert len(response) != 0
-        rates[i] = rates[i] * convert(response, uint256) / PRECISION
+
+        # rates[i] * convert(response, uint256) / PRECISION
+        rates[i] = unsafe_div(rates[i] * convert(response, uint256), PRECISION)
 
     return rates
 
@@ -797,8 +799,11 @@ def add_liquidity(
             else:
                 difference = new_balance - ideal_balance
 
-            fees[i] = base_fee * difference / FEE_DENOMINATOR
-            self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
+            # base_fee * difference / FEE_DENOMINATOR
+            fees[i] = unsafe_div(base_fee * difference, FEE_DENOMINATOR)
+
+            # fees[i] * ADMIN_FEE / FEE_DENOMINATOR
+            self.admin_balances[i] += unsafe_div(fees[i] * ADMIN_FEE, FEE_DENOMINATOR)
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
@@ -846,7 +851,8 @@ def remove_liquidity_one_coin(
     dy, fee, p = self._calc_withdraw_one_coin(_burn_amount, i)
     assert dy >= _min_received, "Not enough coins removed"
 
-    self.admin_balances[i] += fee * ADMIN_FEE / FEE_DENOMINATOR
+    # fee * ADMIN_FEE / FEE_DENOMINATOR
+    self.admin_balances[i] += unsafe_div(fee * ADMIN_FEE, FEE_DENOMINATOR)
 
     self._burnFrom(msg.sender, _burn_amount)
 
@@ -902,8 +908,12 @@ def remove_liquidity_imbalance(
         else:
             difference = new_balance - ideal_balance
 
-        fees[i] = base_fee * difference / FEE_DENOMINATOR
-        self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
+        # base_fee * difference / FEE_DENOMINATOR
+        fees[i] = unsafe_div(base_fee * difference, FEE_DENOMINATOR)
+
+        # fees[i] * ADMIN_FEE / FEE_DENOMINATOR
+        self.admin_balances[i] += unsafe_div(fees[i] * ADMIN_FEE, FEE_DENOMINATOR)
+
         new_balances[i] -= fees[i]
 
     D2: uint256 = self.get_D_mem(rates, new_balances, amp)
@@ -993,7 +1003,7 @@ def __exchange(
     dy = (dy - dy_fee) * PRECISION / rates[j]
 
     self.admin_balances[j] += (
-        dy_fee * ADMIN_FEE / FEE_DENOMINATOR
+        unsafe_div(dy_fee * ADMIN_FEE, FEE_DENOMINATOR)  # dy_fee * ADMIN_FEE / FEE_DENOMINATOR
     ) * PRECISION / rates[j]
 
     # Calculate and store state prices:
@@ -1044,7 +1054,8 @@ def _exchange(
 
     # ------------------------------- Exchange -------------------------------
 
-    x: uint256 = xp[i] + dx * rates[i] / PRECISION
+    # xp[i] + dx * rates[i] / PRECISION
+    x: uint256 = xp[i] + unsafe_div(dx * rates[i], PRECISION)
     dy: uint256 = self.__exchange(dx, x, xp, rates, i, j)
     assert dy >= _min_dy, "Exchange resulted in fewer coins than expected"
 
@@ -1141,12 +1152,15 @@ def _exchange_underlying(
 
         if i == 0:
 
-            x = xp[i] + dx_w_fee * rates[i] / PRECISION
+            # xp[i] + dx_w_fee * rates[i] / PRECISION
+            x = xp[i] + unsafe_div(dx_w_fee * rates[i], PRECISION)
 
         else:
 
             dx_w_fee = self._meta_add_liquidity(dx_w_fee, base_i)
-            x = dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX] / PRECISION
+
+            # dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX] / PRECISION
+            x = unsafe_div(dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX], PRECISION)
             x += xp[MAX_METAPOOL_COIN_INDEX]
 
         dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
@@ -1257,7 +1271,8 @@ def _xp_mem(
 
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(N_COINS_128):
-        result[i] = _rates[i] * _balances[i] / PRECISION
+        # _rates[i] * _balances[i] / PRECISION
+        result[i] = unsafe_div(_rates[i] * _balances[i], PRECISION)
 
     return result
 
@@ -1306,7 +1321,9 @@ def _calc_withdraw_one_coin(
             dx_expected = xp_j * D1 / D0 - new_y
         else:
             dx_expected = xp_j - xp_j * D1 / D0
-        xp_reduced[j] = xp_j - base_fee * dx_expected / FEE_DENOMINATOR
+
+        # xp_j - base_fee * dx_expected / FEE_DENOMINATOR
+        xp_reduced[j] = xp_j - unsafe_div(base_fee * dx_expected, FEE_DENOMINATOR)
 
     dy: uint256 = xp_reduced[i] - math.get_y_D(amp, i, xp_reduced, D1, N_COINS)
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
@@ -1346,7 +1363,8 @@ def _get_p(
         Dr = Dr * D / xp[i]
 
     p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    xp0_A: uint256 = ANN * xp[0] / A_PRECISION
+    # ANN * xp[0] / A_PRECISION
+    xp0_A: uint256 = unsafe_div(ANN * xp[0], A_PRECISION)
     p.append(10**18 * (xp0_A + Dr * xp[0] / xp[1]) / (xp0_A + Dr))
 
     return p
