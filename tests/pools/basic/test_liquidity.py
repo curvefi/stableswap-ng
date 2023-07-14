@@ -11,19 +11,48 @@ class TestLiquidityMethods:
     class TestAddLiquidity:
         @pytest.mark.parametrize("use_eth", (True, False), scope="session")
         def test_add_liquidity(
-            self, bob, swap, is_eth_pool, pool_tokens, deposit_amounts, initial_balance, initial_amounts, use_eth
+            self,
+            bob,
+            swap,
+            is_eth_pool,
+            pool_tokens,
+            deposit_amounts,
+            initial_balance,
+            initial_amounts,
+            use_eth,
+            pool_token_types,
         ):
-            value = deposit_amounts[0] if is_eth_pool and use_eth else 0
-            deposit_amounts[0] = 0 if is_eth_pool and use_eth else deposit_amounts[0]
+            value = deposit_amounts[0] if (is_eth_pool and use_eth) else 0
             swap.add_liquidity(deposit_amounts, 0, use_eth, sender=bob, value=value)
+            is_ideal = True
 
             for i, (pool_token, amount) in enumerate(zip(pool_tokens, deposit_amounts)):
-                assert pool_token.balanceOf(bob) == initial_amounts[i] - deposit_amounts[i]
-                assert pool_token.balanceOf(swap.address) == deposit_amounts[i] * 2
+                if pool_token_types[i] == 0 or pool_token_types[i] == 2 or (pool_tokens[i] == 1 and not use_eth):
+                    assert pool_token.balanceOf(bob) == initial_amounts[i] - deposit_amounts[i]
+                    assert pool_token.balanceOf(swap.address) == deposit_amounts[i] * 2
+
+                    if pool_token_types[i] == 2:
+                        is_ideal = False
+
+                elif pool_token_types[i] == 1 and use_eth:
+                    assert boa.env.get_balance(bob) == initial_balance - value
+                    assert pool_token.balanceOf(bob) == initial_amounts[i]
+                    assert boa.env.get_balance(swap.address) == 0
+                    assert pool_token.balanceOf(swap.address) == deposit_amounts[i] * 2
+
+                elif pool_token_types[i] == 3:
+                    is_ideal = False
+                    if i == 0:  # up rebasing
+                        assert pool_token.balanceOf(bob) >= initial_amounts[i] - deposit_amounts[i]
+                        assert pool_token.balanceOf(swap.address) >= deposit_amounts[i] * 2
+                    else:  # down rebasing
+                        assert pool_token.balanceOf(bob) <= initial_amounts[i] - deposit_amounts[i]
+                        assert pool_token.balanceOf(swap.address) <= deposit_amounts[i] * 2
 
             ideal = len(pool_tokens) * DEPOSIT_AMOUNT * 10**18
-            assert abs(swap.balanceOf(bob) - ideal) <= 1
-            assert abs(swap.totalSupply() - ideal * 2) <= 2
+            if is_ideal:
+                assert abs(swap.balanceOf(bob) - ideal) <= 1
+                assert abs(swap.totalSupply() - ideal * 2) <= 2
 
         @pytest.mark.parametrize("idx", (0, 1))
         @pytest.mark.parametrize("use_eth", (True, False))

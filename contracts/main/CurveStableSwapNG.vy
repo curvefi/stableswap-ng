@@ -698,7 +698,7 @@ def add_liquidity(
             else:
                 difference = new_balance - ideal_balance
 
-            fees[i] = base_fee * difference / FEE_DENOMINATOR
+            fees.append(base_fee * difference / FEE_DENOMINATOR)
             self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
             new_balances[i] -= fees[i]
 
@@ -1299,7 +1299,7 @@ def _get_p(
         if i == N_COINS:
             break
 
-        p[i - 1] = 10**18 * (xp0_A + Dr * xp[0] / xp[i]) / (xp0_A + Dr)
+        p.append(10**18 * (xp0_A + Dr * xp[0] / xp[i]) / (xp0_A + Dr))
 
     return p
 
