@@ -9,12 +9,15 @@ def mint_for_testing(user: str, amount, token_contract: VyperContract | None, mi
     user = to_checksum_address(user)
 
     if mint_eth:
-        boa.env.set_balance(user, boa.env.get_balance(user) + amount)
+        boa.env.set_balance(user, amount)
     else:
-        if token_contract.symbol() == "WETH":
-            boa.env.set_balance(user, boa.env.get_balance(user) + amount)
-            with boa.env.prank(user):
-                token_contract.deposit(value=amount)
-        else:
-            with boa.env.prank(user):
-                token_contract._mint_for_testing(user, amount)
+        balance = token_contract.balanceOf(user)
+        if balance < amount:
+            _amount_to_add = amount - balance
+            if token_contract.symbol() == "WETH":
+                boa.env.set_balance(user, boa.env.get_balance(user) + _amount_to_add)
+                with boa.env.prank(user):
+                    token_contract.deposit(value=_amount_to_add)
+            else:
+                with boa.env.prank(user):
+                    token_contract._mint_for_testing(user, _amount_to_add)

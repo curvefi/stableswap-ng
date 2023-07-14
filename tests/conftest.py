@@ -76,6 +76,9 @@ def pytest_generate_tests(metafunc):
 
     if "pool_token_types" in metafunc.fixturenames:
         cli_options = metafunc.config.getoption("token_types").split(",")
+        if "eth" in cli_options:
+            cli_options.remove("eth")
+            cli_options = ["eth"] + cli_options
 
         if pool_types[pool_type] == 0:
             combs = list(combinations(cli_options, pool_size))

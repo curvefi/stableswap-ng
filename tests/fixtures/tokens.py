@@ -47,7 +47,7 @@ def rebase_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
         for i, d in enumerate(decimals):
-            tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", f"OR_TKN{i}", f"OR_TKN{i}", decimals[i], i != 0))
+            tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", f"OR_TKN{i}", f"OR_TKN{i}", decimals[i], i == 0))
     return tokens
 
 
@@ -58,8 +58,7 @@ def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_toke
         if t == 0:
             pool_tokens.append(plain_tokens[i])
         elif t == 1:
-            # Enforce eth as 0th token
-            pool_tokens = [weth] + pool_tokens
+            pool_tokens.append(weth)
         elif t == 2:
             pool_tokens.append(oracle_tokens[i])
         elif t == 3:

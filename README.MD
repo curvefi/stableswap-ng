@@ -6,8 +6,8 @@ Permissionless deployment of Curve metapools.
 
 The metapool factory has several core components:
 
-* [`Factory`](contracts/main/CurveStableSwapFactoryNG.vy) is the main contract used to deploy new metapools. It also acts a registry for finding the deployed pools and querying information about them.
-* New pools are deployed via blueprints. The [implementation contract](contracts/main/CurveStableSwap2NG.vy) targetted by the proxy is determined according to the base pool.
+- [`Factory`](contracts/main/CurveStableSwapFactoryNG.vy) is the main contract used to deploy new metapools. It also acts a registry for finding the deployed pools and querying information about them.
+- New pools are deployed via blueprints. The [implementation contract](contracts/main/CurveStableSwapNG.vy) targetted by the proxy is determined according to the base pool.
 
 See the [documentation](https://curve.readthedocs.io) for more detailed information.
 
@@ -29,7 +29,6 @@ poetry install
 - `--token-types` - token types to test against(divided by comma), available parameters: `[plain,eth,oracle,rebasing]`
 - `--decimals` - token decimals (divided by comma), default `18,18`
 - `--return-types` - types of .transfer() returns to test against (divided by comma), default `revert,False,None`
-
 
 ### Type of tests
 

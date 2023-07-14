@@ -15,13 +15,24 @@ def gauge_implementation(deployer, gauge_interface):
 
 @pytest.fixture(scope="module")
 def amm_interface():
-    return boa.load_partial("contracts/main/CurveStableSwap2NG.vy")
+    return boa.load_partial("contracts/main/CurveStableSwapNG.vy")
 
 
 @pytest.fixture(scope="module")
 def amm_implementation(deployer, amm_interface):
     with boa.env.prank(deployer):
         return amm_interface.deploy_as_blueprint()
+
+
+@pytest.fixture(scope="module")
+def amm_interface_meta():
+    return boa.load_partial("contracts/main/CurveStableSwapMetaNG.vy")
+
+
+@pytest.fixture(scope="module")
+def amm_implementation_meta(deployer, amm_interface_meta):
+    with boa.env.prank(deployer):
+        return amm_interface_meta.deploy_as_blueprint()
 
 
 @pytest.fixture(scope="module")
@@ -55,6 +66,12 @@ def set_pool_implementations(owner, factory, amm_implementation):
 
 
 @pytest.fixture(scope="module")
+def set_metapool_implementations(owner, factory, amm_implementation_meta):
+    with boa.env.prank(owner):
+        factory.set_pool_implementations(0, amm_implementation_meta.address)
+
+
+@pytest.fixture(scope="module")
 def add_base_pool(
     owner,
     factory,
@@ -69,7 +86,6 @@ def add_base_pool(
             [t.address for t in base_pool_tokens],
             [0] * len(base_pool_tokens),
             len(base_pool_tokens),
-            [False] * len(base_pool_tokens),
         )
 
 
