@@ -50,10 +50,6 @@ interface Factory:
     def admin() -> address: view
     def views_implementation() -> address: view
 
-interface WETH:
-    def deposit(): payable
-    def withdraw(_amount: uint256): nonpayable
-
 interface ERC1271:
     def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
 
