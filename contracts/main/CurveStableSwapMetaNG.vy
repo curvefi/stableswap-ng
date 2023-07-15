@@ -3,13 +3,12 @@
 @title CurveStableSwapMetaNG
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
-@notice Stableswap Metapool implementation for 2 coins with no rehypothecation,
-        i.e. tokens are not deposited into other contracts. Supports pegged assets.
-        Metapools are pools where the coin on index 1 is a liquidity pool token
-        of another pool. This exposes methods such as exchange_underlying, which
-        exchanges token 0 <> token b1, b2, .. bn, where b is base pool and bn is the
-        nth coin index of the base pool.
-@dev Asset Types:
+@notice Stableswap Metapool implementation for 2 coins. Supports pegged assets.
+@dev Metapools are pools where the coin on index 1 is a liquidity pool token
+     of another pool. This exposes methods such as exchange_underlying, which
+     exchanges token 0 <> token b1, b2, .. bn, where b is base pool and bn is the
+     nth coin index of the base pool.
+     Asset Types:
         0. Basic ERC20 token with no additional features
         1. WETH - can we directly converted to/from ETH
         2. Oracle - token with rate oracle
@@ -67,9 +66,6 @@ interface StableSwap2:
 
 interface StableSwap3:
     def add_liquidity(amounts: uint256[3], min_mint_amount: uint256): nonpayable
-
-interface StableSwap4:
-    def add_liquidity(amounts: uint256[4], min_mint_amount: uint256): nonpayable
 
 interface StableSwap:
     def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uint256): nonpayable
@@ -1210,12 +1206,6 @@ def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
         base_inputs: uint256[3] = empty(uint256[3])
         base_inputs[base_i] = dx
         StableSwap3(BASE_POOL).add_liquidity(base_inputs, 0)
-
-    else:
-
-        base_inputs: uint256[4] = empty(uint256[4])
-        base_inputs[base_i] = dx
-        StableSwap4(BASE_POOL).add_liquidity(base_inputs, 0)
 
     return ERC20(coin_i).balanceOf(self) - x
 
