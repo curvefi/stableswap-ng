@@ -137,10 +137,6 @@ event ApplyNewFee:
 
 MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
 MAX_COINS_128: constant(int128) = 8
-MAX_METAPOOL_COIN_INDEX: constant(int128) = 1
-
-# Implementation does not impose transfer restrictions:
-PERMISSIONED: public(constant(bool)) = False
 
 # ---------------------------- Pool Variables --------------------------------
 
@@ -1088,11 +1084,22 @@ def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
     Ann: uint256 = _amp * N_COINS
     D_P: uint256 = 0
     Dprev: uint256 = 0
+    N_pow_N: uint256 = pow_mod256(N_COINS, N_COINS)
 
     for i in range(255):
-        D_P = D * D / _xp[0] * D / _xp[1] / pow_mod256(N_COINS, N_COINS)
+
+        # D * D / _xp[0] * D / _xp[1] / N_COINS**N_COINS
+        D_P = unsafe_div(D * D / _xp[0] * D / _xp[1], N_pow_N)
         Dprev = D
-        D = (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
+
+        # (Ann * S / A_PRECISION + D_P * _n_coins) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (_n_coins + 1) * D_P)
+        D = (
+            (unsafe_div(Ann * S, A_PRECISION) + D_P * N_COINS) *
+            D / (
+                unsafe_div((Ann - A_PRECISION) * D, A_PRECISION) +
+                unsafe_add(N_COINS, 1) * D_P
+            )
+        )
         # Equality with the precision of 1
         if D > Dprev:
             if D - Dprev <= 1:

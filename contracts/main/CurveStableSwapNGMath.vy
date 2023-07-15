@@ -45,9 +45,6 @@ def get_y(
 
     amp: uint256 = _amp
     D: uint256 = _D
-    # if _D == 0:  # TODO: why this even exists?
-    #     amp = self._A()
-    #     D = self.get_D(xp, amp)
     S_: uint256 = 0
     _x: uint256 = 0
     y_prev: uint256 = 0
@@ -112,11 +109,22 @@ def get_D(
     Ann: uint256 = _amp * _n_coins
     D_P: uint256 = 0
     Dprev: uint256 = 0
+    N_pow_N: uint256 = pow_mod256(_n_coins, _n_coins)
 
     for i in range(255):
-        D_P = D * D / _xp[0] * D / _xp[1] / pow_mod256(_n_coins, _n_coins)
+
+        # D * D / _xp[0] * D / _xp[1] / _n_coins**_n_coins
+        D_P = unsafe_div(D * D / _xp[0] * D / _xp[1], N_pow_N)
         Dprev = D
-        D = (Ann * S / A_PRECISION + D_P * _n_coins) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (_n_coins + 1) * D_P)
+
+        # (Ann * S / A_PRECISION + D_P * _n_coins) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (_n_coins + 1) * D_P)
+        D = (
+            (unsafe_div(Ann * S, A_PRECISION) + D_P * _n_coins) *
+            D / (
+                unsafe_div((Ann - A_PRECISION) * D, A_PRECISION) +
+                unsafe_add(_n_coins, 1) * D_P
+            )
+        )
         # Equality with the precision of 1
         if D > Dprev:
             if D - Dprev <= 1:

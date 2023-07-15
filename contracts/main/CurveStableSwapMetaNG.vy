@@ -384,6 +384,10 @@ def _transfer_in(
 
     # ------------------------- Handle Transfers -----------------------------
 
+    if input_coin == BASE_COINS[base_i]:
+
+        return
+
     if expect_optimistic_transfer:
 
         assert _incoming_coin_asset_type != 3, "exchange_received not allowed if incoming token is rebasing"
@@ -1114,14 +1118,16 @@ def _exchange_underlying(
     # for exchange_underlying, optimistic transfers need to be handled differently
     if expect_optimistic_transfer:
 
-        assert asset_types[i] != 3  # dev: rebasing coins not supported
-
-        # This branch is never reached for rebasing tokens
         if input_coin == BASE_COINS[base_i]:
+
+            assert asset_types[base_i + 2] != 3  # dev: rebasing coins not supported
             # we expect base_coin's balance to be 0. So swap whatever base_coin's
             # balance the pool has:
             dx_w_fee = ERC20(input_coin).balanceOf(self)
         else:
+
+            assert asset_types[i] != 3  # dev: rebasing coins not supported
+
             dx_w_fee = ERC20(input_coin).balanceOf(self) - self.stored_balances[meta_i]
             assert dx_w_fee == _dx
             self.stored_balances[meta_i] += dx_w_fee
@@ -1142,7 +1148,7 @@ def _exchange_underlying(
             False,  # expect_optimistic_transfer = False
         )
 
-    # ------------------------------------------------------------------------
+    # ------------------------------- Exchange -------------------------------
 
     if i == 0 or j == 0:  # meta swap
 
@@ -1434,10 +1440,6 @@ def get_p(i: uint256) -> uint256:
 @nonreentrant('lock')
 def price_oracle(i: uint256) -> uint256:
     return self._ma_price()
-
-
-# ----------------------------- Math Utils -----------------------------------
-
 
 
 # ---------------------------- ERC20 Utils -----------------------------------
