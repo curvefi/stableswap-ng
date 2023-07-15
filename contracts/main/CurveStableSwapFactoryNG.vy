@@ -653,7 +653,6 @@ def deploy_metapool(
         _fee,                                           # _fee: uint256
         _ma_exp_time,                                   # _ma_exp_time: uint256
         self.math_implementation,                       # _math_implementation: address
-        WETH20,                                         # _weth: address
         _base_pool,                                     # _base_pool: address
         _coins,                                         # _coins: DynArray[address, MAX_COINS]
         self.base_pool_data[_base_pool].coins,          # base_coins: DynArray[address, MAX_COINS]

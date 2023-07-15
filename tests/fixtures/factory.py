@@ -53,6 +53,9 @@ def factory(
     fee_receiver,
     owner,
     weth,
+    gauge_implementation,
+    views_implementation,
+    math_implementation,
 ):
     with boa.env.prank(deployer):
         _factory = boa.load(
@@ -61,6 +64,12 @@ def factory(
             owner,
             weth,
         )
+
+    with boa.env.prank(owner):
+        _factory.set_gauge_implementation(gauge_implementation.address)
+        _factory.set_views_implementation(views_implementation.address)
+        _factory.set_math_implementation(math_implementation.address)
+
     return _factory
 
 
@@ -74,7 +83,7 @@ def set_pool_implementations(owner, factory, amm_implementation):
 @pytest.fixture(scope="module")
 def set_metapool_implementations(owner, factory, amm_implementation_meta):
     with boa.env.prank(owner):
-        factory.set_pool_implementations(0, amm_implementation_meta.address)
+        factory.set_metapool_implementations(0, amm_implementation_meta.address)
 
 
 @pytest.fixture(scope="module")
