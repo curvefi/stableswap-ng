@@ -384,10 +384,6 @@ def _transfer_in(
 
     # ------------------------- Handle Transfers -----------------------------
 
-    if input_coin == BASE_COINS[base_i]:
-
-        return
-
     if expect_optimistic_transfer:
 
         assert _incoming_coin_asset_type != 3, "exchange_received not allowed if incoming token is rebasing"
@@ -1121,9 +1117,11 @@ def _exchange_underlying(
         if input_coin == BASE_COINS[base_i]:
 
             assert asset_types[base_i + 2] != 3  # dev: rebasing coins not supported
+
             # we expect base_coin's balance to be 0. So swap whatever base_coin's
             # balance the pool has:
             dx_w_fee = ERC20(input_coin).balanceOf(self)
+
         else:
 
             assert asset_types[i] != 3  # dev: rebasing coins not supported
