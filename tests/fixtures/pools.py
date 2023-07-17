@@ -88,17 +88,17 @@ def swap(
             asset_type = 3
 
         pool = factory.deploy_metapool(
-            base_pool.address,
-            "test",
-            "test",
-            underlying_tokens[0].address,
-            A,
-            fee,
-            866,
-            0,
-            asset_type,
-            method_id,
-            oracle,
+            base_pool.address,  # _base_pool: address
+            "test",  # _name: String[32],
+            "test",  # _symbol: String[10],
+            underlying_tokens[0].address,  # _coin: address,
+            A,  # _A: uint256,
+            fee,  # _fee: uint256,
+            866,  # _ma_exp_time: uint256,
+            0,  # _implementation_idx: uint256 = 0,
+            asset_type,  # _asset_type: uint8 = 0,
+            method_id,  # _method_id: bytes4 = empty(bytes4),
+            oracle,  # _oracle: address = empty(address),
         )
 
         return amm_interface_meta.at(pool)

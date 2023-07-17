@@ -76,7 +76,6 @@ event LiquidityGaugeDeployed:
 WETH20: public(immutable(address))
 
 MAX_COINS: constant(uint256) = 8
-MAX_METAPOOL_COINS: constant(uint256) = 2
 ADDRESS_PROVIDER: constant(address) = 0x0000000022D53366457F9d5E68Ec105046FC4383
 
 admin: public(address)
@@ -96,6 +95,7 @@ base_pool_assets: public(HashMap[address, bool])
 # index -> implementation address
 pool_implementations: public(HashMap[uint256, address])
 metapool_implementations: public(HashMap[uint256, address])
+math_implementation: public(address)
 gauge_implementation: public(address)
 views_implementation: public(address)
 
@@ -652,7 +652,7 @@ def deploy_metapool(
         _A,                                             # _A: uint256
         _fee,                                           # _fee: uint256
         _ma_exp_time,                                   # _ma_exp_time: uint256
-        WETH20,                                         # _weth: address
+        self.math_implementation,                       # _math_implementation: address
         _base_pool,                                     # _base_pool: address
         _coins,                                         # _coins: DynArray[address, MAX_COINS]
         self.base_pool_data[_base_pool].coins,          # base_coins: DynArray[address, MAX_COINS]
@@ -789,6 +789,17 @@ def set_metapool_implementations(
     """
     assert msg.sender == self.admin  # dev: admin-only function
     self.metapool_implementations[_implementation_index] = _implementation
+
+
+@external
+def set_math_implementation(_math_implementation: address):
+    """
+    @notice Set implementation contracts for StableSwap Math
+    @dev Only callable by admin
+    @param _implementation Implementation address to use when stableswap pools
+    """
+    assert msg.sender == self.admin  # dev: admin-only function
+    self.math_implementation = _math_implementation
 
 
 @external

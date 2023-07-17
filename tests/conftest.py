@@ -54,7 +54,7 @@ def pytest_generate_tests(metafunc):
     pool_size = int(metafunc.config.getoption("pool_size"))
 
     # TODO: remove after adding implementations
-    assert pool_size == 2, "Only 2-coin pools supported"
+    # assert pool_size == 2, "Only 2-coin pools supported"
 
     if "pool_size" in metafunc.fixturenames:
         metafunc.parametrize(
