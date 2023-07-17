@@ -12,15 +12,32 @@
 from vyper.interfaces import ERC20
 
 interface Swap:
+    def coins(i: uint256) -> address: view
     def exchange_extended(
-        i: uint256,
-        j: uint256,
+        i: int128,
+        j: int128,
         dx: uint256,
         min_dy: uint256,
         use_eth: bool,
         sender: address,
         receiver: address,
         cb: bytes32
+    ) -> uint256: nonpayable
+    def exchange_received(
+        i: int128,
+        j: int128,
+        dx: uint256,
+        min_dy: uint256,
+        use_eth: bool,
+        receiver: address,
+    ) -> uint256: nonpayable
+    def exchange_underlying_received(
+        i: int128,
+        j: int128,
+        dx: uint256,
+        min_dy: uint256,
+        use_eth: bool,
+        receiver: address,
     ) -> uint256: nonpayable
 
 
@@ -84,8 +101,8 @@ def transfer_callback(
 
 @external
 def callback_and_swap(
-    i: uint256,
-    j: uint256,
+    i: int128,
+    j: int128,
     dx: uint256,
     min_dy: uint256,
 ) -> uint256:
@@ -110,4 +127,38 @@ def callback_and_swap(
         msg.sender, # sender  (doesnt matter because we set it to the vault in the callback)
         vault, # receiver
         convert(selector, bytes32)  # <-- your callback is being called here
+    )
+
+
+@external
+def transfer_and_swap(
+    i: int128,
+    j: int128,
+    dx: uint256,
+    min_dy: uint256,
+    underlying: bool
+) -> uint256:
+
+    assert msg.sender == keeper
+
+    coin: address = whitelisted_pool.coins(convert(i, uint256))
+    ERC20(coin).transferFrom(vault, whitelisted_pool.address, dx)
+
+    if not underlying:
+        return whitelisted_pool.exchange_received(
+            i,  # input coin index
+            j,  # output coin index
+            dx,  # amount in
+            min_dy,  # minimum expected out
+            False,   # use native token (eth)
+            vault, # receiver
+        )
+
+    return whitelisted_pool.exchange_underlying_received(
+        i,  # input coin index
+        j,  # output coin index
+        dx,  # amount in
+        min_dy,  # minimum expected out
+        False,   # use native token (eth)
+        vault, # receiver
     )
