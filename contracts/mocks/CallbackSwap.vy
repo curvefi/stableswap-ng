@@ -1,7 +1,7 @@
 # @version 0.3.9
 
 """
-@title CurveExchangeExtendedDemo
+@title CurveExchangeWithoutApproval
 @author fiddyresearch.eth
 @notice A demo of a strategy execution that swaps on
         Curve pools without granting an ERC20 approvals to the DEX contracts
@@ -41,19 +41,16 @@ interface Swap:
     ) -> uint256: nonpayable
 
 
-vault: public(immutable(address))
 keeper: public(immutable(address))
 whitelisted_pool: public(immutable(Swap))
 
 
 @external
 def __init__(
-    _vault: address,
     _whitelisted_pool: address,
     _keeper: address
 ):
 
-    vault = _vault
     whitelisted_pool = Swap(_whitelisted_pool)
     keeper = _keeper
 
@@ -67,7 +64,7 @@ def transfer_callback(
     amount_to_receive: uint256,
 ):
     """
-    Curve CryptoSwap (factory only) pools expect the callback to have the inputs:
+    Curve StableswapNG (factory only) pools expect the callback to have the inputs:
         sender: address
         receiver: address
         coin: address
@@ -96,7 +93,7 @@ def transfer_callback(
     assert msg.sender == whitelisted_pool.address
     assert tx.origin == keeper
 
-    ERC20(coin).transferFrom(vault, whitelisted_pool.address, amount_to_transfer)
+    ERC20(coin).transferFrom(keeper, whitelisted_pool.address, amount_to_transfer)
 
 
 @external
@@ -125,7 +122,7 @@ def callback_and_swap(
         min_dy,  # minimum expected out
         False,   # use native token (eth)
         msg.sender, # sender  (doesnt matter because we set it to the vault in the callback)
-        vault, # receiver
+        keeper, # receiver
         convert(selector, bytes32)  # <-- your callback is being called here
     )
 
@@ -142,7 +139,7 @@ def transfer_and_swap(
     assert msg.sender == keeper
 
     coin: address = whitelisted_pool.coins(convert(i, uint256))
-    ERC20(coin).transferFrom(vault, whitelisted_pool.address, dx)
+    ERC20(coin).transferFrom(keeper, whitelisted_pool.address, dx)
 
     if not underlying:
         return whitelisted_pool.exchange_received(
@@ -151,7 +148,7 @@ def transfer_and_swap(
             dx,  # amount in
             min_dy,  # minimum expected out
             False,   # use native token (eth)
-            vault, # receiver
+            keeper, # receiver
         )
 
     return whitelisted_pool.exchange_underlying_received(
@@ -160,5 +157,5 @@ def transfer_and_swap(
         dx,  # amount in
         min_dy,  # minimum expected out
         False,   # use native token (eth)
-        vault, # receiver
+        keeper, # receiver
     )

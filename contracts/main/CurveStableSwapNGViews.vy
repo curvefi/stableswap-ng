@@ -26,8 +26,6 @@ interface StableSwap2:
 interface StableSwap3:
     def calc_token_amount(amounts: uint256[3], deposit: bool) -> uint256: view
 
-# TODO: Add up until 7 (a basepool can have maximally 7 if 8 is MAX_COINS. the other 1 is the non base pool token.)
-
 
 A_PRECISION: constant(uint256) = 100
 MAX_COINS: constant(uint256) = 8
