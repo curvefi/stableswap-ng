@@ -17,17 +17,14 @@ class TestOptimisticSwap:
 
         return _callback
 
-    @pytest.mark.usefixtures("add_initial_liquidity_alice", "mint_bob", "approve_bob")
-    class TestExchangeReceived:
-
-        # TODO: need to permutate/combinate N_COIN combos.
-        @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-        def test_exchange_received(self, bob, swap, callback_contract, pool_tokens, sending, receiving, zero_address):
+    @pytest.fixture(scope="module")
+    def transfer_and_swap(self, callback_contract, bob):
+        def _transfer_and_swap(swap, pool_tokens, sending, receiving, underlying):
 
             coin = pool_tokens[sending]
-            assert coin.address == swap.coins(sending)
             amount_in = SWAP_AMOUNT * 10 ** (coin.decimals())
-            underlying = False
+
+            assert coin.address == swap.coins(sending)
 
             bob_sending_balance_before = pool_tokens[sending].balanceOf(bob)
             bob_receiving_balance_before = pool_tokens[receiving].balanceOf(bob)
@@ -43,14 +40,42 @@ class TestOptimisticSwap:
             pool_sending_balance_after = pool_tokens[sending].balanceOf(swap.address)
             pool_receiving_balance_after = pool_tokens[receiving].balanceOf(swap.address)
 
-            # TODO: incorporate cases for different asset types:
-            assert bob_sending_balance_before - bob_sending_balance_after == amount_in
-            assert bob_receiving_balance_after - bob_receiving_balance_before == amount_out
+            return {
+                "amount_in": amount_in,
+                "amount_out": amount_out,
+                "bob": {
+                    "sending_token": [bob_sending_balance_before, bob_sending_balance_after],
+                    "receiving_token": [bob_receiving_balance_before, bob_receiving_balance_after],
+                },
+                "swap": {
+                    "sending_token": [pool_sending_balance_before, pool_sending_balance_after],
+                    "receiving_token": [pool_receiving_balance_before, pool_receiving_balance_after],
+                },
+            }
 
-            assert pool_sending_balance_after - pool_sending_balance_before == amount_in
-            assert pool_receiving_balance_before - pool_receiving_balance_after == amount_out
+        return _transfer_and_swap
 
-    # TODO: Add tests for exchange_underlying_received
-    # @pytest.mark.usefixtures("add_initial_liquidity_alice", "mint_bob", "approve_bob")
-    # class TestExchangeUnderlyingReceived:
-    #     pass
+    @pytest.mark.usefixtures("add_initial_liquidity_alice", "mint_bob", "approve_bob")
+    class TestExchangeReceived:
+
+        # TODO: need to permutate/combinate N_COIN combos.
+        @pytest.mark.only_for_token_types(0, 1, 2)
+        @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
+        def test_exchange_received_nonrebasing(self, bob, swap, transfer_and_swap, pool_tokens, sending, receiving):
+
+            underlying = False
+            swap_data = transfer_and_swap(swap, pool_tokens, sending, receiving, underlying)
+
+            assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
+            assert (
+                swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0]
+                == swap_data["amount_out"]
+            )
+
+            assert (
+                swap_data["swap"]["sending_token"][1] - swap_data["swap"]["sending_token"][0] == swap_data["amount_in"]
+            )
+            assert (
+                swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1]
+                == swap_data["amount_out"]
+            )
