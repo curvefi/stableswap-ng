@@ -79,3 +79,11 @@ class TestOptimisticSwap:
                 swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1]
                 == swap_data["amount_out"]
             )
+
+        @pytest.mark.only_for_token_types(3)
+        @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
+        def test_exchange_received_rebasing(self, bob, swap, transfer_and_swap, pool_tokens, sending, receiving):
+
+            underlying = False
+            with boa.reverts("exchange_received not allowed if incoming token is rebasing"):
+                transfer_and_swap(swap, pool_tokens, sending, receiving, underlying)
