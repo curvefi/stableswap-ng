@@ -168,7 +168,7 @@ def decimals(initial_decimals, pool_token_types):
 def skip_by_token_type(request, pool_token_types):
     only_for_token_types = request.node.get_closest_marker("only_for_token_types")
     if only_for_token_types:
-        if not any(pool_token_type in only_for_token_types.args for pool_token_type in pool_token_types):
+        if not all(pool_token_type in only_for_token_types.args for pool_token_type in pool_token_types):
             pytest.skip("skipped because no tokens for these types")
 
 
