@@ -1,8 +1,6 @@
 import boa
 import pytest
 
-# from tests.utils.transactions import call_returning_result_and_logs
-
 SWAP_AMOUNT = 500_000
 
 
@@ -63,8 +61,7 @@ class TestOptimisticSwap:
         @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
         def test_exchange_received_nonrebasing(self, bob, swap, transfer_and_swap, pool_tokens, sending, receiving):
 
-            underlying = False
-            swap_data = transfer_and_swap(swap, pool_tokens, sending, receiving, underlying)
+            swap_data = transfer_and_swap(swap, pool_tokens, sending, receiving, False)
 
             assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
             assert (
@@ -80,12 +77,25 @@ class TestOptimisticSwap:
                 == swap_data["amount_out"]
             )
 
+        @pytest.mark.only_for_token_types(0, 1, 2)
+        @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
+        def test_exchange_not_received(self, bob, swap, pool_tokens, sending, receiving):
+
+            coin = pool_tokens[sending]
+            amount_in = SWAP_AMOUNT * 10 ** (coin.decimals())
+            assert coin.address == swap.coins(sending)
+
+            with boa.env.prank(bob), boa.reverts("Pool did not receive tokens for swap"):
+                swap.exchange_received(sending, receiving, amount_in, 0, False, bob)
+
         @pytest.mark.only_for_token_types(3)
         @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-        @pytest.mark.parametrize("underlying", [True, False])
-        def test_exchange_received_rebasing(
-            self, bob, swap, transfer_and_swap, pool_tokens, sending, receiving, underlying
-        ):
+        def test_exchange_received_rebasing(self, bob, swap, transfer_and_swap, pool_tokens, sending, receiving):
 
-            with boa.env.prank(bob), boa.reverts():
-                transfer_and_swap(swap, pool_tokens, sending, receiving, underlying)
+            with boa.env.prank(bob), boa.reverts(compiler="external call failed"):
+                transfer_and_swap(swap, pool_tokens, sending, receiving, False)
+
+    @pytest.mark.only_for_pool_type(1)  # only for metapools
+    @pytest.mark.usefixtures("add_initial_liquidity_alice", "mint_bob", "approve_bob")
+    class TestExchangeUnderlyingReceived:
+        pass
