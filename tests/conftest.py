@@ -10,6 +10,7 @@ pytest_plugins = [
     "tests.fixtures.factory",
     "tests.fixtures.pools",
     "tests.fixtures.tokens",
+    "tests.fixtures.mocks",
 ]
 
 pool_types = {"basic": 0, "meta": 1}
@@ -131,45 +132,45 @@ def pytest_generate_tests(metafunc):
         )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def pool_size(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def pool_type(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def pool_token_types(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def return_type(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def initial_decimals(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def base_pool_decimals(request):
     raw_values = request.config.getoption("base_pool_decimals")
     decimals = [int(value) for value in raw_values.split(",")]
     return decimals
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def decimals(initial_decimals, pool_token_types, pool_type, base_pool_decimals):
     # eth and oracle tokens are always 18 decimals
     return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def underlying_decimals(decimals, pool_type, base_pool_decimals):
 
     if pool_type == 0:

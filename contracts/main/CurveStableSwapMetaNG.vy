@@ -1592,24 +1592,24 @@ def DOMAIN_SEPARATOR() -> bytes32:
 # ------------------------- AMM View Functions -------------------------------
 
 
-@view
-@external
-def get_dx(i: int128, j: int128, dy: uint256) -> uint256:
-    """
-    @notice Calculate the current input dx given output dy
-    @dev Index values can be found via the `coins` public getter method
-    @param i Index value for the coin to send
-    @param j Index valie of the coin to recieve
-    @param dy Amount of `j` being received after exchange
-    @return Amount of `i` predicted
-    """
-    return StableSwapViews(factory.views_implementation()).get_dx(i, j, dy, self)
+# @view
+# @external
+# def get_dx(i: int128, j: int128, dy: uint256) -> uint256:
+#     """
+#     @notice Calculate the current input dx given output dy
+#     @dev Index values can be found via the `coins` public getter method
+#     @param i Index value for the coin to send
+#     @param j Index valie of the coin to recieve
+#     @param dy Amount of `j` being received after exchange
+#     @return Amount of `i` predicted
+#     """
+#     return StableSwapViews(factory.views_implementation()).get_dx(i, j, dy, self)
 
 
-@view
-@external
-def get_dx_underlying(i: int128, j: int128, dy: uint256) -> uint256:
-    return StableSwapViews(factory.views_implementation()).get_dx_underlying(i, j, dy, self)
+# @view
+# @external
+# def get_dx_underlying(i: int128, j: int128, dy: uint256) -> uint256:
+#     return StableSwapViews(factory.views_implementation()).get_dx_underlying(i, j, dy, self)
 
 
 @view
@@ -1626,10 +1626,10 @@ def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     return StableSwapViews(factory.views_implementation()).get_dy(i, j, dx, self)
 
 
-@view
-@external
-def get_dy_underlying(i: int128, j: int128, dx: uint256) -> uint256:
-    return StableSwapViews(factory.views_implementation()).get_dy_underlying(i, j, dx, self)
+# @view
+# @external
+# def get_dy_underlying(i: int128, j: int128, dx: uint256) -> uint256:
+#     return StableSwapViews(factory.views_implementation()).get_dy_underlying(i, j, dx, self)
 
 
 @view

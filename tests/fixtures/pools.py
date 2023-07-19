@@ -5,7 +5,7 @@ from eth_utils import function_signature_to_4byte_selector
 
 # Only initialize useful fixtures
 @pytest.fixture(scope="module")
-def swap(
+def empty_swap(
     request,
     deployer,
     factory,
@@ -127,54 +127,55 @@ def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base
     return base_pool
 
 
+@pytest.fixture(scope="module")
+def swap(
+    empty_swap,
+    pool_type,
+    deposit_amounts,
+    mint_alice,
+    approve_alice,
+    alice,
+    underlying_decimals,
+    underlying_tokens,
+    underlying_precisions,
+    base_pool,
+):
+
+    if pool_type == 0:
+
+        with boa.env.prank(alice):
+            empty_swap.add_liquidity(deposit_amounts, 0)
+
+    elif pool_type == 1:
+
+        amount = 1_000_000
+        if not base_pool.balances(0) >= amount * underlying_precisions[2]:
+            with boa.env.prank(alice):
+                for d, token in zip(underlying_decimals[2:], underlying_tokens[2:]):
+                    token._mint_for_testing(alice, amount * 10**d)
+                    token.approve(base_pool.address, 2**256 - 1)
+
+                base_pool.add_liquidity([amount * 10**d for d in underlying_decimals[2:]], 0)
+
+        # add liquidity to the metapool next:
+        amounts = [amount * underlying_precisions[0], underlying_tokens[1].balanceOf(alice)]
+
+        for _amt in amounts:
+            assert _amt > 0
+
+        with boa.env.prank(alice):
+
+            for coin in underlying_tokens:
+                coin.approve(empty_swap, 2**256 - 1)
+
+            empty_swap.add_liquidity(amounts, 0)
+
+    return empty_swap
+
+
 # <---------------------   Functions   --------------------->
+
+
 @pytest.fixture(scope="module")
 def is_eth_pool(pool_tokens, weth):
     return weth in pool_tokens
-
-
-@pytest.fixture(scope="module")
-def add_initial_liquidity(owner, approve_owner, mint_owner, deposit_amounts, swap):
-    with boa.env.prank(owner):
-        swap.add_liquidity(deposit_amounts, 0)
-
-
-@pytest.fixture(scope="module")
-def add_initial_liquidity_alice(alice, approve_alice, mint_alice, deposit_amounts, swap):
-    with boa.env.prank(alice):
-        swap.add_liquidity(deposit_amounts, 0)
-
-
-@pytest.fixture(scope="module")
-def add_initial_liquidity_metapool_alice(
-    alice,
-    approve_alice,
-    mint_alice,
-    deposit_amounts,
-    swap,
-    pool_type,
-    underlying_tokens,
-    underlying_precisions,
-    underlying_decimals,
-    base_pool,
-):
-    assert pool_type == 1
-
-    # add liquidity to the base pool first (if it doesnt have liquidity):
-    amount = 1_000_000
-    if not base_pool.balances(0) >= amount * underlying_precisions[2]:
-        with boa.env.prank(alice):
-            for d, token in zip(underlying_decimals[2:], underlying_tokens[2:]):
-                token._mint_for_testing(alice, amount * 10**d)
-                token.approve(base_pool.address, 2**256 - 1)
-
-            base_pool.add_liquidity([amount * 10**d for d in underlying_decimals[2:]], 0)
-
-    # add liquidity to the metapool next:
-    amount = [amount * underlying_precisions[0], underlying_tokens[1].balanceOf(alice)]
-    with boa.env.prank(alice):
-
-        for coin in underlying_tokens:
-            coin.approve(swap, 2**256 - 1)
-
-        swap.add_liquidity(amount, 0)

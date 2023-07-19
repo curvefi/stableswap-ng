@@ -90,8 +90,19 @@ def base_pool_lp_token(deployer):
 
 @pytest.fixture(scope="module")
 def underlying_tokens(
-    pool_token_types, plain_tokens, weth, oracle_tokens, rebase_tokens, base_pool_tokens, base_pool_lp_token
+    pool_token_types,
+    pool_tokens,
+    plain_tokens,
+    weth,
+    oracle_tokens,
+    rebase_tokens,
+    base_pool_tokens,
+    base_pool_lp_token,
+    pool_type,
 ):
+    if pool_type == 0:
+        return pool_tokens
+
     metapool_token_type = pool_token_types[0]
     if metapool_token_type == 0:
         pool_token = plain_tokens[0]
@@ -104,8 +115,7 @@ def underlying_tokens(
     else:
         raise ValueError("Wrong pool token type")
 
-    _underlying_tokens = [pool_token] + [base_pool_lp_token, *base_pool_tokens]
-    return _underlying_tokens
+    return [pool_token] + [base_pool_lp_token, *base_pool_tokens]
 
 
 @pytest.fixture(scope="module")
