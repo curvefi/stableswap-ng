@@ -71,8 +71,22 @@ def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_toke
 
 # <---------------------   Metapool configuration   --------------------->
 @pytest.fixture(scope="module")
+def metapool_token(metapool_token_type, plain_tokens, weth, oracle_tokens, rebase_tokens):
+    if metapool_token_type == 0:
+        return plain_tokens[0]
+    elif metapool_token_type == 1:
+        return weth
+    elif metapool_token_type == 2:
+        return oracle_tokens[0]
+    elif metapool_token_type == 3:
+        return rebase_tokens[0]
+    else:
+        raise ValueError("Wrong pool token type")
+
+
+@pytest.fixture(scope="module")
 def base_pool_decimals():
-    return [18, 6, 6]
+    return [18, 18, 18]
 
 
 @pytest.fixture(scope="module")
@@ -92,22 +106,8 @@ def base_pool_lp_token(deployer):
 
 
 @pytest.fixture(scope="module")
-def underlying_tokens(
-    pool_token_types, plain_tokens, weth, oracle_tokens, rebase_tokens, base_pool_tokens, base_pool_lp_token
-):
-    metapool_token_type = pool_token_types[0]
-    if metapool_token_type == 0:
-        pool_token = plain_tokens[0]
-    elif metapool_token_type == 1:
-        pool_token = weth
-    elif metapool_token_type == 2:
-        pool_token = oracle_tokens[0]
-    elif metapool_token_type == 3:
-        pool_token = rebase_tokens[0]
-    else:
-        raise ValueError("Wrong pool token type")
-
-    return [pool_token] + [base_pool_lp_token, *base_pool_tokens]
+def underlying_tokens(metapool_token, base_pool_tokens, base_pool_lp_token):
+    return [metapool_token, base_pool_lp_token, *base_pool_tokens]
 
 
 # <---------------------   Gauge rewards  --------------------->

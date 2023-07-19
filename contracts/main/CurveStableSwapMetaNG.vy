@@ -315,7 +315,10 @@ def __init__(
     for i in range(N_COINS_128):
 
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
-        self.admin_balances.append(0)  # <--- this initialises storage for admin balances
+
+        #  --------------------------- initialize storage ---------------------------
+        self.stored_balances.append(0)
+        self.admin_balances.append(0)
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -1266,7 +1269,7 @@ def _xp_mem(
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(N_COINS_128):
         # _rates[i] * _balances[i] / PRECISION
-        result[i] = unsafe_div(_rates[i] * _balances[i], PRECISION)
+        result.append(unsafe_div(_rates[i] * _balances[i], PRECISION))
 
     return result
 
@@ -1673,10 +1676,10 @@ def A() -> uint256:
     return self._A() / A_PRECISION
 
 
-@view
-@external
-def A_precise() -> uint256:
-    return self._A()
+# @view
+# @external
+# def A_precise() -> uint256:
+#     return self._A()
 
 
 @view

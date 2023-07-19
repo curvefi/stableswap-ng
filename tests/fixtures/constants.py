@@ -9,8 +9,12 @@ def initial_balance() -> int:
 
 
 @pytest.fixture(scope="module")
-def initial_amounts(decimals: list[int]) -> list[int]:
-    return [INITIAL_AMOUNT * 10**precision for precision in decimals]
+def initial_amounts(pool_type, decimals, meta_decimals) -> list[int]:
+    return (
+        [INITIAL_AMOUNT * 10**precision for precision in decimals]
+        if pool_type == 0
+        else [INITIAL_AMOUNT * 10**meta_decimals, INITIAL_AMOUNT * 10**18]
+    )
 
 
 @pytest.fixture(scope="module")
