@@ -139,6 +139,7 @@ def swap(
     underlying_tokens,
     underlying_precisions,
     base_pool,
+    base_pool_lp_token,
 ):
 
     if pool_type == 0:
@@ -161,7 +162,19 @@ def swap(
         amounts = [amount * underlying_precisions[0], underlying_tokens[1].balanceOf(alice)]
 
         for _amt in amounts:
-            assert _amt > 0  # this only fails if there are isolation issues
+            # this only fails if there are isolation issues
+            # if the above fails: alice deposits into base pool, and then deposits lp
+            # token into metapool. if metapool gets wiped: her lp tokens are gone forever.
+            # so base pool will have non-zero liquidity, but alice will have no lp tokens and
+            # metapool will be empty!
+            if _amt == 0:  # <--- it shouldnt be empty!
+                # the following asserts show that base pool has liquidity, metapool is empty
+                assert empty_swap.get_balances() == [0, 0]
+                assert empty_swap.balanceOf(alice) == 0
+                assert base_pool_lp_token == underlying_tokens[1]
+                assert base_pool_lp_token.balanceOf(alice) == 0
+
+                assert base_pool.balances(0) == 0  # this will fail
 
         with boa.env.prank(alice):
 
