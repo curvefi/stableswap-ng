@@ -179,3 +179,20 @@ def add_initial_liquidity_alice(
         with boa.env.prank(alice):
             base_pool_lp_token.approve(swap.address, 2**256 - 1)
             swap.add_liquidity(deposit_amounts, 0)
+
+
+@pytest.fixture(scope="module")
+def mint_meta_bob(
+    bob,
+    mint_bob,
+    base_pool,
+    base_pool_tokens,
+    base_pool_decimals,
+):
+    add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
+
+
+@pytest.fixture(scope="module")
+def approve_meta_bob(bob, underlying_tokens, swap):
+    for token in underlying_tokens[:2]:
+        token.approve(swap.address, 2**256 - 1)

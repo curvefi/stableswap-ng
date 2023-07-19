@@ -195,12 +195,14 @@ def get_underlying_coins(_pool: address) -> DynArray[address, MAX_COINS]:
     coins: DynArray[address, MAX_COINS] = empty(DynArray[address, MAX_COINS])
     base_pool: address = self.pool_data[_pool].base_pool
     assert base_pool != empty(address)  # dev: pool is not metapool
-    coins[0] = self.pool_data[_pool].coins[0]
+
+    coins.append(self.pool_data[_pool].coins[0])
+    base_pool_n_coins: uint256 = len(self.base_pool_data[base_pool].coins)
     for i in range(1, MAX_COINS):
-        coins[i] = self.base_pool_data[base_pool].coins[i - 1]
-        if coins[i] == empty(address):
+        if (i - 1) == base_pool_n_coins:
             break
 
+        coins.append(self.base_pool_data[base_pool].coins[i - 1])
     return coins
 
 
