@@ -161,7 +161,7 @@ def swap(
         amounts = [amount * underlying_precisions[0], underlying_tokens[1].balanceOf(alice)]
 
         for _amt in amounts:
-            assert _amt > 0
+            assert _amt > 0  # this only fails if there are isolation issues
 
         with boa.env.prank(alice):
 
