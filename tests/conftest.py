@@ -43,6 +43,12 @@ def pytest_addoption(parser):
         help="comma-separated list of ERC20 token precisions to test against",
     )
     parser.addoption(
+        "--base-pool-decimals",
+        action="store",
+        default="18,6,6",  # TODO: can make this dynamic so base pool can also be 2-coin ones
+        help="comma-separated list of ERC20 token precisions of tokens in the base pool",
+    )
+    parser.addoption(
         "--return-type",
         action="store",
         default="revert,False,None",
@@ -151,9 +157,27 @@ def initial_decimals(request):
 
 
 @pytest.fixture(scope="session")
-def decimals(initial_decimals, pool_token_types):
+def base_pool_decimals(request):
+    raw_values = request.config.getoption("base_pool_decimals")
+    decimals = [int(value) for value in raw_values.split(",")]
+    return decimals
+
+
+@pytest.fixture(scope="session")
+def decimals(initial_decimals, pool_token_types, pool_type, base_pool_decimals):
     # eth and oracle tokens are always 18 decimals
     return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
+
+
+@pytest.fixture(scope="session")
+def underlying_decimals(decimals, pool_type, base_pool_decimals):
+
+    if pool_type == 0:
+        return decimals
+
+    decimals += [18] + base_pool_decimals
+    #              ^------------------------- LP Token.
+    return decimals
 
 
 # Usage

@@ -55,6 +55,8 @@ interface ERC1271:
 interface StableSwapViews:
     def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
     def get_dy(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dx_underlying(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dy_underlying(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
     def calc_token_amount(
         _amounts: DynArray[uint256, MAX_COINS],
         _is_deposit: bool,
@@ -316,6 +318,7 @@ def __init__(
 
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
         self.admin_balances.append(0)  # <--- this initialises storage for admin balances
+        self.stored_balances.append(0)
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -1126,11 +1129,12 @@ def _exchange_underlying(
 
             assert asset_types[i] != 3  # dev: rebasing coins not supported
 
+            # Since the coin belongs to the metapool, we need to check if we got more than
+            # what already exists in the pool (since last record):
             dx_w_fee = ERC20(input_coin).balanceOf(self) - self.stored_balances[meta_i]
-            assert dx_w_fee == _dx
             self.stored_balances[meta_i] += dx_w_fee
 
-        dx_w_fee = ERC20(input_coin).balanceOf(self) - _dx
+        assert dx_w_fee == _dx  # dev: did not receive coins to swap
 
     else:
 
@@ -1165,6 +1169,9 @@ def _exchange_underlying(
 
         dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
+        # Adjust stored balances of meta-level tokens:
+        self.stored_balances[meta_j] -= dy
+
         # Withdraw from the base pool if needed
         if j > 0:
             out_amount: uint256 = ERC20(output_coin).balanceOf(self)
@@ -1172,9 +1179,6 @@ def _exchange_underlying(
             dy = ERC20(output_coin).balanceOf(self) - out_amount
 
         assert dy >= _min_dy
-
-        # Adjust stored balances:
-        self.stored_balances[meta_j] -= dy
 
     else:  # base pool swap (user should swap at base pool for better gas)
 
@@ -1266,7 +1270,7 @@ def _xp_mem(
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(N_COINS_128):
         # _rates[i] * _balances[i] / PRECISION
-        result[i] = unsafe_div(_rates[i] * _balances[i], PRECISION)
+        result.append(unsafe_div(_rates[i] * _balances[i], PRECISION))
 
     return result
 
@@ -1604,6 +1608,12 @@ def get_dx(i: int128, j: int128, dy: uint256) -> uint256:
 
 @view
 @external
+def get_dx_underlying(i: int128, j: int128, dy: uint256) -> uint256:
+    return StableSwapViews(factory.views_implementation()).get_dx_underlying(i, j, dy, self)
+
+
+@view
+@external
 def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     """
     @notice Calculate the current output dy given input dx
@@ -1614,6 +1624,12 @@ def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     @return Amount of `j` predicted
     """
     return StableSwapViews(factory.views_implementation()).get_dy(i, j, dx, self)
+
+
+@view
+@external
+def get_dy_underlying(i: int128, j: int128, dx: uint256) -> uint256:
+    return StableSwapViews(factory.views_implementation()).get_dy_underlying(i, j, dx, self)
 
 
 @view

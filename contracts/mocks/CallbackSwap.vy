@@ -13,6 +13,7 @@ from vyper.interfaces import ERC20
 
 interface Swap:
     def coins(i: uint256) -> address: view
+    def BASE_COINS(i: uint256) -> address: view
     def exchange_extended(
         i: int128,
         j: int128,
@@ -138,7 +139,16 @@ def transfer_and_swap(
 
     assert msg.sender == keeper
 
-    coin: address = whitelisted_pool.coins(convert(i, uint256))
+    coin: address = empty(address)
+
+    if not underlying:
+        coin = whitelisted_pool.coins(convert(i, uint256))
+    else:
+        if not i == 0:
+            coin = whitelisted_pool.BASE_COINS(convert(i, uint256) - 1)
+        else:
+            coin = whitelisted_pool.coins(convert(i, uint256))
+
     ERC20(coin).transferFrom(keeper, whitelisted_pool.address, dx)
 
     if not underlying:

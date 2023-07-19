@@ -9,8 +9,11 @@ def initial_balance() -> int:
 
 
 @pytest.fixture(scope="module")
-def initial_amounts(decimals: list[int]) -> list[int]:
-    return [INITIAL_AMOUNT * 10**precision for precision in decimals]
+def initial_amounts(underlying_decimals: list[int], pool_type) -> list[int]:
+    _decimals = underlying_decimals.copy()
+    if pool_type == 1:
+        _decimals.pop(1)
+    return [INITIAL_AMOUNT * 10**precision for precision in _decimals]
 
 
 @pytest.fixture(scope="module")

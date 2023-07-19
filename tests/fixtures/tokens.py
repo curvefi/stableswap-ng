@@ -70,9 +70,6 @@ def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_toke
 
 
 # <---------------------   Metapool configuration   --------------------->
-@pytest.fixture(scope="module")
-def base_pool_decimals():
-    return [18, 6, 6]
 
 
 @pytest.fixture(scope="module")
@@ -107,7 +104,13 @@ def underlying_tokens(
     else:
         raise ValueError("Wrong pool token type")
 
-    return [pool_token] + [base_pool_lp_token, *base_pool_tokens]
+    _underlying_tokens = [pool_token] + [base_pool_lp_token, *base_pool_tokens]
+    return _underlying_tokens
+
+
+@pytest.fixture(scope="module")
+def underlying_precisions(underlying_tokens):
+    return [10 ** coin.decimals() for coin in underlying_tokens]
 
 
 # <---------------------   Gauge rewards  --------------------->

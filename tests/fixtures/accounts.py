@@ -62,21 +62,26 @@ def accounts(bob, charlie, dave, erin, frank):
 
 
 # <---------------------   Functions   --------------------->
-def mint_account(account, pool_tokens, initial_balance, initial_amounts):
+def mint_account(account, underlying_tokens, initial_balance, initial_amounts, pool_type):
     mint_for_testing(account, initial_balance, None, True)
+
+    pool_tokens = underlying_tokens.copy()
+    if pool_type == 1:
+        pool_tokens.pop(1)
+
     for pool_token, amount in zip(pool_tokens, initial_amounts):
         mint_for_testing(account, amount, pool_token, False)
 
 
-def approve_account(account, pool_tokens, swap):
-    for pool_token in pool_tokens:
+def approve_account(account, tokens, swap):
+    for token in tokens:
         with boa.env.prank(account):
-            pool_token.approve(swap.address, 2**256 - 1)
+            token.approve(swap.address, 2**256 - 1)
 
 
 @pytest.fixture(scope="module")
-def mint_owner(owner, pool_tokens, initial_balance, initial_amounts):
-    mint_account(owner, pool_tokens, initial_balance, initial_amounts)
+def mint_owner(owner, pool_tokens, initial_balance, initial_amounts, pool_type):
+    mint_account(owner, pool_tokens, initial_balance, initial_amounts, pool_type)
 
 
 @pytest.fixture(scope="module")
@@ -85,20 +90,20 @@ def approve_owner(owner, pool_tokens, swap):
 
 
 @pytest.fixture(scope="module")
-def mint_alice(alice, pool_tokens, initial_balance, initial_amounts):
-    mint_account(alice, pool_tokens, initial_balance, initial_amounts)
+def mint_alice(alice, underlying_tokens, initial_balance, initial_amounts, pool_type):
+    mint_account(alice, underlying_tokens, initial_balance, initial_amounts, pool_type)
 
 
 @pytest.fixture(scope="module")
-def approve_alice(alice, pool_tokens, swap):
-    approve_account(alice, pool_tokens, swap)
+def approve_alice(alice, underlying_tokens, swap):
+    approve_account(alice, underlying_tokens, swap)
 
 
 @pytest.fixture(scope="module")
-def mint_bob(bob, pool_tokens, initial_balance, initial_amounts):
-    mint_account(bob, pool_tokens, initial_balance, initial_amounts)
+def mint_bob(bob, underlying_tokens, initial_balance, initial_amounts, pool_type):
+    mint_account(bob, underlying_tokens, initial_balance, initial_amounts, pool_type)
 
 
 @pytest.fixture(scope="module")
-def approve_bob(bob, pool_tokens, swap):
-    approve_account(bob, pool_tokens, swap)
+def approve_bob(bob, underlying_tokens, swap):
+    approve_account(bob, underlying_tokens, swap)

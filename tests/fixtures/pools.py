@@ -109,7 +109,9 @@ def swap(
 
 # <---------------------   Metapool configuration   --------------------->
 @pytest.fixture(scope="module")
-def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base_pool_lp_token, zero_address):
+def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base_pool_lp_token):
+
+    # TODO: depending on base_pool_decimals, choose pool config (2-coin or 3-coin)
     with boa.env.prank(deployer):
         base_pool = boa.load(
             "contracts/mocks/CurvePool.vy",
@@ -121,15 +123,6 @@ def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base
             5000000000,
         )
         base_pool_lp_token.set_minter(base_pool.address)
-
-    amount = 1_000_000
-    with boa.env.prank(alice):
-        for d, token in zip(base_pool_decimals, base_pool_tokens):
-            token._mint_for_testing(alice, amount * 10**d)
-            token.approve(base_pool.address, 2**256 - 1)
-
-        base_pool.add_liquidity([amount * 10**d for d in base_pool_decimals], 0)
-        base_pool_lp_token.transfer(zero_address, base_pool_lp_token.balanceOf(alice))
 
     return base_pool
 
@@ -150,3 +143,37 @@ def add_initial_liquidity(owner, approve_owner, mint_owner, deposit_amounts, swa
 def add_initial_liquidity_alice(alice, approve_alice, mint_alice, deposit_amounts, swap):
     with boa.env.prank(alice):
         swap.add_liquidity(deposit_amounts, 0)
+
+
+@pytest.fixture(scope="module")
+def add_initial_liquidity_metapool_alice(
+    alice,
+    approve_alice,
+    mint_alice,
+    deposit_amounts,
+    swap,
+    pool_type,
+    underlying_tokens,
+    underlying_precisions,
+    underlying_decimals,
+    base_pool,
+):
+    assert pool_type == 1
+
+    # add liquidity to the base pool first:
+    amount = 1_000_000
+    with boa.env.prank(alice):
+        for d, token in zip(underlying_decimals[2:], underlying_tokens[2:]):
+            token._mint_for_testing(alice, amount * 10**d)
+            token.approve(base_pool.address, 2**256 - 1)
+
+        base_pool.add_liquidity([amount * 10**d for d in underlying_decimals[2:]], 0)
+
+    # add liquidity to the metapool next:
+    amount = [amount * underlying_precisions[0], underlying_tokens[1].balanceOf(alice)]
+    with boa.env.prank(alice):
+
+        for coin in underlying_tokens:
+            coin.approve(swap, 2**256 - 1)
+
+        swap.add_liquidity(amount, 0)
