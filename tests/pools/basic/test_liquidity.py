@@ -9,7 +9,7 @@ DEPOSIT_AMOUNT = 500_000
 class TestLiquidityMethods:
     @pytest.mark.usefixtures("add_initial_liquidity_alice", "mint_bob", "approve_bob")
     class TestAddLiquidity:
-        @pytest.mark.parametrize("use_eth", (True, False), scope="session")
+        @pytest.mark.parametrize("use_eth", (True, False), scope="function")
         def test_add_liquidity(
             self,
             bob,

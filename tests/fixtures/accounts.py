@@ -6,57 +6,57 @@ from eth_account.account import Account, LocalAccount
 from tests.utils.tokens import mint_for_testing
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def deployer() -> AddressType:
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def owner() -> AddressType:
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def fee_receiver() -> AddressType:
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def eth_acc() -> LocalAccount:
     return Account.create()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def alice():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def bob():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def charlie():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def dave():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def erin():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def frank():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def accounts(bob, charlie, dave, erin, frank):
     return [bob, charlie, dave, erin, frank]
 
@@ -74,31 +74,31 @@ def approve_account(account, pool_tokens, swap):
             pool_token.approve(swap.address, 2**256 - 1)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def mint_owner(owner, pool_tokens, initial_balance, initial_amounts):
     mint_account(owner, pool_tokens, initial_balance, initial_amounts)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def approve_owner(owner, pool_tokens, swap):
     approve_account(owner, pool_tokens, swap)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def mint_alice(alice, pool_tokens, initial_balance, initial_amounts):
     mint_account(alice, pool_tokens, initial_balance, initial_amounts)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def approve_alice(alice, pool_tokens, swap):
     approve_account(alice, pool_tokens, swap)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def mint_bob(bob, pool_tokens, initial_balance, initial_amounts):
     mint_account(bob, pool_tokens, initial_balance, initial_amounts)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def approve_bob(bob, pool_tokens, swap):
     approve_account(bob, pool_tokens, swap)

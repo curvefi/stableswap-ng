@@ -125,43 +125,43 @@ def pytest_generate_tests(metafunc):
         )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def pool_size(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def pool_type(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def pool_token_types(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def metapool_token_type(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def return_type(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def initial_decimals(request):
     return request.param
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def decimals(initial_decimals, pool_token_types):
     # eth and oracle tokens are always 18 decimals
     return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def meta_decimals(initial_decimals, metapool_token_type, decimals):
     # eth and oracle tokens are always 18 decimals
     return decimals[0] if metapool_token_type in [0, 3] else 18
@@ -194,7 +194,7 @@ def skip_by_pool_type(request, pool_type):
             pytest.skip("skipped because another pool type")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def forked_chain():
     rpc_url = os.getenv("WEB3_PROVIDER_URL")
     assert rpc_url is not None, "Provider url is not set, add WEB3_PROVIDER_URL param to env"

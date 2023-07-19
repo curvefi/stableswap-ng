@@ -138,6 +138,7 @@ class TestFactory:
                 "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
             ]
 
+            assert factory.base_pool_count() == 1
             factory.add_base_pool(susd_pool, lp_token, coins, [0] * len(coins), len(coins), sender=owner)
             assert factory.base_pool_count() == 2
             assert factory.base_pool_list(1) == susd_pool
@@ -218,7 +219,7 @@ class TestFactory:
             pool_size,
             zero_address,
         ):
-            assert factory.pool_count() == 3
+            assert factory.pool_count() == 1
 
             _ = factory.deploy_plain_pool(
                 "test",
@@ -232,4 +233,4 @@ class TestFactory:
                 [bytes(b"")] * pool_size,
                 [zero_address] * pool_size,
             )
-            assert factory.pool_count() == 4
+            assert factory.pool_count() == 2
