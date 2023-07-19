@@ -1134,7 +1134,7 @@ def _exchange_underlying(
             dx_w_fee = ERC20(input_coin).balanceOf(self) - self.stored_balances[meta_i]
             self.stored_balances[meta_i] += dx_w_fee
 
-        assert dx_w_fee == _dx  # dev: did not receive coins to swap
+        assert dx_w_fee == _dx, "Pool did not receive tokens for swap"
 
     else:
 

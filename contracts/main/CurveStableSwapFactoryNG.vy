@@ -212,11 +212,6 @@ def get_decimals(_pool: address) -> DynArray[uint256, MAX_COINS]:
     @param _pool Pool address
     @return uint256 list of decimals
     """
-    if self.pool_data[_pool].base_pool != empty(address):
-        decimals: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-        decimals = self.pool_data[_pool].decimals
-        decimals[1] = 18
-        return decimals
     return self.pool_data[_pool].decimals
 
 
@@ -672,7 +667,7 @@ def deploy_metapool(
 
     base_lp_token: address = self.base_pool_data[_base_pool].lp_token
 
-    self.pool_data[pool].decimals = [decimals, 0, 0, 0, 0, 0, 0, 0]
+    self.pool_data[pool].decimals = [decimals, 18, 0, 0, 0, 0, 0, 0]
     self.pool_data[pool].n_coins = 2
     self.pool_data[pool].base_pool = _base_pool
     self.pool_data[pool].coins = [_coin, self.base_pool_data[_base_pool].lp_token]

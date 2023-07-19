@@ -160,14 +160,15 @@ def add_initial_liquidity_metapool_alice(
 ):
     assert pool_type == 1
 
-    # add liquidity to the base pool first:
+    # add liquidity to the base pool first (if it doesnt have liquidity):
     amount = 1_000_000
-    with boa.env.prank(alice):
-        for d, token in zip(underlying_decimals[2:], underlying_tokens[2:]):
-            token._mint_for_testing(alice, amount * 10**d)
-            token.approve(base_pool.address, 2**256 - 1)
+    if not base_pool.balances(0) >= amount * underlying_precisions[2]:
+        with boa.env.prank(alice):
+            for d, token in zip(underlying_decimals[2:], underlying_tokens[2:]):
+                token._mint_for_testing(alice, amount * 10**d)
+                token.approve(base_pool.address, 2**256 - 1)
 
-        base_pool.add_liquidity([amount * 10**d for d in underlying_decimals[2:]], 0)
+            base_pool.add_liquidity([amount * 10**d for d in underlying_decimals[2:]], 0)
 
     # add liquidity to the metapool next:
     amount = [amount * underlying_precisions[0], underlying_tokens[1].balanceOf(alice)]

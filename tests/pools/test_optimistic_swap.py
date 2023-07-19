@@ -122,12 +122,8 @@ class TestOptimisticSwap:
         @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
         def test_exchange_not_received(self, bob, swap, pool_tokens, sending, receiving):
 
-            coin = pool_tokens[sending]
-            amount_in = SWAP_AMOUNT * 10 ** (coin.decimals())
-            assert coin.address == swap.coins(sending)
-
             with boa.env.prank(bob), boa.reverts("Pool did not receive tokens for swap"):
-                swap.exchange_received(sending, receiving, amount_in, 0, False, bob)
+                swap.exchange_received(sending, receiving, 1, 0, False, bob)
 
         @pytest.mark.only_for_token_types(3)
         @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
@@ -135,7 +131,7 @@ class TestOptimisticSwap:
             self, bob, swap, transfer_and_swap, pool_tokens, sending, receiving
         ):
 
-            with boa.env.prank(bob), boa.reverts(compiler="external call failed"):
+            with boa.reverts(compiler="external call failed"):
                 transfer_and_swap(swap, sending, receiving, False)
 
     @pytest.mark.only_for_pool_type(1)  # only for metapools
@@ -146,6 +142,9 @@ class TestOptimisticSwap:
         def test_exchange_underlying_received_nonrebasing(
             self, bob, swap, transfer_and_swap, underlying_tokens, sending, receiving
         ):
+
+            print()
+            print(swap.get_balances())
 
             swap_data = transfer_and_swap(swap, sending, receiving, True)
 
@@ -171,3 +170,18 @@ class TestOptimisticSwap:
                 - swap_data[receiving_token_pool]["receiving_token"][1]
                 == swap_data["amount_out"]
             )
+
+        # @pytest.mark.only_for_token_types(0, 1, 2)
+        # @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
+        # def test_exchange_underlying_not_received(self, bob, swap, sending, receiving):
+
+        #     with boa.env.prank(bob), boa.reverts():
+        #         breakpoint()
+        #         swap.exchange_underlying_received(sending, receiving, 1, 0, False, bob)
+
+        # @pytest.mark.only_for_token_types(3)
+        # @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
+        # def test_exchange_underlying_received_rebasing_reverts(self, swap, transfer_and_swap, sending, receiving):
+
+        #     with boa.reverts(compiler="external call failed"):
+        #         transfer_and_swap(swap, sending, receiving, True)
