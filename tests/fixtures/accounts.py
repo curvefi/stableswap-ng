@@ -85,8 +85,8 @@ def mint_owner(owner, pool_tokens, initial_balance, initial_amounts, pool_type):
 
 
 @pytest.fixture(scope="module")
-def approve_owner(owner, pool_tokens, empty_swap):
-    approve_account(owner, pool_tokens, empty_swap)
+def approve_owner(owner, pool_tokens, swap):
+    approve_account(owner, pool_tokens, swap)
 
 
 @pytest.fixture(scope="module")
@@ -95,8 +95,8 @@ def mint_alice(alice, underlying_tokens, initial_balance, initial_amounts, pool_
 
 
 @pytest.fixture(scope="module")
-def approve_alice(alice, underlying_tokens, empty_swap):
-    approve_account(alice, underlying_tokens, empty_swap)
+def approve_alice(alice, underlying_tokens, swap):
+    approve_account(alice, underlying_tokens, swap)
 
 
 @pytest.fixture(scope="module")
@@ -105,5 +105,5 @@ def mint_bob(bob, underlying_tokens, initial_balance, initial_amounts, pool_type
 
 
 @pytest.fixture(scope="module")
-def approve_bob(bob, underlying_tokens, empty_swap):
-    approve_account(bob, underlying_tokens, empty_swap)
+def approve_bob(bob, underlying_tokens, swap):
+    approve_account(bob, underlying_tokens, swap)

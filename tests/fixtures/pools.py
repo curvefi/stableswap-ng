@@ -5,7 +5,7 @@ from eth_utils import function_signature_to_4byte_selector
 
 # Only initialize useful fixtures
 @pytest.fixture(scope="module")
-def empty_swap(
+def swap(
     request,
     deployer,
     factory,
@@ -128,8 +128,8 @@ def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base
 
 
 @pytest.fixture(scope="module")
-def swap(
-    empty_swap,
+def add_initial_liquidity(
+    swap,
     pool_type,
     deposit_amounts,
     mint_alice,
@@ -141,49 +141,50 @@ def swap(
     base_pool,
     base_pool_lp_token,
 ):
+    def _add_liquidity():
 
-    if pool_type == 0:
+        if pool_type == 0:
 
-        with boa.env.prank(alice):
-            empty_swap.add_liquidity(deposit_amounts, 0)
-
-    elif pool_type == 1:
-
-        amount = 1_000_000
-        if not base_pool.balances(0) >= amount * underlying_precisions[2]:
             with boa.env.prank(alice):
-                for d, token in zip(underlying_decimals[2:], underlying_tokens[2:]):
-                    token._mint_for_testing(alice, amount * 10**d)
-                    token.approve(base_pool.address, 2**256 - 1)
+                swap.add_liquidity(deposit_amounts, 0)
 
-                base_pool.add_liquidity([amount * 10**d for d in underlying_decimals[2:]], 0)
+        elif pool_type == 1:
 
-        # add liquidity to the metapool next:
-        amounts = [amount * underlying_precisions[0], underlying_tokens[1].balanceOf(alice)]
+            amount = 1_000_000
+            if not base_pool.balances(0) >= amount * underlying_precisions[2]:
+                with boa.env.prank(alice):
+                    for d, token in zip(underlying_decimals[2:], underlying_tokens[2:]):
+                        token._mint_for_testing(alice, amount * 10**d)
+                        token.approve(base_pool.address, 2**256 - 1)
 
-        for _amt in amounts:
-            # this only fails if there are isolation issues
-            # if the above fails: alice deposits into base pool, and then deposits lp
-            # token into metapool. if metapool gets wiped: her lp tokens are gone forever.
-            # so base pool will have non-zero liquidity, but alice will have no lp tokens and
-            # metapool will be empty!
-            if _amt == 0:  # <--- it shouldnt be empty!
-                # the following asserts show that base pool has liquidity, metapool is empty
-                assert empty_swap.get_balances() == [0, 0]
-                assert empty_swap.balanceOf(alice) == 0
-                assert base_pool_lp_token == underlying_tokens[1]
-                assert base_pool_lp_token.balanceOf(alice) == 0
+                    base_pool.add_liquidity([amount * 10**d for d in underlying_decimals[2:]], 0)
 
-                assert base_pool.balances(0) == 0  # this will fail
+            # add liquidity to the metapool next:
+            amounts = [amount * underlying_precisions[0], underlying_tokens[1].balanceOf(alice)]
 
-        with boa.env.prank(alice):
+            for _amt in amounts:
+                # this only fails if there are isolation issues
+                # if the above fails: alice deposits into base pool, and then deposits lp
+                # token into metapool. if metapool gets wiped: her lp tokens are gone forever.
+                # so base pool will have non-zero liquidity, but alice will have no lp tokens and
+                # metapool will be empty!
+                if _amt == 0:  # <--- it shouldnt be empty!
+                    # the following asserts show that base pool has liquidity, metapool is empty
+                    assert swap.get_balances() == [0, 0]
+                    assert swap.balanceOf(alice) == 0
+                    assert base_pool_lp_token == underlying_tokens[1]
+                    assert base_pool_lp_token.balanceOf(alice) == 0
 
-            for coin in underlying_tokens:
-                coin.approve(empty_swap, 2**256 - 1)
+                    assert base_pool.balances(0) == 0  # this will fail
 
-            empty_swap.add_liquidity(amounts, 0)
+            with boa.env.prank(alice):
 
-    return empty_swap
+                for coin in underlying_tokens:
+                    coin.approve(swap, 2**256 - 1)
+
+                swap.add_liquidity(amounts, 0)
+
+    return _add_liquidity
 
 
 # <---------------------   Functions   --------------------->
