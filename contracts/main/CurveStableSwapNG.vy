@@ -145,11 +145,11 @@ N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
 
-factory: public(immutable(Factory))
+factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
 fee: public(uint256)  # fee * 1e10
-asset_types: public(DynArray[uint8, MAX_COINS])
+asset_types: DynArray[uint8, MAX_COINS]
 
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
@@ -166,7 +166,7 @@ future_A_time: public(uint256)
 
 # ---------------------------- Admin Variables -------------------------------
 
-ADMIN_FEE: constant(uint256) = 5000000000
+admin_fee: constant(uint256) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
 admin_balances: public(DynArray[uint256, MAX_COINS])
@@ -177,7 +177,7 @@ rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
 oracles: DynArray[uint256, MAX_COINS]
 
-last_prices_packed: public(DynArray[uint256, MAX_COINS])  #  packing: last_price, ma_price
+last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_price
 ma_exp_time: public(uint256)
 ma_last_time: public(uint256)
 
@@ -371,7 +371,7 @@ def _transfer_in(
 
     elif expect_optimistic_transfer:
 
-        assert _incoming_coin_asset_type != 3, "exchange_received not allowed if incoming token is rebasing"
+        assert _incoming_coin_asset_type != 3  # dev: rebasing coins not supported
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
     elif callback_sig != empty(bytes32):
@@ -397,9 +397,9 @@ def _transfer_in(
     # --------------------------- Check Transfer -----------------------------
 
     if _incoming_coin_asset_type == 3:
-        assert _dx > 0, "Pool did not receive tokens for swap"  # TODO: Check this!!
+        assert _dx > 0  # dev: pool did not receive tokens for swap  # TODO: Check this!!
     else:
-        assert dx == _dx, "Pool did not receive tokens for swap"
+        assert dx == _dx  # dev: pool did not receive tokens for swap
 
     # ----------------------- Update Stored Balances -------------------------
 
@@ -695,7 +695,7 @@ def add_liquidity(
                 difference = new_balance - ideal_balance
 
             fees.append(base_fee * difference / FEE_DENOMINATOR)
-            self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
+            self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
@@ -743,7 +743,7 @@ def remove_liquidity_one_coin(
     dy, fee, p = self._calc_withdraw_one_coin(_burn_amount, i)
     assert dy >= _min_received, "Not enough coins removed"
 
-    self.admin_balances[i] += fee * ADMIN_FEE / FEE_DENOMINATOR
+    self.admin_balances[i] += fee * admin_fee / FEE_DENOMINATOR
 
     self._burnFrom(msg.sender, _burn_amount)
 
@@ -804,7 +804,7 @@ def remove_liquidity_imbalance(
             difference = new_balance - ideal_balance
 
         fees[i] = base_fee * difference / FEE_DENOMINATOR
-        self.admin_balances[i] += fees[i] * ADMIN_FEE / FEE_DENOMINATOR
+        self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
         new_balances[i] -= fees[i]
 
     D2: uint256 = self.get_D_mem(rates, new_balances, amp)
@@ -899,7 +899,7 @@ def __exchange(
     dy = (dy - dy_fee) * PRECISION / rates[j]
 
     self.admin_balances[j] += (
-        dy_fee * ADMIN_FEE / FEE_DENOMINATOR
+        dy_fee * admin_fee / FEE_DENOMINATOR
     ) * PRECISION / rates[j]
 
     # Calculate and store state prices:
@@ -1694,12 +1694,6 @@ def calc_token_amount(
 
     views: address = factory.views_implementation()
     return StableSwapViews(views).calc_token_amount(amounts, _is_deposit, self)
-
-
-@view
-@external
-def admin_fee() -> uint256:
-    return ADMIN_FEE
 
 
 @view

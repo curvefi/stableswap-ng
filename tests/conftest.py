@@ -8,6 +8,7 @@ pytest_plugins = [
     "tests.fixtures.accounts",
     "tests.fixtures.constants",
     "tests.fixtures.factory",
+    "tests.fixtures.mocks",
     "tests.fixtures.pools",
     "tests.fixtures.tokens",
 ]

@@ -135,7 +135,7 @@ def add_base_pool_liquidity(user, base_pool, base_pool_tokens, base_pool_decimal
         base_pool.add_liquidity([amount * 10**d for d in base_pool_decimals], 0)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def add_initial_liquidity_owner(
     owner,
     approve_owner,
@@ -158,7 +158,7 @@ def add_initial_liquidity_owner(
             swap.add_liquidity(deposit_amounts, 0)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def add_initial_liquidity_alice(
     alice,
     approve_alice,
@@ -181,7 +181,7 @@ def add_initial_liquidity_alice(
             swap.add_liquidity(deposit_amounts, 0)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def mint_meta_bob(
     bob,
     mint_bob,
@@ -192,7 +192,7 @@ def mint_meta_bob(
     add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def approve_meta_bob(bob, underlying_tokens, swap):
-    for token in underlying_tokens[:2]:
+    for token in underlying_tokens:
         token.approve(swap.address, 2**256 - 1)
