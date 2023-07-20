@@ -1,7 +1,7 @@
 # @version 0.3.9
 
 """
-@title CurveExchangeExtendedDemo
+@title CurveExchangeWithoutApproval
 @author fiddyresearch.eth
 @notice A demo of a strategy execution that swaps on
         Curve pools without granting an ERC20 approvals to the DEX contracts
@@ -12,9 +12,10 @@
 from vyper.interfaces import ERC20
 
 interface Swap:
+    def coins(i: uint256) -> address: view
     def exchange_extended(
-        i: uint256,
-        j: uint256,
+        i: int128,
+        j: int128,
         dx: uint256,
         min_dy: uint256,
         use_eth: bool,
@@ -22,21 +23,34 @@ interface Swap:
         receiver: address,
         cb: bytes32
     ) -> uint256: nonpayable
+    def exchange_received(
+        i: int128,
+        j: int128,
+        dx: uint256,
+        min_dy: uint256,
+        use_eth: bool,
+        receiver: address,
+    ) -> uint256: nonpayable
+    def exchange_underlying_received(
+        i: int128,
+        j: int128,
+        dx: uint256,
+        min_dy: uint256,
+        use_eth: bool,
+        receiver: address,
+    ) -> uint256: nonpayable
 
 
-vault: public(immutable(address))
 keeper: public(immutable(address))
 whitelisted_pool: public(immutable(Swap))
 
 
 @external
 def __init__(
-    _vault: address,
     _whitelisted_pool: address,
     _keeper: address
 ):
 
-    vault = _vault
     whitelisted_pool = Swap(_whitelisted_pool)
     keeper = _keeper
 
@@ -50,7 +64,7 @@ def transfer_callback(
     amount_to_receive: uint256,
 ):
     """
-    Curve CryptoSwap (factory only) pools expect the callback to have the inputs:
+    Curve StableswapNG (factory only) pools expect the callback to have the inputs:
         sender: address
         receiver: address
         coin: address
@@ -79,13 +93,13 @@ def transfer_callback(
     assert msg.sender == whitelisted_pool.address
     assert tx.origin == keeper
 
-    ERC20(coin).transferFrom(vault, whitelisted_pool.address, amount_to_transfer)
+    ERC20(coin).transferFrom(keeper, whitelisted_pool.address, amount_to_transfer)
 
 
 @external
 def callback_and_swap(
-    i: uint256,
-    j: uint256,
+    i: int128,
+    j: int128,
     dx: uint256,
     min_dy: uint256,
 ) -> uint256:
@@ -108,6 +122,40 @@ def callback_and_swap(
         min_dy,  # minimum expected out
         False,   # use native token (eth)
         msg.sender, # sender  (doesnt matter because we set it to the vault in the callback)
-        vault, # receiver
+        keeper, # receiver
         convert(selector, bytes32)  # <-- your callback is being called here
+    )
+
+
+@external
+def transfer_and_swap(
+    i: int128,
+    j: int128,
+    dx: uint256,
+    min_dy: uint256,
+    underlying: bool
+) -> uint256:
+
+    assert msg.sender == keeper
+
+    coin: address = whitelisted_pool.coins(convert(i, uint256))
+    ERC20(coin).transferFrom(keeper, whitelisted_pool.address, dx)
+
+    if not underlying:
+        return whitelisted_pool.exchange_received(
+            i,  # input coin index
+            j,  # output coin index
+            dx,  # amount in
+            min_dy,  # minimum expected out
+            False,   # use native token (eth)
+            keeper, # receiver
+        )
+
+    return whitelisted_pool.exchange_underlying_received(
+        i,  # input coin index
+        j,  # output coin index
+        dx,  # amount in
+        min_dy,  # minimum expected out
+        False,   # use native token (eth)
+        keeper, # receiver
     )

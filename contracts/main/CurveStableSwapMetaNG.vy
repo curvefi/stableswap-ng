@@ -55,6 +55,8 @@ interface ERC1271:
 interface StableSwapViews:
     def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
     def get_dy(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dx_underlying(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dy_underlying(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
     def calc_token_amount(
         _amounts: DynArray[uint256, MAX_COINS],
         _is_deposit: bool,
@@ -178,12 +180,12 @@ BASE_POOL: public(immutable(address))
 BASE_N_COINS: public(immutable(uint256))
 BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
 
-math: public(immutable(Math))
-factory: public(immutable(Factory))
+math: immutable(Math)
+factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
 fee: public(uint256)  # fee * 1e10
-asset_types: public(immutable(DynArray[uint8, MAX_COINS]))
+asset_types: immutable(DynArray[uint8, MAX_COINS])
 
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
@@ -200,7 +202,7 @@ future_A_time: public(uint256)
 
 # ---------------------------- Admin Variables -------------------------------
 
-ADMIN_FEE: constant(uint256) = 5000000000
+admin_fee: constant(uint256) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
 admin_balances: public(DynArray[uint256, MAX_COINS])
@@ -211,7 +213,7 @@ rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
 oracles: DynArray[uint256, MAX_COINS]
 
-last_prices_packed: public(DynArray[uint256, MAX_COINS])  #  packing: last_price, ma_price
+last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_price
 ma_exp_time: public(uint256)
 ma_last_time: public(uint256)
 
@@ -316,6 +318,7 @@ def __init__(
 
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
         self.admin_balances.append(0)  # <--- this initialises storage for admin balances
+        self.stored_balances.append(0)
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -386,7 +389,7 @@ def _transfer_in(
 
     if expect_optimistic_transfer:
 
-        assert _incoming_coin_asset_type != 3, "exchange_received not allowed if incoming token is rebasing"
+        assert _incoming_coin_asset_type != 3  # dev: rebasing coins not supported
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
     elif callback_sig != empty(bytes32):
@@ -412,9 +415,9 @@ def _transfer_in(
     # --------------------------- Check Transfer -----------------------------
 
     if _incoming_coin_asset_type == 3:
-        assert _dx > 0, "Pool did not receive tokens for swap"  # TODO: Check this!!
+        assert _dx > 0  # dev: pool did not receive tokens for swap  # TODO: Check this!!
     else:
-        assert dx == _dx, "Pool did not receive tokens for swap"
+        assert dx == _dx  # dev: pool did not receive tokens for swap
 
     # ----------------------- Update Stored Balances -------------------------
 
@@ -798,8 +801,8 @@ def add_liquidity(
             # base_fee * difference / FEE_DENOMINATOR
             fees[i] = unsafe_div(base_fee * difference, FEE_DENOMINATOR)
 
-            # fees[i] * ADMIN_FEE / FEE_DENOMINATOR
-            self.admin_balances[i] += unsafe_div(fees[i] * ADMIN_FEE, FEE_DENOMINATOR)
+            # fees[i] * admin_fee / FEE_DENOMINATOR
+            self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
@@ -847,8 +850,8 @@ def remove_liquidity_one_coin(
     dy, fee, p = self._calc_withdraw_one_coin(_burn_amount, i)
     assert dy >= _min_received, "Not enough coins removed"
 
-    # fee * ADMIN_FEE / FEE_DENOMINATOR
-    self.admin_balances[i] += unsafe_div(fee * ADMIN_FEE, FEE_DENOMINATOR)
+    # fee * admin_fee / FEE_DENOMINATOR
+    self.admin_balances[i] += unsafe_div(fee * admin_fee, FEE_DENOMINATOR)
 
     self._burnFrom(msg.sender, _burn_amount)
 
@@ -907,8 +910,8 @@ def remove_liquidity_imbalance(
         # base_fee * difference / FEE_DENOMINATOR
         fees[i] = unsafe_div(base_fee * difference, FEE_DENOMINATOR)
 
-        # fees[i] * ADMIN_FEE / FEE_DENOMINATOR
-        self.admin_balances[i] += unsafe_div(fees[i] * ADMIN_FEE, FEE_DENOMINATOR)
+        # fees[i] * admin_fee / FEE_DENOMINATOR
+        self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
 
         new_balances[i] -= fees[i]
 
@@ -999,7 +1002,7 @@ def __exchange(
     dy = (dy - dy_fee) * PRECISION / rates[j]
 
     self.admin_balances[j] += (
-        unsafe_div(dy_fee * ADMIN_FEE, FEE_DENOMINATOR)  # dy_fee * ADMIN_FEE / FEE_DENOMINATOR
+        unsafe_div(dy_fee * admin_fee, FEE_DENOMINATOR)  # dy_fee * admin_fee / FEE_DENOMINATOR
     ) * PRECISION / rates[j]
 
     # Calculate and store state prices:
@@ -1126,11 +1129,12 @@ def _exchange_underlying(
 
             assert asset_types[i] != 3  # dev: rebasing coins not supported
 
+            # Since the coin belongs to the metapool, we need to check if we got more than
+            # what already exists in the pool (since last record):
             dx_w_fee = ERC20(input_coin).balanceOf(self) - self.stored_balances[meta_i]
-            assert dx_w_fee == _dx
             self.stored_balances[meta_i] += dx_w_fee
 
-        dx_w_fee = ERC20(input_coin).balanceOf(self) - _dx
+        assert dx_w_fee == _dx, "Pool did not receive tokens for swap"
 
     else:
 
@@ -1165,6 +1169,9 @@ def _exchange_underlying(
 
         dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
+        # Adjust stored balances of meta-level tokens:
+        self.stored_balances[meta_j] -= dy
+
         # Withdraw from the base pool if needed
         if j > 0:
             out_amount: uint256 = ERC20(output_coin).balanceOf(self)
@@ -1172,9 +1179,6 @@ def _exchange_underlying(
             dy = ERC20(output_coin).balanceOf(self) - out_amount
 
         assert dy >= _min_dy
-
-        # Adjust stored balances:
-        self.stored_balances[meta_j] -= dy
 
     else:  # base pool swap (user should swap at base pool for better gas)
 
@@ -1266,7 +1270,7 @@ def _xp_mem(
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(N_COINS_128):
         # _rates[i] * _balances[i] / PRECISION
-        result[i] = unsafe_div(_rates[i] * _balances[i], PRECISION)
+        result.append(unsafe_div(_rates[i] * _balances[i], PRECISION))
 
     return result
 
@@ -1359,7 +1363,9 @@ def _get_p(
     p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     # ANN * xp[0] / A_PRECISION
     xp0_A: uint256 = unsafe_div(ANN * xp[0], A_PRECISION)
-    p.append(10**18 * (xp0_A + Dr * xp[0] / xp[1]) / (xp0_A + Dr))
+    p.append(
+        10**18 * (xp0_A + unsafe_div(Dr * xp[0], xp[1])) / (xp0_A + Dr)
+    )
 
     return p
 
@@ -1398,7 +1404,7 @@ def _ma_price() -> uint256:
 
     if ma_last_time < block.timestamp:
         alpha: uint256 = math.exp(- convert((block.timestamp - ma_last_time) * 10**18 / self.ma_exp_time, int256))
-        return (last_price * (10**18 - alpha) + last_ema_price * alpha) / 10**18
+        return unsafe_div(last_price * (10**18 - alpha) + last_ema_price * alpha, 10**18)
 
     else:
         return last_ema_price
@@ -1569,7 +1575,7 @@ def permit(
         assert ecrecover(digest, convert(_v, uint256), convert(_r, uint256), convert(_s, uint256)) == _owner
 
     self.allowance[_owner][_spender] = _value
-    self.nonces[_owner] = nonce + 1
+    self.nonces[_owner] = unsafe_add(nonce, 1)
 
     log Approval(_owner, _spender, _value)
     return True
@@ -1604,6 +1610,12 @@ def get_dx(i: int128, j: int128, dy: uint256) -> uint256:
 
 @view
 @external
+def get_dx_underlying(i: int128, j: int128, dy: uint256) -> uint256:
+    return StableSwapViews(factory.views_implementation()).get_dx_underlying(i, j, dy, self)
+
+
+@view
+@external
 def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     """
     @notice Calculate the current output dy given input dx
@@ -1614,6 +1626,12 @@ def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     @return Amount of `j` predicted
     """
     return StableSwapViews(factory.views_implementation()).get_dy(i, j, dx, self)
+
+
+@view
+@external
+def get_dy_underlying(i: int128, j: int128, dx: uint256) -> uint256:
+    return StableSwapViews(factory.views_implementation()).get_dy_underlying(i, j, dx, self)
 
 
 @view
@@ -1637,9 +1655,8 @@ def get_virtual_price() -> uint256:
     @dev Useful for calculating profits
     @return LP token virtual price normalized to 1e18
     """
-    amp: uint256 = self._A()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(self._stored_rates(), self._balances())
-    D: uint256 = math.get_D(xp, amp, N_COINS)
+    D: uint256 = math.get_D(xp, self._A(), N_COINS)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
     return D * PRECISION / self.totalSupply
@@ -1657,20 +1674,13 @@ def calc_token_amount(
     @param _is_deposit set True for deposits, False for withdrawals
     @return Expected amount of LP tokens received
     """
-    views: address = factory.views_implementation()
-    return StableSwapViews(views).calc_token_amount(_amounts, _is_deposit, self)
-
-
-@view
-@external
-def admin_fee() -> uint256:
-    return ADMIN_FEE
+    return StableSwapViews(factory.views_implementation()).calc_token_amount(_amounts, _is_deposit, self)
 
 
 @view
 @external
 def A() -> uint256:
-    return self._A() / A_PRECISION
+    return unsafe_div(self._A(), A_PRECISION)
 
 
 @view

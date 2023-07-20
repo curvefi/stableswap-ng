@@ -29,12 +29,7 @@ jobs:
           poetry config virtualenvs.in-project true
           poetry install --no-interaction
 
-      - name: Run Test Basic
+      - name: Run Tests
         run: |
           source .venv/bin/activate
-          pytest tests/test_token.py --pool-size=2 --pool-type=basic --token-types=plain --decimals=18,18 -n auto
-
-      - name: Run Test Meta
-        run: |
-          source .venv/bin/activate
-          pytest tests/test_token.py --pool-size=2 --pool-type=meta --token-types=plain --decimals=18 -n auto
+          pytest tests/test_token.py --token-types=plain -n auto

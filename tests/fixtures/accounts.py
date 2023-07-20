@@ -74,17 +74,17 @@ def approve_account(account, pool_tokens, swap):
             pool_token.approve(swap.address, 2**256 - 1)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def mint_owner(owner, pool_tokens, initial_balance, initial_amounts):
     mint_account(owner, pool_tokens, initial_balance, initial_amounts)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def approve_owner(owner, pool_tokens, swap):
     approve_account(owner, pool_tokens, swap)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def mint_alice(alice, pool_tokens, initial_balance, initial_amounts):
     mint_account(alice, pool_tokens, initial_balance, initial_amounts)
 
@@ -94,11 +94,11 @@ def approve_alice(alice, pool_tokens, swap):
     approve_account(alice, pool_tokens, swap)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def mint_bob(bob, pool_tokens, initial_balance, initial_amounts):
     mint_account(bob, pool_tokens, initial_balance, initial_amounts)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def approve_bob(bob, pool_tokens, swap):
     approve_account(bob, pool_tokens, swap)

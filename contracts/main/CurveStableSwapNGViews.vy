@@ -26,8 +26,6 @@ interface StableSwap2:
 interface StableSwap3:
     def calc_token_amount(amounts: uint256[3], deposit: bool) -> uint256: view
 
-# TODO: Add up until 7 (a basepool can have maximally 7 if 8 is MAX_COINS. the other 1 is the non base pool token.)
-
 
 A_PRECISION: constant(uint256) = 100
 MAX_COINS: constant(uint256) = 8
@@ -56,8 +54,11 @@ def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256:
     xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     rates, balances, xp = self._get_rates_balances_xp(pool, N_COINS)
 
+    amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
+    D: uint256 = self.get_D(xp, amp, N_COINS)
+
     y: uint256 = xp[j] - (dy * rates[j] / PRECISION + 1) * FEE_DENOMINATOR / (FEE_DENOMINATOR - StableSwapNG(pool).fee())
-    x: uint256 = self.get_y(j, i, y, xp, 0, 0, N_COINS)
+    x: uint256 = self.get_y(j, i, y, xp, amp, D, N_COINS)
     return (x - xp[i]) * PRECISION / rates[i]
 
 
@@ -79,9 +80,11 @@ def get_dy(i: int128, j: int128, dx: uint256, pool: address) -> uint256:
     xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     rates, balances, xp = self._get_rates_balances_xp(pool, N_COINS)
 
+    amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
+    D: uint256 = self.get_D(xp, amp, N_COINS)
 
     x: uint256 = xp[i] + (dx * rates[i] / PRECISION)
-    y: uint256 = self.get_y(i, j, x, xp, 0, 0, N_COINS)
+    y: uint256 = self.get_y(i, j, x, xp, amp, D, N_COINS)
     dy: uint256 = xp[j] - y - 1
     fee: uint256 = StableSwapNG(pool).fee() * dy / FEE_DENOMINATOR
     return (dy - fee) * PRECISION / rates[j]
@@ -506,13 +509,13 @@ def _get_rates_balances_xp(pool: address, N_COINS: uint256) -> (
         if idx == N_COINS:
             break
         rate = StableSwapNG(pool).stored_rates(idx)
-        rates[idx] = StableSwapNG(pool).stored_rates(idx)
-        balances[idx] = StableSwapNG(pool).balances(idx)
+        rates.append(StableSwapNG(pool).stored_rates(idx))
+        balances.append(StableSwapNG(pool).balances(idx))
 
     xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for idx in range(MAX_COINS):
         if idx == N_COINS:
             break
-        xp[idx] = rates[idx] * balances[idx] / PRECISION
+        xp.append(rates[idx] * balances[idx] / PRECISION)
 
     return rates, balances, xp

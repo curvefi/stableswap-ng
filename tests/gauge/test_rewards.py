@@ -10,7 +10,7 @@ LP_AMOUNT = 10**18
 class TestGaugeRewards:
     class TestAddRewards:
         @pytest.fixture(autouse=True)
-        def initial_setup(self, owner, gauge, swap, add_initial_liquidity, set_gauge_implementation):
+        def initial_setup(self, owner, gauge, swap, add_initial_liquidity_owner, set_gauge_implementation):
             with boa.env.prank(owner):
                 swap.approve(gauge.address, LP_AMOUNT)
                 gauge.deposit(LP_AMOUNT)

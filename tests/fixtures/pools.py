@@ -3,10 +3,8 @@ import pytest
 from eth_utils import function_signature_to_4byte_selector
 
 
-# Only initialize useful fixtures
 @pytest.fixture(scope="module")
 def swap(
-    request,
     deployer,
     factory,
     weth,
@@ -15,12 +13,16 @@ def swap(
     pool_token_types,
     pool_tokens,
     zero_address,
+    amm_interface,
+    set_pool_implementations,
+    underlying_tokens,
+    base_pool,
+    amm_interface_meta,
+    add_base_pool,
+    set_metapool_implementations,
 ):
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
     if pool_type == 0:
-        amm_interface_plain = request.getfixturevalue("amm_interface")
-        _ = request.getfixturevalue("set_pool_implementations")
-
         A = 2000
         fee = 1000000
         method_ids = [bytes(b"")] * pool_size
@@ -51,15 +53,9 @@ def swap(
             pool = factory.deploy_plain_pool(
                 "test", "test", [t.address for t in pool_tokens], A, fee, 866, 0, asset_types, method_ids, oracles
             )
-        return amm_interface_plain.at(pool)
+        return amm_interface.at(pool)
 
     elif pool_type == 1:
-        base_pool = request.getfixturevalue("base_pool")
-        underlying_tokens = request.getfixturevalue("underlying_tokens")
-        amm_interface_meta = request.getfixturevalue("amm_interface_meta")
-        _ = request.getfixturevalue("add_base_pool")
-        _ = request.getfixturevalue("set_metapool_implementations")
-
         A = 2000
         fee = 1000000
         method_id = bytes(b"")
@@ -121,16 +117,6 @@ def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base
             5000000000,
         )
         base_pool_lp_token.set_minter(base_pool.address)
-
-    amount = 1_000_000
-    with boa.env.prank(alice):
-        for d, token in zip(base_pool_decimals, base_pool_tokens):
-            token._mint_for_testing(alice, amount * 10**d)
-            token.approve(base_pool.address, 2**256 - 1)
-
-        base_pool.add_liquidity([amount * 10**d for d in base_pool_decimals], 0)
-        base_pool_lp_token.transfer(zero_address, base_pool_lp_token.balanceOf(alice))
-
     return base_pool
 
 
@@ -140,13 +126,73 @@ def is_eth_pool(pool_tokens, weth):
     return weth in pool_tokens
 
 
-@pytest.fixture(scope="module")
-def add_initial_liquidity(owner, approve_owner, mint_owner, deposit_amounts, swap):
-    with boa.env.prank(owner):
-        swap.add_liquidity(deposit_amounts, 0)
+def add_base_pool_liquidity(user, base_pool, base_pool_tokens, base_pool_decimals):
+    amount = 1_000_000
+    with boa.env.prank(user):
+        for d, token in zip(base_pool_decimals, base_pool_tokens):
+            token._mint_for_testing(user, amount * 10**d)
+            token.approve(base_pool.address, 2**256 - 1)
+        base_pool.add_liquidity([amount * 10**d for d in base_pool_decimals], 0)
 
 
-@pytest.fixture(scope="module")
-def add_initial_liquidity_alice(alice, approve_alice, mint_alice, deposit_amounts, swap):
-    with boa.env.prank(alice):
-        swap.add_liquidity(deposit_amounts, 0)
+@pytest.fixture(scope="function")
+def add_initial_liquidity_owner(
+    owner,
+    approve_owner,
+    mint_owner,
+    deposit_amounts,
+    swap,
+    pool_type,
+    base_pool,
+    base_pool_tokens,
+    base_pool_decimals,
+    base_pool_lp_token,
+):
+    if pool_type == 0:
+        with boa.env.prank(owner):
+            swap.add_liquidity(deposit_amounts, 0)
+    else:
+        add_base_pool_liquidity(owner, base_pool, base_pool_tokens, base_pool_decimals)
+        with boa.env.prank(owner):
+            base_pool_lp_token.approve(swap.address, 2**256 - 1)
+            swap.add_liquidity(deposit_amounts, 0)
+
+
+@pytest.fixture(scope="function")
+def add_initial_liquidity_alice(
+    alice,
+    approve_alice,
+    mint_alice,
+    deposit_amounts,
+    swap,
+    pool_type,
+    base_pool,
+    base_pool_tokens,
+    base_pool_decimals,
+    base_pool_lp_token,
+):
+    if pool_type == 0:
+        with boa.env.prank(alice):
+            swap.add_liquidity(deposit_amounts, 0)
+    else:
+        add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
+        with boa.env.prank(alice):
+            base_pool_lp_token.approve(swap.address, 2**256 - 1)
+            swap.add_liquidity(deposit_amounts, 0)
+
+
+@pytest.fixture(scope="function")
+def mint_meta_bob(
+    bob,
+    mint_bob,
+    base_pool,
+    base_pool_tokens,
+    base_pool_decimals,
+):
+    add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
+
+
+@pytest.fixture(scope="function")
+def approve_meta_bob(bob, underlying_tokens, swap):
+    for token in underlying_tokens:
+        token.approve(swap.address, 2**256 - 1)

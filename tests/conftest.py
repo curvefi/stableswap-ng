@@ -1,5 +1,5 @@
+import itertools
 import os
-from itertools import combinations
 
 import boa
 import pytest
@@ -8,6 +8,7 @@ pytest_plugins = [
     "tests.fixtures.accounts",
     "tests.fixtures.constants",
     "tests.fixtures.factory",
+    "tests.fixtures.mocks",
     "tests.fixtures.pools",
     "tests.fixtures.tokens",
 ]
@@ -25,9 +26,9 @@ def pytest_addoption(parser):
         help="pool size to test against",
     )
     parser.addoption(
-        "--pool-type",
+        "--pool-types",
         action="store",
-        default="basic",
+        default="basic,meta",
         help="pool type to test against",
     )
     parser.addoption(
@@ -64,14 +65,13 @@ def pytest_generate_tests(metafunc):
             ids=[f"(PoolSize={pool_size})"],
         )
 
-    pool_type = metafunc.config.getoption("pool_type")
-
     if "pool_type" in metafunc.fixturenames:
+        cli_options = metafunc.config.getoption("pool_types").split(",")
         metafunc.parametrize(
             "pool_type",
-            [pool_types[pool_type]],
+            [pool_types[pool_type] for pool_type in cli_options],
             indirect=True,
-            ids=[f"(PoolType={pool_type})"],
+            ids=[f"(PoolType={pool_type})" for pool_type in cli_options],
         )
 
     if "pool_token_types" in metafunc.fixturenames:
@@ -80,29 +80,30 @@ def pytest_generate_tests(metafunc):
             cli_options.remove("eth")
             cli_options = ["eth"] + cli_options
 
-        if pool_types[pool_type] == 0:
-            combs = list(combinations(cli_options, pool_size))
-            if pool_size == 2:
-                # do not include (eth,eth) pair
-                for t in cli_options:
-                    if t != "eth":
-                        combs.append((t, t))
+        combinations = list(itertools.combinations(cli_options, pool_size))
+        if pool_size == 2:
+            # do not include (eth,eth) pair
+            for t in cli_options:
+                if t != "eth":
+                    combinations.append((t, t))
 
-            metafunc.parametrize(
-                "pool_token_types",
-                [(token_types[c[0]], token_types[c[1]]) for c in combs],
-                indirect=True,
-                ids=[f"(PoolTokenTypes={c})" for c in combs],
-            )
-        else:
-            # workaround for generating tokens
-            # for meta pool only 1st coin is selected
-            metafunc.parametrize(
-                "pool_token_types",
-                [[token_types[c]] for c in cli_options],
-                indirect=True,
-                ids=[f"(PoolTokenTypes={c})" for c in cli_options],
-            )
+        metafunc.parametrize(
+            "pool_token_types",
+            [[token_types[idx] for idx in c] for c in combinations],
+            indirect=True,
+            ids=[f"(PoolTokenTypes={c})" for c in combinations],
+        )
+
+    if "metapool_token_type" in metafunc.fixturenames:
+        cli_options = metafunc.config.getoption("token_types").split(",")
+
+        # for meta pool only 1st coin is selected
+        metafunc.parametrize(
+            "metapool_token_type",
+            [token_types[c] for c in cli_options],
+            indirect=True,
+            ids=[f"(PoolTokenTypes={c})" for c in cli_options],
+        )
 
     if "initial_decimals" in metafunc.fixturenames:
         cli_options = metafunc.config.getoption("decimals")
@@ -141,6 +142,11 @@ def pool_token_types(request):
 
 
 @pytest.fixture(scope="session")
+def metapool_token_type(request):
+    return request.param
+
+
+@pytest.fixture(scope="session")
 def return_type(request):
     return request.param
 
@@ -156,6 +162,12 @@ def decimals(initial_decimals, pool_token_types):
     return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
 
 
+@pytest.fixture(scope="session")
+def meta_decimals(initial_decimals, metapool_token_type, decimals):
+    # eth and oracle tokens are always 18 decimals
+    return decimals[0] if metapool_token_type in [0, 3] else 18
+
+
 # Usage
 # @pytest.mark.only_for_token_types(1,2)
 #
@@ -168,7 +180,7 @@ def decimals(initial_decimals, pool_token_types):
 def skip_by_token_type(request, pool_token_types):
     only_for_token_types = request.node.get_closest_marker("only_for_token_types")
     if only_for_token_types:
-        if not any(pool_token_type in only_for_token_types.args for pool_token_type in pool_token_types):
+        if not all(pool_token_type in only_for_token_types.args for pool_token_type in pool_token_types):
             pytest.skip("skipped because no tokens for these types")
 
 
@@ -183,7 +195,7 @@ def skip_by_pool_type(request, pool_type):
             pytest.skip("skipped because another pool type")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def forked_chain():
     rpc_url = os.getenv("WEB3_PROVIDER_URL")
     assert rpc_url is not None, "Provider url is not set, add WEB3_PROVIDER_URL param to env"
