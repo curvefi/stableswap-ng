@@ -2,7 +2,7 @@ import boa
 import pytest
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def plain_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
@@ -11,13 +11,13 @@ def plain_tokens(deployer, decimals):
     return tokens
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def weth(deployer):
     with boa.env.prank(deployer):
         return boa.load("contracts/mocks/WETH.vy")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def oracle_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
@@ -42,7 +42,7 @@ def oracle_tokens(deployer, decimals):
     return tokens
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def rebase_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
@@ -51,7 +51,7 @@ def rebase_tokens(deployer, decimals):
     return tokens
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_tokens):
     pool_tokens = []
     for i, t in enumerate(pool_token_types):
@@ -70,7 +70,7 @@ def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_toke
 
 
 # <---------------------   Metapool configuration   --------------------->
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def metapool_token(metapool_token_type, plain_tokens, weth, oracle_tokens, rebase_tokens):
     if metapool_token_type == 0:
         return plain_tokens[0]
@@ -84,12 +84,12 @@ def metapool_token(metapool_token_type, plain_tokens, weth, oracle_tokens, rebas
         raise ValueError("Wrong pool token type")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def base_pool_decimals():
     return [18, 18, 18]
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def base_pool_tokens(deployer, base_pool_decimals):
     tokens = []
     with boa.env.prank(deployer):
@@ -99,37 +99,37 @@ def base_pool_tokens(deployer, base_pool_decimals):
     return tokens
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def base_pool_lp_token(deployer):
     with boa.env.prank(deployer):
         return boa.load("contracts/mocks/CurveTokenV3.vy", "LP", "LP")
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def underlying_tokens(metapool_token, base_pool_tokens, base_pool_lp_token):
     return [metapool_token, base_pool_lp_token, *base_pool_tokens]
 
 
 # <---------------------   Gauge rewards  --------------------->
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def coin_reward(owner):
     with boa.env.prank(owner):
         return boa.load("contracts/mocks/ERC20.vy", "CR", "CR", 18)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def coin_reward_a(owner, mint_owner):
     with boa.env.prank(owner):
         return boa.load("contracts/mocks/ERC20.vy", "CRa", "CRa", 18)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def coin_reward_b(owner):
     with boa.env.prank(owner):
         return boa.load("contracts/mocks/ERC20.vy", "CRb", "CRb", 18)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def coin_rewards_additional(owner):
     coins = []
     with boa.env.prank(owner):

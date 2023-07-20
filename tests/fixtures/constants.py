@@ -3,12 +3,12 @@ import pytest
 INITIAL_AMOUNT = 1_000_000
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def initial_balance() -> int:
     return INITIAL_AMOUNT * 10**18
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def initial_amounts(pool_type, decimals, meta_decimals) -> list[int]:
     return (
         [INITIAL_AMOUNT * 10**precision for precision in decimals]
@@ -17,11 +17,11 @@ def initial_amounts(pool_type, decimals, meta_decimals) -> list[int]:
     )
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def deposit_amounts(initial_amounts: list[int]) -> list[int]:
     return [ia // 2 for ia in initial_amounts]
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def zero_address() -> str:
     return "0x0000000000000000000000000000000000000000"

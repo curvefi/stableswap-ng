@@ -7,7 +7,7 @@ SWAP_AMOUNT = 500_000
 
 
 class TestOptimisticSwap:
-    @pytest.fixture(scope="function")
+    @pytest.fixture(scope="module")
     def callback_contract(self, bob, swap, mint_bob, pool_tokens):
 
         with boa.env.prank(bob):
@@ -17,7 +17,7 @@ class TestOptimisticSwap:
 
         return _callback
 
-    @pytest.fixture(scope="function")
+    @pytest.fixture(scope="module")
     def transfer_and_swap(self, callback_contract, bob):
         def _transfer_and_swap(swap, pool_tokens, sending, receiving, underlying):
 
