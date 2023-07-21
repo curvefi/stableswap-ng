@@ -193,7 +193,7 @@ version: public(constant(String[8])) = "v7.0.0"
 
 balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
-totalSupply: public(uint256)
+total_supply: uint256
 nonces: public(HashMap[address, uint256])
 
 # keccak256("isValidSignature(bytes32,bytes)")[:4] << 224
@@ -316,24 +316,15 @@ def __init__(
 # ------------------ Token transfers in and out of the AMM -------------------
 
 
-@payable
-@external
-def __default__():
-    if msg.value > 0:
-        assert WETH20 in coins
-
-
 @internal
 def _transfer_in(
     coin_idx: int128,
     dx: uint256,
     dy: uint256,
-    mvalue: uint256,
     callbacker: address,
     callback_sig: bytes32,
     sender: address,
     receiver: address,
-    use_eth: bool,
     expect_optimistic_transfer: bool,
 ) -> uint256:
     """
@@ -346,7 +337,6 @@ def _transfer_in(
             dy: uint256
          The `dy` that the pool enforces is actually min_dy.
          Callback only occurs for `exchange_extended`.
-         Callback cannot happen for `_use_eth` = True.
     @dev If callback_sig is empty, `_transfer_in` does a transferFrom.
     @params _coin address of the coin to transfer in.
     @params dx amount of `_coin` to transfer into the pool.
@@ -356,7 +346,6 @@ def _transfer_in(
     @params callback_sig signature of the callback function.
     @params sender address to transfer `_coin` from.
     @params receiver address to transfer `_coin` to.
-    @params use_eth True if the transfer is ETH, False otherwise.
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
@@ -364,12 +353,7 @@ def _transfer_in(
 
     # ------------------------- Handle Transfers -----------------------------
 
-    if use_eth and coins[coin_idx] == WETH20:
-
-        _dx = mvalue
-        WETH(WETH20).deposit(value=dx)
-
-    elif expect_optimistic_transfer:
+    if expect_optimistic_transfer:
 
         assert _incoming_coin_asset_type != 3  # dev: rebasing coins not supported
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
@@ -409,31 +393,21 @@ def _transfer_in(
 
 
 @internal
-def _transfer_out(
-    _coin_idx: int128, _amount: uint256, use_eth: bool, receiver: address
-):
+def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     """
     @notice Transfer a single token from the pool to receiver.
     @dev This function is called by `remove_liquidity` and
          `remove_liquidity_one` and `_exchange` methods.
     @params _coin Address of the token to transfer out
     @params _amount Amount of token to transfer out
-    @params use_eth Whether to transfer ETH or not
     @params receiver Address to send the tokens to
     """
 
     # ------------------------- Handle Transfers -----------------------------
 
-    if use_eth and coins[_coin_idx] == WETH20:
-
-        WETH(WETH20).withdraw(_amount)
-        raw_call(receiver, b"", value=_amount)
-
-    else:
-
-        assert ERC20(coins[_coin_idx]).transfer(
-            receiver, _amount, default_return_value=True
-        )
+    assert ERC20(coins[_coin_idx]).transfer(
+        receiver, _amount, default_return_value=True
+    )
 
     # ----------------------- Update Stored Balances -------------------------
 
@@ -499,7 +473,6 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
 # -------------------------- AMM Main Functions ------------------------------
 
 
-@payable
 @external
 @nonreentrant('lock')
 def exchange(
@@ -507,7 +480,6 @@ def exchange(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender,
 ) -> uint256:
     """
@@ -523,12 +495,10 @@ def exchange(
     """
     return self._exchange(
         msg.sender,
-        msg.value,
         i,
         j,
         _dx,
         _min_dy,
-        _use_eth,
         _receiver,
         empty(address),
         empty(bytes32),
@@ -543,7 +513,6 @@ def exchange_extended(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool,
     _sender: address,
     _receiver: address,
     _cb: bytes32
@@ -562,12 +531,10 @@ def exchange_extended(
     assert _cb != empty(bytes32)  # dev: No callback specified
     return self._exchange(
         _sender,
-        0,  # mvalue is zero here
         i,
         j,
         _dx,
         _min_dy,
-        _use_eth,
         _receiver,
         msg.sender,  # <---------------------------- callbacker is msg.sender.
         _cb,
@@ -582,7 +549,6 @@ def exchange_received(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool,
     _receiver: address,
 ) -> uint256:
     """
@@ -601,12 +567,10 @@ def exchange_received(
     """
     return self._exchange(
         msg.sender,
-        0,
         i,
         j,
         _dx,
         _min_dy,
-        _use_eth,
         _receiver,
         empty(address),
         empty(bytes32),
@@ -614,13 +578,11 @@ def exchange_received(
     )
 
 
-@payable
 @external
 @nonreentrant('lock')
 def add_liquidity(
     _amounts: DynArray[uint256, MAX_COINS],
     _min_mint_amount: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender
 ) -> uint256:
     """
@@ -637,7 +599,7 @@ def add_liquidity(
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
 
-    total_supply: uint256 = self.totalSupply
+    total_supply: uint256 = self.total_supply
     new_balances: DynArray[uint256, MAX_COINS] = old_balances
 
     # -------------------------- Do Transfers In -----------------------------
@@ -653,12 +615,10 @@ def add_liquidity(
                 i,
                 _amounts[i],
                 0,
-                msg.value,
                 empty(address),
                 empty(bytes32),
                 msg.sender,
                 empty(address),
-                _use_eth,
                 False,  # expect_optimistic_transfer
             )
 
@@ -712,7 +672,7 @@ def add_liquidity(
     # Mint pool tokens
     total_supply += mint_amount
     self.balanceOf[_receiver] += mint_amount
-    self.totalSupply = total_supply
+    self.total_supply = total_supply
     log Transfer(empty(address), _receiver, mint_amount)
 
     log AddLiquidity(msg.sender, _amounts, fees, D1, total_supply)
@@ -726,7 +686,6 @@ def remove_liquidity_one_coin(
     _burn_amount: uint256,
     i: int128,
     _min_received: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender,
 ) -> uint256:
     """
@@ -747,9 +706,9 @@ def remove_liquidity_one_coin(
 
     self._burnFrom(msg.sender, _burn_amount)
 
-    self._transfer_out(i, dy, _use_eth, _receiver)
+    self._transfer_out(i, dy, _receiver)
 
-    log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, self.totalSupply)
+    log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, self.total_supply)
 
     self.save_p_from_price(p)
 
@@ -761,7 +720,6 @@ def remove_liquidity_one_coin(
 def remove_liquidity_imbalance(
     _amounts: DynArray[uint256, MAX_COINS],
     _max_burn_amount: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender
 ) -> uint256:
     """
@@ -784,7 +742,7 @@ def remove_liquidity_imbalance(
 
         if _amounts[i] != 0:
             new_balances[i] -= _amounts[i]
-            self._transfer_out(i, _amounts[i], _use_eth, _receiver)
+            self._transfer_out(i, _amounts[i], _receiver)
 
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
     fees: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -811,7 +769,7 @@ def remove_liquidity_imbalance(
 
     self.save_p(new_balances, amp, D2)
 
-    total_supply: uint256 = self.totalSupply
+    total_supply: uint256 = self.total_supply
     burn_amount: uint256 = ((D0 - D2) * total_supply / D0) + 1
     assert burn_amount > 1  # dev: zero tokens burned
     assert burn_amount <= _max_burn_amount, "Slippage screwed you"
@@ -829,7 +787,6 @@ def remove_liquidity_imbalance(
 def remove_liquidity(
     _burn_amount: uint256,
     _min_amounts: DynArray[uint256, MAX_COINS],
-    _use_eth: bool = False,
     _receiver: address = msg.sender,
     _claim_admin_fees: bool = True,
 ) -> DynArray[uint256, MAX_COINS]:
@@ -841,7 +798,7 @@ def remove_liquidity(
     @param _receiver Address that receives the withdrawn coins
     @return List of amounts of coins that were withdrawn
     """
-    total_supply: uint256 = self.totalSupply
+    total_supply: uint256 = self.total_supply
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
 
@@ -853,7 +810,7 @@ def remove_liquidity(
         value: uint256 = balances[i] * _burn_amount / total_supply
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
         amounts[i] = value
-        self._transfer_out(i, value, _use_eth, _receiver)
+        self._transfer_out(i, value, _receiver)
 
     total_supply -= _burn_amount
     self._burnFrom(msg.sender, _burn_amount)
@@ -915,12 +872,10 @@ def __exchange(
 @internal
 def _exchange(
     sender: address,
-    mvalue: uint256,
     i: int128,
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    use_eth: bool,
     receiver: address,
     callbacker: address,
     callback_sig: bytes32,
@@ -941,12 +896,10 @@ def _exchange(
         i,
         _dx,
         _min_dy,
-        mvalue,
         callbacker,
         callback_sig,
         sender,
         receiver,
-        use_eth,
         expect_optimistic_transfer
     )
 
@@ -958,7 +911,7 @@ def _exchange(
 
     # --------------------------- Do Transfer out ----------------------------
 
-    self._transfer_out(j, dy, use_eth, receiver)
+    self._transfer_out(j, dy, receiver)
 
     # ------------------------------------------------------------------------
 
@@ -981,7 +934,7 @@ def _withdraw_admin_fees():
 
         if admin_balances[i] > 0:
 
-            self._transfer_out(i, admin_balances[i], False, fee_receiver)
+            self._transfer_out(i, admin_balances[i], fee_receiver)
             admin_balances[i] = 0
 
     self.admin_balances = admin_balances
@@ -1239,7 +1192,7 @@ def _calc_withdraw_one_coin(
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, self._balances())
     D0: uint256 = self.get_D(xp, amp)
 
-    total_supply: uint256 = self.totalSupply
+    total_supply: uint256 = self.total_supply
     D1: uint256 = D0 - _burn_amount * D0 / total_supply
     new_y: uint256 = self.get_y_D(amp, i, xp, D1)
 
@@ -1499,7 +1452,7 @@ def _transfer(_from: address, _to: address, _value: uint256):
 @internal
 def _burnFrom(_from: address, _burn_amount: uint256):
 
-    self.totalSupply -= _burn_amount
+    self.total_supply -= _burn_amount
     self.balanceOf[_from] -= _burn_amount
     log Transfer(_from, empty(address), _burn_amount)
 
@@ -1657,6 +1610,18 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256:
 @view
 @external
 @nonreentrant('lock')
+def totalSupply() -> uint256:
+    """
+    @notice The total supply of pool LP tokens
+    @dev reentrancy guarded, just in case.
+    @returns self.total_supply, 18 decimals.
+    """
+    return self.total_supply
+
+
+@view
+@external
+@nonreentrant('lock')
 def get_virtual_price() -> uint256:
     """
     @notice The current virtual price of the pool LP token
@@ -1668,7 +1633,7 @@ def get_virtual_price() -> uint256:
     D: uint256 = self.get_D(xp, amp)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
-    return D * PRECISION / self.totalSupply
+    return D * PRECISION / self.total_supply
 
 
 @view
