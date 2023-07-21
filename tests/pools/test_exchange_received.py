@@ -3,10 +3,9 @@ import itertools
 import boa
 import pytest
 
-from tests.fixtures.accounts import add_base_pool_liquidity
-from tests.utils.tokens import mint_for_testing
+from tests.fixtures.constants import INITIAL_AMOUNT
 
-SWAP_AMOUNT = 50
+SWAP_AMOUNT = INITIAL_AMOUNT // 1000
 
 
 @pytest.fixture(scope="function")
@@ -58,16 +57,9 @@ def transfer_and_swap(
         # calc amount in:
         amount_in = SWAP_AMOUNT * 10 ** (input_coin.decimals())
 
-        # mint tokens if account does not have:
-        if input_coin.balanceOf(bob) < amount_in:
-            if input_coin == base_pool_lp_token:
-                add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
-            else:
-                mint_for_testing(bob, amount_in, input_coin, False)
-
         # record balances before
-        bob_sending_balance_before = input_coin.balanceOf(bob)
-        bob_receiving_balance_before = output_coin.balanceOf(bob)
+        bob_sending_balance_before = input_coin.balanceOf(bob)  # always INITIAL_AMOUNT
+        bob_receiving_balance_before = output_coin.balanceOf(bob)  # always INITIAL_AMOUNT
         pool_sending_balance_before = input_coin.balanceOf(pool.address)
         pool_receiving_balance_before = output_coin.balanceOf(pool.address)
         base_pool_sending_balance_before = input_coin.balanceOf(base_pool.address)
@@ -125,6 +117,7 @@ def test_exchange_received_nonrebasing(
     transfer_and_swap,
 ):
     swap_data = transfer_and_swap(swap, sending, receiving, False)
+    print(swap_data)
 
     assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
     assert swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0] == swap_data["amount_out"]

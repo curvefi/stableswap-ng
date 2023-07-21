@@ -5,6 +5,8 @@ from eth_account.account import Account, LocalAccount
 
 from tests.utils.tokens import mint_for_testing
 
+from .constants import INITIAL_AMOUNT
+
 
 @pytest.fixture(scope="module")
 def deployer() -> AddressType:
@@ -31,32 +33,32 @@ def alice():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def bob():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def charlie():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def dave():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def erin():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def frank():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def accounts(bob, charlie, dave, erin, frank):
     return [bob, charlie, dave, erin, frank]
 
@@ -106,7 +108,7 @@ def approve_bob(bob, pool_tokens, swap):
 
 # <---------------------   Functions   --------------------->
 def add_base_pool_liquidity(user, base_pool, base_pool_tokens, base_pool_decimals):
-    amount = 1_000_000 // 3 + 1
+    amount = INITIAL_AMOUNT // 3
     with boa.env.prank(user):
         for d, token in zip(base_pool_decimals, base_pool_tokens):
             token._mint_for_testing(user, amount * 10**d)
@@ -182,6 +184,7 @@ def mint_meta_bob(
 ):
     add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
     mint_for_testing(bob, initial_amounts[0], underlying_tokens[0], False)
+    assert underlying_tokens[0].balanceOf(bob) == base_pool_lp_token.balanceOf(bob)
 
 
 @pytest.fixture(scope="function")
