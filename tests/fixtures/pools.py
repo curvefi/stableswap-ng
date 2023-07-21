@@ -2,6 +2,8 @@ import boa
 import pytest
 from eth_utils import function_signature_to_4byte_selector
 
+from tests.utils.tokens import mint_for_testing
+
 
 @pytest.fixture(scope="module")
 def swap(
@@ -132,7 +134,9 @@ def add_base_pool_liquidity(user, base_pool, base_pool_tokens, base_pool_decimal
         for d, token in zip(base_pool_decimals, base_pool_tokens):
             token._mint_for_testing(user, amount * 10**d)
             token.approve(base_pool.address, 2**256 - 1)
-        base_pool.add_liquidity([amount * 10**d for d in base_pool_decimals], 0)
+
+        amounts = [amount * 10**d for d in base_pool_decimals]
+        base_pool.add_liquidity(amounts, 0)
 
 
 @pytest.fixture(scope="function")
@@ -143,6 +147,7 @@ def add_initial_liquidity_owner(
     deposit_amounts,
     swap,
     pool_type,
+    underlying_tokens,
     base_pool,
     base_pool_tokens,
     base_pool_decimals,
@@ -155,7 +160,13 @@ def add_initial_liquidity_owner(
         add_base_pool_liquidity(owner, base_pool, base_pool_tokens, base_pool_decimals)
         with boa.env.prank(owner):
             base_pool_lp_token.approve(swap.address, 2**256 - 1)
-            swap.add_liquidity(deposit_amounts, 0)
+            lp_token_bal = base_pool_lp_token.balanceOf(owner)
+            to_mint_token0 = lp_token_bal * 10 ** underlying_tokens[0].decimals() // 10 ** base_pool_lp_token.decimals()
+
+            mint_for_testing(owner, to_mint_token0, underlying_tokens[0], False)
+            underlying_tokens[0].approve(swap.address, 2**256 - 1)
+
+            swap.add_liquidity([to_mint_token0, lp_token_bal], 0)
 
 
 @pytest.fixture(scope="function")

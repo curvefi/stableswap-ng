@@ -3,6 +3,9 @@ import itertools
 import boa
 import pytest
 
+from tests.fixtures.pools import add_base_pool_liquidity
+from tests.utils.tokens import mint_for_testing
+
 SWAP_AMOUNT = 50
 
 
@@ -14,50 +17,68 @@ def transfer_and_swap(
     underlying_tokens,
     pool_type,
     base_pool,
+    mint_meta_bob,
+    base_pool_lp_token,
+    base_pool_tokens,
+    base_pool_decimals,
 ):
     def _transfer_and_swap(pool, sending: int, receiving: int, underlying: bool):
 
+        # get input and output tokens:
         sending_token = "swap"
         receiving_token = "swap"
 
         if pool_type == 1:
 
-            input_coin = underlying_tokens[sending]
-            output_coin = underlying_tokens[receiving]
+            if underlying:
 
-            # if sending == 0:
-            #     input_coin = underlying_tokens[0]
-            # else:
-            #     base_i = sending - 1
-            #     input_coin = underlying_tokens[2 + base_i]
-            #     sending_token = "base_pool"
-            # if receiving == 0:
-            #     output_coin = underlying_tokens[0]
-            # else:
-            #     base_j = receiving - 1
-            #     output_coin = underlying_tokens[2 + base_j]
-            #     receiving_token = "base_pool"
+                if sending == 0:
+                    input_coin = underlying_tokens[0]
+                else:
+                    base_i = sending - 1
+                    input_coin = underlying_tokens[2 + base_i]
+                    sending_token = "base_pool"
+                if receiving == 0:
+                    output_coin = underlying_tokens[0]
+                else:
+                    base_j = receiving - 1
+                    output_coin = underlying_tokens[2 + base_j]
+                    receiving_token = "base_pool"
+
+            else:
+
+                input_coin = underlying_tokens[sending]
+                output_coin = underlying_tokens[receiving]
 
         else:
 
             input_coin = pool_tokens[sending]
             output_coin = pool_tokens[receiving]
 
+        # calc amount in:
         amount_in = SWAP_AMOUNT * 10 ** (input_coin.decimals())
 
-        bob_sending_balance_before = input_coin.balanceOf(bob)
-        assert bob_sending_balance_before >= amount_in
+        # mint tokens if account does not have:
+        if input_coin.balanceOf(bob) < amount_in:
+            if input_coin == base_pool_lp_token:
+                add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
+            else:
+                mint_for_testing(bob, amount_in, input_coin, False)
 
+        # record balances before
+        bob_sending_balance_before = input_coin.balanceOf(bob)
         bob_receiving_balance_before = output_coin.balanceOf(bob)
         pool_sending_balance_before = input_coin.balanceOf(pool.address)
         pool_receiving_balance_before = output_coin.balanceOf(pool.address)
         base_pool_sending_balance_before = input_coin.balanceOf(base_pool.address)
         base_pool_receiving_balance_before = output_coin.balanceOf(base_pool.address)
 
+        # swap
         with boa.env.prank(bob):
-            amount_out = callback_contract.transfer_and_swap(sending, receiving, amount_in, 0, underlying)
+            amount_out = callback_contract.transfer_and_swap(sending, receiving, input_coin, amount_in, 0, underlying)
             assert amount_out > 0
 
+        # record balances after
         bob_sending_balance_after = input_coin.balanceOf(bob)
         bob_receiving_balance_after = output_coin.balanceOf(bob)
         pool_sending_balance_after = input_coin.balanceOf(pool.address)

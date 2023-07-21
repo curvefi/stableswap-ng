@@ -127,6 +127,7 @@ def callback_and_swap(
 def transfer_and_swap(
     i: int128,
     j: int128,
+    input_coin: address,
     dx: uint256,
     min_dy: uint256,
     underlying: bool
@@ -134,8 +135,7 @@ def transfer_and_swap(
 
     assert msg.sender == keeper
 
-    coin: address = whitelisted_pool.coins(convert(i, uint256))
-    ERC20(coin).transferFrom(keeper, whitelisted_pool.address, dx)
+    ERC20(input_coin).transferFrom(keeper, whitelisted_pool.address, dx)
 
     if not underlying:
         return whitelisted_pool.exchange_received(

@@ -776,7 +776,7 @@ def add_liquidity(
                 difference = new_balance - ideal_balance
 
             # base_fee * difference / FEE_DENOMINATOR
-            fees[i] = unsafe_div(base_fee * difference, FEE_DENOMINATOR)
+            fees.append(unsafe_div(base_fee * difference, FEE_DENOMINATOR))
 
             # fees[i] * admin_fee / FEE_DENOMINATOR
             self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
