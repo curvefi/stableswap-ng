@@ -10,9 +10,8 @@
      nth coin index of the base pool.
      Asset Types:
         0. Basic ERC20 token with no additional features
-        1. WETH - can we directly converted to/from ETH
-        2. Oracle - token with rate oracle
-        3. Rebasing - token with rebase (e.g. stETH)
+        1. Oracle - token with rate oracle
+        2. Rebasing - token with rebase (e.g. stETH)
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
@@ -28,9 +27,9 @@
             b. swaps without transferFrom (no need for token approvals)
         3. Adds feature: `exchange_received`: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
-           Note: a. If pool contains rebasing tokens and one of the `asset_types` is 3 (Rebasing)
+           Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
                     then calling `exchange_received` will REVERT.
-                 b. If pool contains rebasing token and `asset_types` does not contain 3 (Rebasing)
+                 b. If pool contains rebasing token and `asset_types` does not contain 2 (Rebasing)
                     then this is an incorrect implementation and rebases can be
                     stolen.
         4. Adds `get_dx`, `get_dx_underlying`: Similar to `get_dy` which returns an expected output
@@ -202,7 +201,7 @@ future_A_time: public(uint256)
 
 # ---------------------------- Admin Variables -------------------------------
 
-admin_fee: constant(uint256) = 5000000000
+admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
 admin_balances: public(DynArray[uint256, MAX_COINS])
@@ -386,7 +385,7 @@ def _transfer_in(
 
     if expect_optimistic_transfer:
 
-        assert _incoming_coin_asset_type != 3  # dev: rebasing coins not supported
+        assert _incoming_coin_asset_type != 2  # dev: rebasing coins not supported
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
     elif callback_sig != empty(bytes32):
@@ -411,7 +410,7 @@ def _transfer_in(
 
     # --------------------------- Check Transfer -----------------------------
 
-    if _incoming_coin_asset_type == 3:
+    if _incoming_coin_asset_type == 2:
         assert _dx > 0  # dev: pool did not receive tokens for swap  # TODO: Check this!!
     else:
         assert dx == _dx  # dev: pool did not receive tokens for swap
@@ -517,8 +516,6 @@ def exchange(
     """
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
-         Allows for native token swaps (e.g. ETH <> whatever)
-         If native token is not in coin list and msg.value > 0, swap will revert
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -552,8 +549,8 @@ def exchange_extended(
     """
     @notice Perform an exchange between two coins after a callback
     @dev Index values can be found via the `coins` public getter method
-         Not payable (does not accept eth). Users of this method are dex aggregators,
-         arbitrageurs, or other users who do not wish to grant approvals to the contract.
+         Users of this method are dex aggregators,arbitrageurs, or other
+         users who do not wish to grant approvals to the contract.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -1091,7 +1088,7 @@ def _exchange_underlying(
 
         if input_coin == BASE_COINS[base_i]:
 
-            assert asset_types[base_i + 2] != 3  # dev: rebasing coins not supported
+            assert asset_types[base_i + 2] != 2  # dev: rebasing coins not supported
 
             # we expect base_coin's balance to be 0. So swap whatever base_coin's
             # balance the pool has:
@@ -1099,7 +1096,7 @@ def _exchange_underlying(
 
         else:
 
-            assert asset_types[i] != 3  # dev: rebasing coins not supported
+            assert asset_types[i] != 2  # dev: rebasing coins not supported
 
             # Since the coin belongs to the metapool, we need to check if we got more than
             # what already exists in the pool (since last record):

@@ -52,7 +52,6 @@ def factory(
     deployer,
     fee_receiver,
     owner,
-    weth,
     gauge_implementation,
     views_implementation,
     math_implementation,
@@ -62,7 +61,6 @@ def factory(
             "contracts/main/CurveStableSwapFactoryNG.vy",
             fee_receiver,
             owner,
-            weth,
         )
 
     with boa.env.prank(owner):

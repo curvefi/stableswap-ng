@@ -12,12 +12,6 @@ def plain_tokens(deployer, decimals):
 
 
 @pytest.fixture(scope="module")
-def weth(deployer):
-    with boa.env.prank(deployer):
-        return boa.load("contracts/mocks/WETH.vy")
-
-
-@pytest.fixture(scope="module")
 def oracle_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
@@ -52,16 +46,14 @@ def rebase_tokens(deployer, decimals):
 
 
 @pytest.fixture(scope="module")
-def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_tokens):
+def pool_tokens(pool_token_types, plain_tokens, oracle_tokens, rebase_tokens):
     pool_tokens = []
     for i, t in enumerate(pool_token_types):
         if t == 0:
             pool_tokens.append(plain_tokens[i])
         elif t == 1:
-            pool_tokens.append(weth)
-        elif t == 2:
             pool_tokens.append(oracle_tokens[i])
-        elif t == 3:
+        elif t == 2:
             pool_tokens.append(rebase_tokens[i])
         else:
             raise ValueError("Wrong pool token type")
@@ -71,14 +63,12 @@ def pool_tokens(pool_token_types, plain_tokens, weth, oracle_tokens, rebase_toke
 
 # <---------------------   Metapool configuration   --------------------->
 @pytest.fixture(scope="module")
-def metapool_token(metapool_token_type, plain_tokens, weth, oracle_tokens, rebase_tokens):
+def metapool_token(metapool_token_type, plain_tokens, oracle_tokens, rebase_tokens):
     if metapool_token_type == 0:
         return plain_tokens[0]
     elif metapool_token_type == 1:
-        return weth
-    elif metapool_token_type == 2:
         return oracle_tokens[0]
-    elif metapool_token_type == 3:
+    elif metapool_token_type == 2:
         return rebase_tokens[0]
     else:
         raise ValueError("Wrong pool token type")
