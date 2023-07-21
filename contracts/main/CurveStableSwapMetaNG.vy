@@ -1663,7 +1663,8 @@ def calc_token_amount(
 @view
 @external
 def A() -> uint256:
-    return unsafe_div(self._A(), A_PRECISION)
+    amp: uint256 = self._A()
+    return unsafe_div(amp, A_PRECISION)
 
 
 @view

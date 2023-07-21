@@ -18,7 +18,6 @@ interface Swap:
         j: int128,
         dx: uint256,
         min_dy: uint256,
-        use_eth: bool,
         sender: address,
         receiver: address,
         cb: bytes32
@@ -28,7 +27,6 @@ interface Swap:
         j: int128,
         dx: uint256,
         min_dy: uint256,
-        use_eth: bool,
         receiver: address,
     ) -> uint256: nonpayable
     def exchange_underlying_received(
@@ -36,7 +34,6 @@ interface Swap:
         j: int128,
         dx: uint256,
         min_dy: uint256,
-        use_eth: bool,
         receiver: address,
     ) -> uint256: nonpayable
 
@@ -120,7 +117,6 @@ def callback_and_swap(
         j,  # output coin index
         dx,  # amount in
         min_dy,  # minimum expected out
-        False,   # use native token (eth)
         msg.sender, # sender  (doesnt matter because we set it to the vault in the callback)
         keeper, # receiver
         convert(selector, bytes32)  # <-- your callback is being called here
@@ -147,7 +143,6 @@ def transfer_and_swap(
             j,  # output coin index
             dx,  # amount in
             min_dy,  # minimum expected out
-            False,   # use native token (eth)
             keeper, # receiver
         )
 
@@ -156,6 +151,5 @@ def transfer_and_swap(
         j,  # output coin index
         dx,  # amount in
         min_dy,  # minimum expected out
-        False,   # use native token (eth)
         keeper, # receiver
     )

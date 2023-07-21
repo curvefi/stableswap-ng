@@ -115,22 +115,18 @@ def test_exchange_received_nonrebasing(
 @pytest.mark.only_for_token_types(0, 1, 2)
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_not_received(
-    bob, swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity
+    bob, swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
 ):
 
-    add_initial_liquidity()
-
-    with boa.env.prank(bob), boa.reverts("Pool did not receive tokens for swap"):
-        swap.exchange_received(sending, receiving, 1, 0, False, bob)
+    with boa.env.prank(bob), boa.reverts():
+        swap.exchange_received(sending, receiving, 1, 0, bob)
 
 
 @pytest.mark.only_for_token_types(3)
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_rebasing_reverts(
-    bob, swap, transfer_and_swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity
+    bob, swap, transfer_and_swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
 ):
-
-    add_initial_liquidity()
 
     with boa.reverts(compiler="external call failed"):
         transfer_and_swap(swap, sending, receiving, False)
@@ -148,10 +144,8 @@ def test_exchange_underlying_received_nonrebasing(
     approve_bob,
     sending,
     receiving,
-    add_initial_liquidity,
+    add_initial_liquidity_owner,
 ):
-
-    add_initial_liquidity()
 
     swap_data = transfer_and_swap(swap, sending, receiving, True)
 
@@ -178,19 +172,20 @@ def test_exchange_underlying_received_nonrebasing(
 @pytest.mark.only_for_pool_type(1)  # only for metapools
 @pytest.mark.only_for_token_types(0, 1, 2)
 @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
-def test_exchange_underlying_not_received(bob, swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity):
-    add_initial_liquidity()
+def test_exchange_underlying_not_received(
+    bob, swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
+):
+
     with boa.env.prank(bob), boa.reverts():
-        swap.exchange_underlying_received(sending, receiving, 1, 0, False, bob)
+        swap.exchange_underlying_received(sending, receiving, 1, 0, bob)
 
 
 @pytest.mark.only_for_pool_type(1)  # only for metapools
 @pytest.mark.only_for_token_types(3)
 @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
 def test_exchange_underlying_received_rebasing_reverts(
-    swap, transfer_and_swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity
+    swap, transfer_and_swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
 ):
-    add_initial_liquidity()  # <---- factory fixture that only adds liquidity when called
 
     if sending == 0:
         with boa.reverts(compiler="external call failed"):
