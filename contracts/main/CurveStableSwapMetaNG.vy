@@ -349,7 +349,8 @@ def __init__(
 
 @internal
 def _transfer_in(
-    coin_idx: int128,
+    coin_metapool_idx: int128,
+    coin_basepool_idx: int128,
     dx: uint256,
     dy: uint256,
     callbacker: address,
@@ -378,15 +379,24 @@ def _transfer_in(
     @params receiver address to transfer `_coin` to.
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
-    _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
-    _incoming_coin_asset_type: uint8 = asset_types[coin_idx]
+    _input_coin: ERC20 = ERC20(coins[coin_metapool_idx])
+    _incoming_coin_asset_type: uint8 = asset_types[coin_metapool_idx]
+    _stored_balance: uint256 = self.stored_balances[coin_metapool_idx]
+
+    if coin_basepool_idx >= 0 and coin_metapool_idx == 1:  # self._exchange_underlying
+
+        _input_coin = ERC20(BASE_COINS[coin_basepool_idx])
+        _incoming_coin_asset_type = asset_types[coin_basepool_idx + 2]
+        _stored_balance = 0
+
+    _dx: uint256 = _input_coin.balanceOf(self)
 
     # ------------------------- Handle Transfers -----------------------------
 
     if expect_optimistic_transfer:
 
         assert _incoming_coin_asset_type != 2  # dev: rebasing coins not supported
-        _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
+        _dx -= _stored_balance  # <--- for base_pool coins, stored balance is 0.
 
     elif callback_sig != empty(bytes32):
 
@@ -394,19 +404,16 @@ def _transfer_in(
                 callbacker,
                 concat(
                     slice(callback_sig, 0, 4),
-                    _abi_encode(sender, receiver, coins[coin_idx], dx, dy)
+                    _abi_encode(sender, receiver, _input_coin.address, dx, dy)
                 )
             )
 
-        _dx = ERC20(coins[coin_idx]).balanceOf(self) - _dx
+        _dx = _input_coin.balanceOf(self) - _dx
 
     else:
 
-        assert ERC20(coins[coin_idx]).transferFrom(
-            sender, self, dx, default_return_value=True
-        )
-
-        _dx = ERC20(coins[coin_idx]).balanceOf(self) - _dx
+        assert _input_coin.transferFrom(sender, self, dx, default_return_value=True)
+        _dx = _input_coin.balanceOf(self) - _dx
 
     # --------------------------- Check Transfer -----------------------------
 
@@ -417,7 +424,7 @@ def _transfer_in(
 
     # ----------------------- Update Stored Balances -------------------------
 
-    self.stored_balances[coin_idx] += _dx
+    self.stored_balances[coin_metapool_idx] += _dx
 
     return _dx
 
@@ -734,6 +741,7 @@ def add_liquidity(
 
             new_balances[i] += self._transfer_in(
                 i,
+                -1,  # <--- we're not handling underlying coins here
                 _amounts[i],
                 0,
                 empty(address),
@@ -1011,6 +1019,7 @@ def _exchange(
     # `dx` is whatever the pool received after ERC20 transfer:
     dx: uint256 = self._transfer_in(
         i,
+        -1,  # <----- we're not handling underlying coins here.
         _dx,
         _min_dy,
         callbacker,
@@ -1066,6 +1075,8 @@ def _exchange_underlying(
     input_coin: address = empty(address)
     output_coin: address = empty(address)
 
+    # ------------------------ Determine coin indices ------------------------
+
     if i == 0:
         input_coin = coins[0]
     else:
@@ -1081,42 +1092,17 @@ def _exchange_underlying(
 
     # --------------------------- Do Transfer in -----------------------------
 
-    dx_w_fee: uint256 = 0
-
-    # for exchange_underlying, optimistic transfers need to be handled differently
-    if expect_optimistic_transfer:
-
-        if input_coin == BASE_COINS[base_i]:
-
-            assert asset_types[base_i + 2] != 2  # dev: rebasing coins not supported
-
-            # we expect base_coin's balance to be 0. So swap whatever base_coin's
-            # balance the pool has:
-            dx_w_fee = ERC20(input_coin).balanceOf(self)
-
-        else:
-
-            assert asset_types[i] != 2  # dev: rebasing coins not supported
-
-            # Since the coin belongs to the metapool, we need to check if we got more than
-            # what already exists in the pool (since last record):
-            dx_w_fee = ERC20(input_coin).balanceOf(self) - self.stored_balances[meta_i]
-            self.stored_balances[meta_i] += dx_w_fee
-
-        assert dx_w_fee == _dx, "Pool did not receive tokens for swap"
-
-    else:
-
-        dx_w_fee = self._transfer_in(
-            i,
-            _dx,
-            _min_dy,
-            callbacker,
-            callback_sig,
-            sender,
-            receiver,
-            False,  # expect_optimistic_transfer = False
-        )
+    dx_w_fee: uint256 =  self._transfer_in(
+        meta_i,
+        base_i,
+        _dx,
+        _min_dy,
+        callbacker,
+        callback_sig,
+        sender,
+        receiver,
+        expect_optimistic_transfer,
+    )
 
     # ------------------------------- Exchange -------------------------------
 
@@ -1138,6 +1124,7 @@ def _exchange_underlying(
         dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
         # Adjust stored balances of meta-level tokens:
+        # TODO: refactor this stray self.stored_balances to self._transfer_out somehow
         self.stored_balances[meta_j] -= dy
 
         # Withdraw from the base pool if needed

@@ -4,6 +4,7 @@ import boa
 import pytest
 
 from tests.fixtures.constants import INITIAL_AMOUNT
+from tests.utils.tokens import mint_for_testing
 
 SWAP_AMOUNT = INITIAL_AMOUNT // 1000
 
@@ -56,6 +57,9 @@ def transfer_and_swap(
 
         # calc amount in:
         amount_in = SWAP_AMOUNT * 10 ** (input_coin.decimals())
+
+        if amount_in > input_coin.balanceOf(bob):
+            mint_for_testing(bob, amount_in, input_coin, False)
 
         # record balances before
         bob_sending_balance_before = input_coin.balanceOf(bob)  # always INITIAL_AMOUNT
@@ -117,7 +121,6 @@ def test_exchange_received_nonrebasing(
     transfer_and_swap,
 ):
     swap_data = transfer_and_swap(swap, sending, receiving, False)
-    print(swap_data)
 
     assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
     assert swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0] == swap_data["amount_out"]
@@ -142,7 +145,7 @@ def test_exchange_received_rebasing_reverts(
     bob, swap, transfer_and_swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
 ):
 
-    with boa.reverts(compiler="external call failed"):
+    with boa.reverts():
         transfer_and_swap(swap, sending, receiving, False)
 
 
@@ -202,5 +205,5 @@ def test_exchange_underlying_received_rebasing_reverts(
 ):
 
     if sending == 0:
-        with boa.reverts(compiler="external call failed"):
+        with boa.reverts():
             transfer_and_swap(swap, sending, receiving, True)

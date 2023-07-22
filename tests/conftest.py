@@ -169,10 +169,11 @@ def meta_decimals(initial_decimals, metapool_token_type, decimals):
 # @pytest.mark.only_for_token_types(2)
 # class TestPoolsWithOracleToken:
 @pytest.fixture(autouse=True)
-def skip_by_token_type(request, pool_token_types):
+def skip_by_token_type(request, swap):
     only_for_token_types = request.node.get_closest_marker("only_for_token_types")
     if only_for_token_types:
-        if not all(pool_token_type in only_for_token_types.args for pool_token_type in pool_token_types):
+        asset_types = swap._immutables.asset_types
+        if not all(asset_type in only_for_token_types.args for asset_type in asset_types):
             pytest.skip("skipped because no tokens for these types")
 
 

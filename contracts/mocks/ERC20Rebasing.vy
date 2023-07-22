@@ -36,6 +36,9 @@ totalShares: public(uint256)
 shares: public(HashMap[address, uint256])
 IS_UP: immutable(bool)
 
+# asset type
+asset_type: public(constant(uint8)) = 2
+
 
 @external
 def __init__(_name: String[64], _symbol: String[32], _decimals: uint256, is_up: bool):

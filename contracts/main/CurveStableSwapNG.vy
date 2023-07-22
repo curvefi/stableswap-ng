@@ -142,7 +142,7 @@ factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
 fee: public(uint256)  # fee * 1e10
-asset_types: DynArray[uint8, MAX_COINS]
+asset_types: immutable(DynArray[uint8, MAX_COINS])
 
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
@@ -251,7 +251,7 @@ def __init__(
         self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
 
     rate_multipliers = _rate_multipliers
-    self.asset_types = _asset_types
+    asset_types = _asset_types
 
     factory = Factory(msg.sender)
 
@@ -336,7 +336,7 @@ def _transfer_in(
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
-    _incoming_coin_asset_type: uint8 = self.asset_types[coin_idx]
+    _incoming_coin_asset_type: uint8 = asset_types[coin_idx]
 
     # ------------------------- Handle Transfers -----------------------------
 

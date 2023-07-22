@@ -454,10 +454,10 @@ def deploy_plain_pool(
     _A: uint256,
     _fee: uint256,
     _ma_exp_time: uint256,
-    _implementation_idx: uint256 = 0,
-    _asset_types: DynArray[uint8, MAX_COINS] = empty(DynArray[uint8, MAX_COINS]),
-    _method_ids: DynArray[bytes4, MAX_COINS] = empty(DynArray[bytes4, MAX_COINS]),
-    _oracles: DynArray[address, MAX_COINS] = empty(DynArray[address, MAX_COINS]),
+    _implementation_idx: uint256,
+    _asset_types: DynArray[uint8, MAX_COINS],
+    _method_ids: DynArray[bytes4, MAX_COINS],
+    _oracles: DynArray[address, MAX_COINS],
 ) -> address:
     """
     @notice Deploy a new plain pool
@@ -573,10 +573,10 @@ def deploy_metapool(
     _A: uint256,
     _fee: uint256,
     _ma_exp_time: uint256,
-    _implementation_idx: uint256 = 0,
-    _asset_type: uint8 = 0,
-    _method_id: bytes4 = empty(bytes4),
-    _oracle: address = empty(address),
+    _implementation_idx: uint256,
+    _asset_type: uint8,
+    _method_id: bytes4,
+    _oracle: address,
 ) -> address:
     """
     @notice Deploy a new metapool

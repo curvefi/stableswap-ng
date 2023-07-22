@@ -3,7 +3,7 @@ from boa.vyper.contract import VyperContract
 from eth_utils import to_checksum_address
 
 
-def mint_for_testing(user: str, amount, token_contract: VyperContract | None, mint_eth: bool = False) -> None:
+def mint_for_testing(user: str, amount: int, token_contract: VyperContract | None, mint_eth: bool = False) -> None:
     assert token_contract is not None or mint_eth
 
     user = to_checksum_address(user)
