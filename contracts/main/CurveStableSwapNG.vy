@@ -10,9 +10,8 @@
         1, 2 and 3 relative to coin 0.
 @dev Asset Types:
         0. Basic ERC20 token with no additional features
-        1. WETH - can we directly converted to/from ETH
-        2. Oracle - token with rate oracle
-        3. Rebasing - token with rebase (e.g. stETH)
+        1. Oracle - token with rate oracle
+        2. Rebasing - token with rebase (e.g. stETH)
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
@@ -23,20 +22,19 @@
            `exchange_received`.
         2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
            Note: Oracle precision _must_ be 10**18.
-        3. Support for ETH/WETH transfers
-        4. Adds oracles based on AMM State Price (and _not_ last traded price).
-        5. Adds exchanging tokens with callbacks that allows for:
+        3. Adds oracles based on AMM State Price (and _not_ last traded price).
+        4. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        6. Adds feature: `exchange_received`, which is inspired
+        5. Adds feature: `exchange_received`, which is inspired
            by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
-           Note: a. If pool contains rebasing tokens and one of the `asset_types` is 3 (Rebasing)
+           Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
                     then calling `exchange_received` will REVERT.
-                 b. If pool contains rebasing token and `asset_types` does not contain 3 (Rebasing)
+                 b. If pool contains rebasing token and `asset_types` does not contain 2 (Rebasing)
                     then this is an incorrect implementation and rebases can be
                     stolen.
-        7. Adds `get_dx`: Similar to `get_dy` which returns an expected output
+        6. Adds `get_dx`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
 """
@@ -51,10 +49,6 @@ interface Factory:
     def get_fee_receiver() -> address: view
     def admin() -> address: view
     def views_implementation() -> address: view
-
-interface WETH:
-    def deposit(): payable
-    def withdraw(_amount: uint256): nonpayable
 
 interface ERC1271:
     def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
@@ -140,7 +134,6 @@ MAX_COINS_128: constant(int128) = 8
 
 # ---------------------------- Pool Variables --------------------------------
 
-WETH20: immutable(address)
 N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
@@ -166,7 +159,7 @@ future_A_time: public(uint256)
 
 # ---------------------------- Admin Variables -------------------------------
 
-admin_fee: constant(uint256) = 5000000000
+admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
 admin_balances: public(DynArray[uint256, MAX_COINS])
@@ -218,7 +211,6 @@ def __init__(
     _A: uint256,
     _fee: uint256,
     _ma_exp_time: uint256,
-    _weth: address,
     _coins: DynArray[address, MAX_COINS],
     _rate_multipliers: DynArray[uint256, MAX_COINS],
     _asset_types: DynArray[uint8, MAX_COINS],
@@ -248,7 +240,6 @@ def __init__(
     @param _oracles Array of rate oracle addresses.
     """
 
-    WETH20 = _weth
     coins = _coins
     __n_coins: uint256 = len(_coins)
     N_COINS = __n_coins
@@ -277,10 +268,6 @@ def __init__(
 
         if i == N_COINS_128:
             break
-
-        # Enforce native token as coin[0]
-        if _coins[i] == WETH20:
-            assert i == 0, "ETH must be at index 0"
 
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
 
@@ -355,7 +342,7 @@ def _transfer_in(
 
     if expect_optimistic_transfer:
 
-        assert _incoming_coin_asset_type != 3  # dev: rebasing coins not supported
+        assert _incoming_coin_asset_type != 2  # dev: rebasing coins not supported
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
     elif callback_sig != empty(bytes32):
@@ -380,7 +367,7 @@ def _transfer_in(
 
     # --------------------------- Check Transfer -----------------------------
 
-    if _incoming_coin_asset_type == 3:
+    if _incoming_coin_asset_type == 2:
         assert _dx > 0  # dev: pool did not receive tokens for swap  # TODO: Check this!!
     else:
         assert dx == _dx  # dev: pool did not receive tokens for swap

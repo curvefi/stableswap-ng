@@ -128,7 +128,38 @@ class TestFactory:
             assert factory.is_meta(swap.address) is True
 
     class TestFactoryAddPools:
-        def test_add_base_pool(self, factory, owner, add_base_pool, forked_chain):
+        @pytest.fixture
+        def empty_factory(self, deployer, fee_receiver, owner):
+            with boa.env.prank(deployer):
+                _factory = boa.load(
+                    "contracts/main/CurveStableSwapFactoryNG.vy",
+                    fee_receiver,
+                    owner,
+                )
+            return _factory
+
+        @pytest.fixture
+        def empty_factory_with_implementations(
+            self,
+            empty_factory,
+            owner,
+            gauge_implementation,
+            views_implementation,
+            math_implementation,
+            amm_implementation,
+            amm_implementation_meta,
+        ):
+            with boa.env.prank(owner):
+                empty_factory.set_gauge_implementation(gauge_implementation.address)
+                empty_factory.set_views_implementation(views_implementation.address)
+                empty_factory.set_math_implementation(math_implementation.address)
+
+                empty_factory.set_pool_implementations(0, amm_implementation.address)
+                empty_factory.set_metapool_implementations(0, amm_implementation_meta.address)
+
+            return empty_factory
+
+        def test_add_base_pool(self, empty_factory, owner, forked_chain):
             susd_pool = "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD"
             lp_token = "0xC25a3A3b969415c80451098fa907EC722572917F"
             coins = [
@@ -138,10 +169,10 @@ class TestFactory:
                 "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
             ]
 
-            assert factory.base_pool_count() == 1
-            factory.add_base_pool(susd_pool, lp_token, coins, [0] * len(coins), len(coins), sender=owner)
-            assert factory.base_pool_count() == 2
-            assert factory.base_pool_list(1) == susd_pool
+            assert empty_factory.base_pool_count() == 0
+            empty_factory.add_base_pool(susd_pool, lp_token, coins, [0] * len(coins), len(coins), sender=owner)
+            assert empty_factory.base_pool_count() == 1
+            assert empty_factory.base_pool_list(0) == susd_pool
 
         def test_add_base_pool_already_exists(
             self,
@@ -181,9 +212,9 @@ class TestFactory:
                 )
 
         def test_deploy_plain_pool(
-            self, factory, amm_interface, set_pool_implementations, pool_tokens, pool_size, zero_address
+            self, empty_factory_with_implementations, amm_interface, pool_tokens, pool_size, zero_address
         ):
-            swap_address = factory.deploy_plain_pool(
+            swap_address = empty_factory_with_implementations.deploy_plain_pool(
                 "test",
                 "test",
                 [t.address for t in pool_tokens],
@@ -204,13 +235,13 @@ class TestFactory:
             assert swap.A() == 2000
             assert swap.fee() == 1000000
 
-            assert factory.pool_count() == 1
-            assert factory.pool_list(0) == swap.address
-            assert factory.get_decimals(swap) == [t.decimals() for t in pool_tokens]
+            assert empty_factory_with_implementations.pool_count() == 1
+            assert empty_factory_with_implementations.pool_list(0) == swap.address
+            assert empty_factory_with_implementations.get_decimals(swap) == [t.decimals() for t in pool_tokens]
 
         def test_pool_count(
             self,
-            factory,
+            empty_factory_with_implementations,
             swap,
             add_base_pool,
             amm_interface,
@@ -219,9 +250,9 @@ class TestFactory:
             pool_size,
             zero_address,
         ):
-            assert factory.pool_count() == 1
+            assert empty_factory_with_implementations.pool_count() == 0
 
-            _ = factory.deploy_plain_pool(
+            empty_factory_with_implementations.deploy_plain_pool(
                 "test",
                 "test",
                 [t.address for t in pool_tokens],
@@ -233,4 +264,4 @@ class TestFactory:
                 [bytes(b"")] * pool_size,
                 [zero_address] * pool_size,
             )
-            assert factory.pool_count() == 2
+            assert empty_factory_with_implementations.pool_count() == 1
