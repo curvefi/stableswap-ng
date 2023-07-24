@@ -24,6 +24,9 @@ balanceOf: public(HashMap[address, uint256])
 allowances: HashMap[address, HashMap[address, uint256]]
 totalSupply: public(uint256)
 
+# asset type
+asset_type: public(constant(uint8)) = 0
+
 
 @external
 def __init__(_name: String[64], _symbol: String[32], _decimals: uint256):

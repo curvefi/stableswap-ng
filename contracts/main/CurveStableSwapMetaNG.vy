@@ -10,9 +10,8 @@
      nth coin index of the base pool.
      Asset Types:
         0. Basic ERC20 token with no additional features
-        1. WETH - can we directly converted to/from ETH
-        2. Oracle - token with rate oracle
-        3. Rebasing - token with rebase (e.g. stETH)
+        1. Oracle - token with rate oracle
+        2. Rebasing - token with rebase (e.g. stETH)
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
@@ -28,9 +27,9 @@
             b. swaps without transferFrom (no need for token approvals)
         3. Adds feature: `exchange_received`: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
-           Note: a. If pool contains rebasing tokens and one of the `asset_types` is 3 (Rebasing)
+           Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
                     then calling `exchange_received` will REVERT.
-                 b. If pool contains rebasing token and `asset_types` does not contain 3 (Rebasing)
+                 b. If pool contains rebasing token and `asset_types` does not contain 2 (Rebasing)
                     then this is an incorrect implementation and rebases can be
                     stolen.
         4. Adds `get_dx`, `get_dx_underlying`: Similar to `get_dy` which returns an expected output
@@ -202,7 +201,7 @@ future_A_time: public(uint256)
 
 # ---------------------------- Admin Variables -------------------------------
 
-admin_fee: constant(uint256) = 5000000000
+admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
 admin_balances: public(DynArray[uint256, MAX_COINS])
@@ -229,7 +228,7 @@ version: public(constant(String[8])) = "v7.0.0"
 
 balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
-totalSupply: public(uint256)
+total_supply: uint256
 nonces: public(HashMap[address, uint256])
 
 # keccak256("isValidSignature(bytes32,bytes)")[:4] << 224
@@ -350,14 +349,14 @@ def __init__(
 
 @internal
 def _transfer_in(
-    coin_idx: int128,
+    coin_metapool_idx: int128,
+    coin_basepool_idx: int128,
     dx: uint256,
     dy: uint256,
     callbacker: address,
     callback_sig: bytes32,
     sender: address,
     receiver: address,
-    use_eth: bool,
     expect_optimistic_transfer: bool,
 ) -> uint256:
     """
@@ -370,7 +369,6 @@ def _transfer_in(
             dy: uint256
          The `dy` that the pool enforces is actually min_dy.
          Callback only occurs for `exchange_extended`.
-         Callback cannot happen for `_use_eth` = True.
     @dev If callback_sig is empty, `_transfer_in` does a transferFrom.
     @params _coin address of the coin to transfer in.
     @params dx amount of `_coin` to transfer into the pool.
@@ -379,18 +377,26 @@ def _transfer_in(
     @params callback_sig signature of the callback function.
     @params sender address to transfer `_coin` from.
     @params receiver address to transfer `_coin` to.
-    @params use_eth True if the transfer is ETH, False otherwise.
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
-    _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
-    _incoming_coin_asset_type: uint8 = asset_types[coin_idx]
+    _input_coin: ERC20 = ERC20(coins[coin_metapool_idx])
+    _incoming_coin_asset_type: uint8 = asset_types[coin_metapool_idx]
+    _stored_balance: uint256 = self.stored_balances[coin_metapool_idx]
+
+    if coin_basepool_idx >= 0 and coin_metapool_idx == 1:  # self._exchange_underlying
+
+        _input_coin = ERC20(BASE_COINS[coin_basepool_idx])
+        _incoming_coin_asset_type = asset_types[coin_basepool_idx + 2]
+        _stored_balance = 0
+
+    _dx: uint256 = _input_coin.balanceOf(self)
 
     # ------------------------- Handle Transfers -----------------------------
 
     if expect_optimistic_transfer:
 
-        assert _incoming_coin_asset_type != 3  # dev: rebasing coins not supported
-        _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
+        assert _incoming_coin_asset_type != 2  # dev: rebasing coins not supported
+        _dx -= _stored_balance  # <--- for base_pool coins, stored balance is 0.
 
     elif callback_sig != empty(bytes32):
 
@@ -398,37 +404,34 @@ def _transfer_in(
                 callbacker,
                 concat(
                     slice(callback_sig, 0, 4),
-                    _abi_encode(sender, receiver, coins[coin_idx], dx, dy)
+                    _abi_encode(sender, receiver, _input_coin.address, dx, dy)
                 )
             )
 
-        _dx = ERC20(coins[coin_idx]).balanceOf(self) - _dx
+        _dx = _input_coin.balanceOf(self) - _dx
 
     else:
 
-        assert ERC20(coins[coin_idx]).transferFrom(
-            sender, self, dx, default_return_value=True
-        )
-
-        _dx = ERC20(coins[coin_idx]).balanceOf(self) - _dx
+        assert _input_coin.transferFrom(sender, self, dx, default_return_value=True)
+        _dx = _input_coin.balanceOf(self) - _dx
 
     # --------------------------- Check Transfer -----------------------------
 
-    if _incoming_coin_asset_type == 3:
+    if _incoming_coin_asset_type == 2:
         assert _dx > 0  # dev: pool did not receive tokens for swap  # TODO: Check this!!
     else:
         assert dx == _dx  # dev: pool did not receive tokens for swap
 
     # ----------------------- Update Stored Balances -------------------------
 
-    self.stored_balances[coin_idx] += _dx
+    self.stored_balances[coin_metapool_idx] += _dx
 
     return _dx
 
 
 @internal
 def _transfer_out(
-    _coin_idx: int128, _amount: uint256, use_eth: bool, receiver: address
+    _coin_idx: int128, _amount: uint256, receiver: address
 ):
     """
     @notice Transfer a single token from the pool to receiver.
@@ -436,7 +439,6 @@ def _transfer_out(
          `remove_liquidity_one` and `_exchange` methods.
     @params _coin Address of the token to transfer out
     @params _amount Amount of token to transfer out
-    @params use_eth Whether to transfer ETH or not
     @params receiver Address to send the tokens to
     """
 
@@ -516,14 +518,11 @@ def exchange(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender,
 ) -> uint256:
     """
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
-         Allows for native token swaps (e.g. ETH <> whatever)
-         If native token is not in coin list and msg.value > 0, swap will revert
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -536,7 +535,6 @@ def exchange(
         j,
         _dx,
         _min_dy,
-        _use_eth,
         _receiver,
         empty(address),
         empty(bytes32),
@@ -551,7 +549,6 @@ def exchange_extended(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool,
     _sender: address,
     _receiver: address,
     _cb: bytes32
@@ -559,8 +556,8 @@ def exchange_extended(
     """
     @notice Perform an exchange between two coins after a callback
     @dev Index values can be found via the `coins` public getter method
-         Not payable (does not accept eth). Users of this method are dex aggregators,
-         arbitrageurs, or other users who do not wish to grant approvals to the contract.
+         Users of this method are dex aggregators,arbitrageurs, or other
+         users who do not wish to grant approvals to the contract.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -574,7 +571,6 @@ def exchange_extended(
         j,
         _dx,
         _min_dy,
-        _use_eth,
         _receiver,
         msg.sender,  # <---------------------------- callbacker is msg.sender.
         _cb,
@@ -589,7 +585,6 @@ def exchange_received(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool,
     _receiver: address,
 ) -> uint256:
     """
@@ -612,7 +607,6 @@ def exchange_received(
         j,
         _dx,
         _min_dy,
-        _use_eth,
         _receiver,
         empty(address),
         empty(bytes32),
@@ -627,19 +621,14 @@ def exchange_underlying(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender,
 ) -> uint256:
     """
     @notice Perform an exchange between two underlying coins
-    @dev Even if _use_eth is in the abi, the method does not accept native token
     @param i Index value for the underlying coin to send
     @param j Index value of the underlying coin to receive
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
-    @param _use_eth Use native token transfers (if pool has WETH20)
-                    For MetaNG: native token wrapping/unwrapping is disabled; this
-                    parameter can be whatever.
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
@@ -663,18 +652,15 @@ def exchange_underlying_extended(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool,
     _receiver: address,
     _cb: bytes32
 ) -> uint256:
     """
     @notice Perform an exchange between two underlying coins
-    @dev Even if _use_eth is in the abi, the method does not accept native token
     @param i Index value for the underlying coin to send
     @param j Index value of the underlying coin to receive
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
-    @param _use_eth Use native token transfers (if pool has WETH20)
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
@@ -699,17 +685,14 @@ def exchange_underlying_received(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _use_eth: bool,
     _receiver: address,
 ) -> uint256:
     """
     @notice Perform an exchange between two underlying coins
-    @dev Even if _use_eth is in the abi, the method does not accept native token
     @param i Index value for the underlying coin to send
     @param j Index value of the underlying coin to receive
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
-    @param _use_eth Use native token transfers (if pool has WETH20)
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
@@ -731,7 +714,6 @@ def exchange_underlying_received(
 def add_liquidity(
     _amounts: DynArray[uint256, MAX_COINS],
     _min_mint_amount: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender
 ) -> uint256:
     """
@@ -748,7 +730,7 @@ def add_liquidity(
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
 
-    total_supply: uint256 = self.totalSupply
+    total_supply: uint256 = self.total_supply
     new_balances: DynArray[uint256, MAX_COINS] = old_balances
 
     # -------------------------- Do Transfers In -----------------------------
@@ -759,13 +741,13 @@ def add_liquidity(
 
             new_balances[i] += self._transfer_in(
                 i,
+                -1,  # <--- we're not handling underlying coins here
                 _amounts[i],
                 0,
                 empty(address),
                 empty(bytes32),
                 msg.sender,
                 empty(address),
-                _use_eth,
                 False,  # expect_optimistic_transfer
             )
 
@@ -799,7 +781,7 @@ def add_liquidity(
                 difference = new_balance - ideal_balance
 
             # base_fee * difference / FEE_DENOMINATOR
-            fees[i] = unsafe_div(base_fee * difference, FEE_DENOMINATOR)
+            fees.append(unsafe_div(base_fee * difference, FEE_DENOMINATOR))
 
             # fees[i] * admin_fee / FEE_DENOMINATOR
             self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
@@ -819,7 +801,7 @@ def add_liquidity(
     # Mint pool tokens
     total_supply += mint_amount
     self.balanceOf[_receiver] += mint_amount
-    self.totalSupply = total_supply
+    self.total_supply = total_supply
     log Transfer(empty(address), _receiver, mint_amount)
 
     log AddLiquidity(msg.sender, _amounts, fees, D1, total_supply)
@@ -833,7 +815,6 @@ def remove_liquidity_one_coin(
     _burn_amount: uint256,
     i: int128,
     _min_received: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender,
 ) -> uint256:
     """
@@ -857,9 +838,9 @@ def remove_liquidity_one_coin(
 
     log Transfer(msg.sender, empty(address), _burn_amount)
 
-    self._transfer_out(i, dy, _use_eth, _receiver)
+    self._transfer_out(i, dy, _receiver)
 
-    log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, self.totalSupply)
+    log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, self.total_supply)
 
     self.save_p_from_price(p)
 
@@ -871,7 +852,6 @@ def remove_liquidity_one_coin(
 def remove_liquidity_imbalance(
     _amounts: DynArray[uint256, MAX_COINS],
     _max_burn_amount: uint256,
-    _use_eth: bool = False,
     _receiver: address = msg.sender
 ) -> uint256:
     """
@@ -891,7 +871,7 @@ def remove_liquidity_imbalance(
 
         if _amounts[i] != 0:
             new_balances[i] -= _amounts[i]
-            self._transfer_out(i, _amounts[i], _use_eth, _receiver)
+            self._transfer_out(i, _amounts[i], _receiver)
 
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
     fees: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -919,7 +899,7 @@ def remove_liquidity_imbalance(
 
     self.save_p(new_balances, amp, D2)
 
-    total_supply: uint256 = self.totalSupply
+    total_supply: uint256 = self.total_supply
     burn_amount: uint256 = ((D0 - D2) * total_supply / D0) + 1
     assert burn_amount > 1  # dev: zero tokens burned
     assert burn_amount <= _max_burn_amount, "Slippage screwed you"
@@ -936,7 +916,6 @@ def remove_liquidity_imbalance(
 def remove_liquidity(
     _burn_amount: uint256,
     _min_amounts: DynArray[uint256, MAX_COINS],
-    _use_eth: bool = False,
     _receiver: address = msg.sender,
     _claim_admin_fees: bool = True,
 ) -> DynArray[uint256, MAX_COINS]:
@@ -948,7 +927,7 @@ def remove_liquidity(
     @param _receiver Address that receives the withdrawn coins
     @return List of amounts of coins that were withdrawn
     """
-    total_supply: uint256 = self.totalSupply
+    total_supply: uint256 = self.total_supply
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
 
@@ -957,7 +936,7 @@ def remove_liquidity(
         value: uint256 = balances[i] * _burn_amount / total_supply
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
         amounts[i] = value
-        self._transfer_out(i, value, _use_eth, _receiver)
+        self._transfer_out(i, value, _receiver)
 
     self._burnFrom(msg.sender, _burn_amount)  # dev: insufficient funds
 
@@ -1022,7 +1001,6 @@ def _exchange(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    use_eth: bool,
     receiver: address,
     callbacker: address,
     callback_sig: bytes32,
@@ -1041,13 +1019,13 @@ def _exchange(
     # `dx` is whatever the pool received after ERC20 transfer:
     dx: uint256 = self._transfer_in(
         i,
+        -1,  # <----- we're not handling underlying coins here.
         _dx,
         _min_dy,
         callbacker,
         callback_sig,
         sender,
         receiver,
-        use_eth,
         expect_optimistic_transfer
     )
 
@@ -1060,7 +1038,7 @@ def _exchange(
 
     # --------------------------- Do Transfer out ----------------------------
 
-    self._transfer_out(j, dy, use_eth, receiver)
+    self._transfer_out(j, dy, receiver)
 
     # ------------------------------------------------------------------------
 
@@ -1097,6 +1075,8 @@ def _exchange_underlying(
     input_coin: address = empty(address)
     output_coin: address = empty(address)
 
+    # ------------------------ Determine coin indices ------------------------
+
     if i == 0:
         input_coin = coins[0]
     else:
@@ -1112,43 +1092,17 @@ def _exchange_underlying(
 
     # --------------------------- Do Transfer in -----------------------------
 
-    dx_w_fee: uint256 = 0
-
-    # for exchange_underlying, optimistic transfers need to be handled differently
-    if expect_optimistic_transfer:
-
-        if input_coin == BASE_COINS[base_i]:
-
-            assert asset_types[base_i + 2] != 3  # dev: rebasing coins not supported
-
-            # we expect base_coin's balance to be 0. So swap whatever base_coin's
-            # balance the pool has:
-            dx_w_fee = ERC20(input_coin).balanceOf(self)
-
-        else:
-
-            assert asset_types[i] != 3  # dev: rebasing coins not supported
-
-            # Since the coin belongs to the metapool, we need to check if we got more than
-            # what already exists in the pool (since last record):
-            dx_w_fee = ERC20(input_coin).balanceOf(self) - self.stored_balances[meta_i]
-            self.stored_balances[meta_i] += dx_w_fee
-
-        assert dx_w_fee == _dx, "Pool did not receive tokens for swap"
-
-    else:
-
-        dx_w_fee = self._transfer_in(
-            i,
-            _dx,
-            _min_dy,
-            callbacker,
-            callback_sig,
-            sender,
-            receiver,
-            False,  # use_eth = False
-            False,  # expect_optimistic_transfer = False
-        )
+    dx_w_fee: uint256 =  self._transfer_in(
+        meta_i,
+        base_i,
+        _dx,
+        _min_dy,
+        callbacker,
+        callback_sig,
+        sender,
+        receiver,
+        expect_optimistic_transfer,
+    )
 
     # ------------------------------- Exchange -------------------------------
 
@@ -1170,6 +1124,7 @@ def _exchange_underlying(
         dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
         # Adjust stored balances of meta-level tokens:
+        # TODO: refactor this stray self.stored_balances to self._transfer_out somehow
         self.stored_balances[meta_j] -= dy
 
         # Withdraw from the base pool if needed
@@ -1229,7 +1184,7 @@ def _withdraw_admin_fees():
 
         if admin_balances[i] > 0:
 
-            self._transfer_out(i, admin_balances[i], False, fee_receiver)
+            self._transfer_out(i, admin_balances[i], fee_receiver)
             admin_balances[i] = 0
 
     self.admin_balances = admin_balances
@@ -1304,7 +1259,7 @@ def _calc_withdraw_one_coin(
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, self._balances())
     D0: uint256 = math.get_D(xp, amp, N_COINS)
 
-    total_supply: uint256 = self.totalSupply
+    total_supply: uint256 = self.total_supply
     D1: uint256 = D0 - _burn_amount * D0 / total_supply
     new_y: uint256 = math.get_y_D(amp, i, xp, D1, N_COINS)
 
@@ -1479,7 +1434,7 @@ def _transfer(_from: address, _to: address, _value: uint256):
 @internal
 def _burnFrom(_from: address, _burn_amount: uint256):
 
-    self.totalSupply -= _burn_amount
+    self.total_supply -= _burn_amount
     self.balanceOf[_from] -= _burn_amount
     log Transfer(_from, empty(address), _burn_amount)
 
@@ -1649,6 +1604,18 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256:
 @view
 @external
 @nonreentrant('lock')
+def totalSupply() -> uint256:
+    """
+    @notice The total supply of pool LP tokens
+    @dev reentrancy guarded, just in case.
+    @returns self.total_supply, 18 decimals.
+    """
+    return self.total_supply
+
+
+@view
+@external
+@nonreentrant('lock')
 def get_virtual_price() -> uint256:
     """
     @notice The current virtual price of the pool LP token
@@ -1659,7 +1626,7 @@ def get_virtual_price() -> uint256:
     D: uint256 = math.get_D(xp, self._A(), N_COINS)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
-    return D * PRECISION / self.totalSupply
+    return D * PRECISION / self.total_supply
 
 
 @view
@@ -1680,7 +1647,8 @@ def calc_token_amount(
 @view
 @external
 def A() -> uint256:
-    return unsafe_div(self._A(), A_PRECISION)
+    amp: uint256 = self._A()
+    return unsafe_div(amp, A_PRECISION)
 
 
 @view

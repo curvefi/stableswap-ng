@@ -27,6 +27,9 @@ totalSupply: public(uint256)
 
 exchange_rate: public(uint256)
 
+# asset type
+asset_type: public(constant(uint8)) = 1
+
 
 @external
 def __init__(

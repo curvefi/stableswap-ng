@@ -1,6 +1,6 @@
 import pytest
 
-INITIAL_AMOUNT = 1_000_000
+INITIAL_AMOUNT = 3_000_000
 
 
 @pytest.fixture(scope="module")

@@ -44,7 +44,6 @@ interface CurvePool:
         j: int128,
         dx: uint256,
         min_dy: uint256,
-        _use_eth: bool,
         _receiver: address,
     ) -> uint256: nonpayable
 
@@ -72,8 +71,6 @@ event MetaPoolDeployed:
 event LiquidityGaugeDeployed:
     pool: address
     gauge: address
-
-WETH20: public(immutable(address))
 
 MAX_COINS: constant(uint256) = 8
 ADDRESS_PROVIDER: constant(address) = 0x0000000022D53366457F9d5E68Ec105046FC4383
@@ -110,13 +107,10 @@ market_counts: HashMap[uint256, uint256]
 
 
 @external
-def __init__(_fee_receiver: address, _owner: address, _weth: address):
+def __init__(_fee_receiver: address, _owner: address):
 
     self.fee_receiver = _fee_receiver
     self.admin = _owner
-
-    WETH20 = _weth
-
 
 # <--- Factory Getters --->
 
@@ -195,11 +189,14 @@ def get_underlying_coins(_pool: address) -> DynArray[address, MAX_COINS]:
     coins: DynArray[address, MAX_COINS] = empty(DynArray[address, MAX_COINS])
     base_pool: address = self.pool_data[_pool].base_pool
     assert base_pool != empty(address)  # dev: pool is not metapool
-    coins[0] = self.pool_data[_pool].coins[0]
+
+    coins.append(self.pool_data[_pool].coins[0])
+    base_pool_n_coins: uint256 = len(self.base_pool_data[base_pool].coins)
     for i in range(1, MAX_COINS):
-        coins[i] = self.base_pool_data[base_pool].coins[i - 1]
-        if coins[i] == empty(address):
+        if i - 1 == base_pool_n_coins:
             break
+
+        coins.append(self.base_pool_data[base_pool].coins[i - 1])
 
     return coins
 
@@ -440,7 +437,7 @@ def is_meta(_pool: address) -> bool:
 def get_pool_asset_types(_pool: address) -> DynArray[uint8, MAX_COINS]:
     """
     @notice Query the asset type of `_pool`
-    @dev 0 = USD, 1 = ETH, 2 = BTC, 3 = Other
+    @dev 0 = Plain, 1 = Oracle, 2 = Rebasing
     @param _pool Pool Address
     @return Integer indicating the pool asset type
     """
@@ -457,10 +454,10 @@ def deploy_plain_pool(
     _A: uint256,
     _fee: uint256,
     _ma_exp_time: uint256,
-    _implementation_idx: uint256 = 0,
-    _asset_types: DynArray[uint8, MAX_COINS] = empty(DynArray[uint8, MAX_COINS]),
-    _method_ids: DynArray[bytes4, MAX_COINS] = empty(DynArray[bytes4, MAX_COINS]),
-    _oracles: DynArray[address, MAX_COINS] = empty(DynArray[address, MAX_COINS]),
+    _implementation_idx: uint256,
+    _asset_types: DynArray[uint8, MAX_COINS],
+    _method_ids: DynArray[bytes4, MAX_COINS],
+    _oracles: DynArray[address, MAX_COINS],
 ) -> address:
     """
     @notice Deploy a new plain pool
@@ -481,7 +478,7 @@ def deploy_plain_pool(
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
     @param _implementation_idx Index of the implementation to use
     @param _asset_types Asset types for pool, as an integer
-                       0 = PLAIN, 1 = ETH, 2 = ORACLE, 3 = REBASING
+                       0 = Plain, 1 = Oracle, 2 = Rebasing
     @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
@@ -523,7 +520,6 @@ def deploy_plain_pool(
         _A,                                             # _A: uint256
         _fee,                                           # _fee: uint256
         _ma_exp_time,                                   # _ma_exp_time: uint256
-        WETH20,                                         # _weth: address
         _coins,                                         # _coins: DynArray[address, MAX_COINS]
         _rate_multipliers,                              # _rate_multipliers: DynArray[uint256, MAX_COINS]
         _asset_types,                                   # _asset_types: DynArray[uint8, MAX_COINS]
@@ -577,10 +573,10 @@ def deploy_metapool(
     _A: uint256,
     _fee: uint256,
     _ma_exp_time: uint256,
-    _implementation_idx: uint256 = 0,
-    _asset_type: uint8 = 0,
-    _method_id: bytes4 = empty(bytes4),
-    _oracle: address = empty(address),
+    _implementation_idx: uint256,
+    _asset_type: uint8,
+    _method_id: bytes4,
+    _oracle: address,
 ) -> address:
     """
     @notice Deploy a new metapool
@@ -606,7 +602,7 @@ def deploy_metapool(
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
     @param _implementation_idx Index of the implementation to use
     @param _asset_type Asset type for token, as an integer
-                       0 = PLAIN, 1 = ETH, 2 = ORACLE, 3 = REBASING
+                       0 = Plain, 1 = Oracle, 2 = Rebasing
     @param _method_id  First four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
@@ -727,7 +723,7 @@ def add_base_pool(
     @notice Add a base pool to the registry, which may be used in factory metapools
     @dev Only callable by admin
     @param _base_pool Pool address to add
-    @param _asset_types Asset type for pool, as an integer  0 = Plain, 1 = ETH, 2 = Oracle, 3 = Rebasing
+    @param _asset_types Asset type for pool, as an integer  0 = Plain, 1 = Oracle, 2 = Rebasing
     """
     assert msg.sender == self.admin  # dev: admin-only function
     assert len(self.base_pool_data[_base_pool].coins) == 0  # dev: pool exists

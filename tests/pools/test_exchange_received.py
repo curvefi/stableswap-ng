@@ -3,7 +3,10 @@ import itertools
 import boa
 import pytest
 
-SWAP_AMOUNT = 50
+from tests.fixtures.constants import INITIAL_AMOUNT
+from tests.utils.tokens import mint_for_testing
+
+SWAP_AMOUNT = INITIAL_AMOUNT // 1000
 
 
 @pytest.fixture(scope="function")
@@ -14,50 +17,64 @@ def transfer_and_swap(
     underlying_tokens,
     pool_type,
     base_pool,
+    mint_meta_bob,
+    base_pool_lp_token,
+    base_pool_tokens,
+    base_pool_decimals,
 ):
     def _transfer_and_swap(pool, sending: int, receiving: int, underlying: bool):
 
+        # get input and output tokens:
         sending_token = "swap"
         receiving_token = "swap"
 
         if pool_type == 1:
 
-            input_coin = underlying_tokens[sending]
-            output_coin = underlying_tokens[receiving]
+            if underlying:
 
-            # if sending == 0:
-            #     input_coin = underlying_tokens[0]
-            # else:
-            #     base_i = sending - 1
-            #     input_coin = underlying_tokens[2 + base_i]
-            #     sending_token = "base_pool"
-            # if receiving == 0:
-            #     output_coin = underlying_tokens[0]
-            # else:
-            #     base_j = receiving - 1
-            #     output_coin = underlying_tokens[2 + base_j]
-            #     receiving_token = "base_pool"
+                if sending == 0:
+                    input_coin = underlying_tokens[0]
+                else:
+                    base_i = sending - 1
+                    input_coin = underlying_tokens[2 + base_i]
+                    sending_token = "base_pool"
+                if receiving == 0:
+                    output_coin = underlying_tokens[0]
+                else:
+                    base_j = receiving - 1
+                    output_coin = underlying_tokens[2 + base_j]
+                    receiving_token = "base_pool"
+
+            else:
+
+                input_coin = underlying_tokens[sending]
+                output_coin = underlying_tokens[receiving]
 
         else:
 
             input_coin = pool_tokens[sending]
             output_coin = pool_tokens[receiving]
 
+        # calc amount in:
         amount_in = SWAP_AMOUNT * 10 ** (input_coin.decimals())
 
-        bob_sending_balance_before = input_coin.balanceOf(bob)
-        assert bob_sending_balance_before >= amount_in
+        if amount_in > input_coin.balanceOf(bob):
+            mint_for_testing(bob, amount_in, input_coin, False)
 
-        bob_receiving_balance_before = output_coin.balanceOf(bob)
+        # record balances before
+        bob_sending_balance_before = input_coin.balanceOf(bob)  # always INITIAL_AMOUNT
+        bob_receiving_balance_before = output_coin.balanceOf(bob)  # always INITIAL_AMOUNT
         pool_sending_balance_before = input_coin.balanceOf(pool.address)
         pool_receiving_balance_before = output_coin.balanceOf(pool.address)
         base_pool_sending_balance_before = input_coin.balanceOf(base_pool.address)
         base_pool_receiving_balance_before = output_coin.balanceOf(base_pool.address)
 
+        # swap
         with boa.env.prank(bob):
-            amount_out = callback_contract.transfer_and_swap(sending, receiving, amount_in, 0, underlying)
+            amount_out = callback_contract.transfer_and_swap(sending, receiving, input_coin, amount_in, 0, underlying)
             assert amount_out > 0
 
+        # record balances after
         bob_sending_balance_after = input_coin.balanceOf(bob)
         bob_receiving_balance_after = output_coin.balanceOf(bob)
         pool_sending_balance_after = input_coin.balanceOf(pool.address)
@@ -88,7 +105,7 @@ def transfer_and_swap(
 
 
 # TODO: need to permutate/combinate N_COIN combos.
-@pytest.mark.only_for_token_types(0, 1, 2)
+@pytest.mark.only_for_token_types(0, 1)
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_nonrebasing(
     bob,
@@ -112,32 +129,28 @@ def test_exchange_received_nonrebasing(
     assert swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1] == swap_data["amount_out"]
 
 
-@pytest.mark.only_for_token_types(0, 1, 2)
+@pytest.mark.only_for_token_types(0, 1)
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_not_received(
-    bob, swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity
+    bob, swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
 ):
 
-    add_initial_liquidity()
-
-    with boa.env.prank(bob), boa.reverts("Pool did not receive tokens for swap"):
-        swap.exchange_received(sending, receiving, 1, 0, False, bob)
+    with boa.env.prank(bob), boa.reverts():
+        swap.exchange_received(sending, receiving, 1, 0, bob)
 
 
-@pytest.mark.only_for_token_types(3)
+@pytest.mark.only_for_token_types(2)
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_rebasing_reverts(
-    bob, swap, transfer_and_swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity
+    bob, swap, transfer_and_swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
 ):
 
-    add_initial_liquidity()
-
-    with boa.reverts(compiler="external call failed"):
+    with boa.reverts():
         transfer_and_swap(swap, sending, receiving, False)
 
 
 @pytest.mark.only_for_pool_type(1)  # only for metapools
-@pytest.mark.only_for_token_types(0, 1, 2)
+@pytest.mark.only_for_token_types(0, 1)
 @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
 def test_exchange_underlying_received_nonrebasing(
     bob,
@@ -148,10 +161,8 @@ def test_exchange_underlying_received_nonrebasing(
     approve_bob,
     sending,
     receiving,
-    add_initial_liquidity,
+    add_initial_liquidity_owner,
 ):
-
-    add_initial_liquidity()
 
     swap_data = transfer_and_swap(swap, sending, receiving, True)
 
@@ -176,22 +187,23 @@ def test_exchange_underlying_received_nonrebasing(
 
 
 @pytest.mark.only_for_pool_type(1)  # only for metapools
-@pytest.mark.only_for_token_types(0, 1, 2)
+@pytest.mark.only_for_token_types(0, 1)
 @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
-def test_exchange_underlying_not_received(bob, swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity):
-    add_initial_liquidity()
+def test_exchange_underlying_not_received(
+    bob, swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
+):
+
     with boa.env.prank(bob), boa.reverts():
-        swap.exchange_underlying_received(sending, receiving, 1, 0, False, bob)
+        swap.exchange_underlying_received(sending, receiving, 1, 0, bob)
 
 
 @pytest.mark.only_for_pool_type(1)  # only for metapools
-@pytest.mark.only_for_token_types(3)
+@pytest.mark.only_for_token_types(2)
 @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
 def test_exchange_underlying_received_rebasing_reverts(
-    swap, transfer_and_swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity
+    swap, transfer_and_swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
 ):
-    add_initial_liquidity()  # <---- factory fixture that only adds liquidity when called
 
     if sending == 0:
-        with boa.reverts(compiler="external call failed"):
+        with boa.reverts():
             transfer_and_swap(swap, sending, receiving, True)

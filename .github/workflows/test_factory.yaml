@@ -41,4 +41,4 @@ jobs:
       - name: Run Tests Basic
         run: |
           source .venv/bin/activate
-          pytest tests/test_factory.py -n auto
+          pytest tests/test_factory.py --token-types=plain -n auto

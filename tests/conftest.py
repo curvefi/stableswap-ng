@@ -14,7 +14,7 @@ pytest_plugins = [
 ]
 
 pool_types = {"basic": 0, "meta": 1}
-token_types = {"plain": 0, "eth": 1, "oracle": 2, "rebasing": 3}
+token_types = {"plain": 0, "oracle": 1, "rebasing": 2}
 return_types = {"revert": 0, "False": 1, "None": 2}
 
 
@@ -34,7 +34,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--token-types",
         action="store",
-        default="plain,eth,oracle,rebasing",
+        default="plain,oracle,rebasing",
         help="comma-separated list of ERC20 token types to test against",
     )
     parser.addoption(
@@ -53,9 +53,6 @@ def pytest_addoption(parser):
 
 def pytest_generate_tests(metafunc):
     pool_size = int(metafunc.config.getoption("pool_size"))
-
-    # TODO: remove after adding implementations
-    # assert pool_size == 2, "Only 2-coin pools supported"
 
     if "pool_size" in metafunc.fixturenames:
         metafunc.parametrize(
@@ -80,12 +77,7 @@ def pytest_generate_tests(metafunc):
             cli_options.remove("eth")
             cli_options = ["eth"] + cli_options
 
-        combinations = list(itertools.combinations(cli_options, pool_size))
-        if pool_size == 2:
-            # do not include (eth,eth) pair
-            for t in cli_options:
-                if t != "eth":
-                    combinations.append((t, t))
+        combinations = list(itertools.combinations_with_replacement(cli_options, pool_size))
 
         metafunc.parametrize(
             "pool_token_types",
@@ -102,7 +94,7 @@ def pytest_generate_tests(metafunc):
             "metapool_token_type",
             [token_types[c] for c in cli_options],
             indirect=True,
-            ids=[f"(PoolTokenTypes={c})" for c in cli_options],
+            ids=[f"(MetaTokenType={c})" for c in cli_options],
         )
 
     if "initial_decimals" in metafunc.fixturenames:
@@ -158,14 +150,14 @@ def initial_decimals(request):
 
 @pytest.fixture(scope="session")
 def decimals(initial_decimals, pool_token_types):
-    # eth and oracle tokens are always 18 decimals
-    return [d if t in [0, 3] else 18 for d, t in zip(initial_decimals, pool_token_types)]
+    # oracle tokens are always 18 decimals
+    return [d if t != 1 else 18 for d, t in zip(initial_decimals, pool_token_types)]
 
 
 @pytest.fixture(scope="session")
 def meta_decimals(initial_decimals, metapool_token_type, decimals):
-    # eth and oracle tokens are always 18 decimals
-    return decimals[0] if metapool_token_type in [0, 3] else 18
+    # oracle tokens are always 18 decimals
+    return decimals[0] if metapool_token_type != 1 else 18
 
 
 # Usage
@@ -177,10 +169,11 @@ def meta_decimals(initial_decimals, metapool_token_type, decimals):
 # @pytest.mark.only_for_token_types(2)
 # class TestPoolsWithOracleToken:
 @pytest.fixture(autouse=True)
-def skip_by_token_type(request, pool_token_types):
+def skip_by_token_type(request, swap):
     only_for_token_types = request.node.get_closest_marker("only_for_token_types")
     if only_for_token_types:
-        if not all(pool_token_type in only_for_token_types.args for pool_token_type in pool_token_types):
+        asset_types = swap._immutables.asset_types
+        if not all(asset_type in only_for_token_types.args for asset_type in asset_types):
             pytest.skip("skipped because no tokens for these types")
 
 
