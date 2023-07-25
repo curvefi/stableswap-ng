@@ -19,6 +19,7 @@ interface StableSwapNG:
     def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256: view
     def totalSupply() -> uint256: view
     def calc_token_amount(amounts: DynArray[uint256, MAX_COINS], deposit: bool) -> uint256: view
+    def offpeg_fee_multiplier() -> uint256: view
 
 interface StableSwap2:
     def calc_token_amount(amounts: uint256[2], deposit: bool) -> uint256: view
@@ -57,6 +58,7 @@ def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256:
     amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
     D: uint256 = self.get_D(xp, amp, N_COINS)
 
+    # TODO: Add Dynamic fee
     y: uint256 = xp[j] - (dy * rates[j] / PRECISION + 1) * FEE_DENOMINATOR / (FEE_DENOMINATOR - StableSwapNG(pool).fee())
     x: uint256 = self.get_y(j, i, y, xp, amp, D, N_COINS)
     return (x - xp[i]) * PRECISION / rates[i]
@@ -86,7 +88,11 @@ def get_dy(i: int128, j: int128, dx: uint256, pool: address) -> uint256:
     x: uint256 = xp[i] + (dx * rates[i] / PRECISION)
     y: uint256 = self.get_y(i, j, x, xp, amp, D, N_COINS)
     dy: uint256 = xp[j] - y - 1
-    fee: uint256 = StableSwapNG(pool).fee() * dy / FEE_DENOMINATOR
+
+    base_fee: uint256 = StableSwapNG(pool).fee()
+    fee_multiplier: uint256 = StableSwapNG(pool).offpeg_fee_multiplier()
+    fee: uint256 = self._dynamic_fee((xp[i] + x) / 2, (xp[j] + y) / 2, base_fee, fee_multiplier) * dy / FEE_DENOMINATOR
+
     return (dy - fee) * PRECISION / rates[j]
 
 
@@ -99,6 +105,7 @@ def get_dx_underlying(
     pool: address,
 ) -> uint256:
     # TODO: Add get_dx_underlying
+    # TODO: Add dynamic fee
     return 0
 
 
@@ -163,7 +170,12 @@ def get_dy_underlying(
     D: uint256 = self.get_D(xp, amp, N_COINS)
     y: uint256 = self.get_y(meta_i, meta_j, x, xp, amp, D, N_COINS)
     dy: uint256 = xp[meta_j] - y - 1
-    dy = (dy - StableSwapNG(pool).fee() * dy / FEE_DENOMINATOR)
+
+    # calculate output after subtracting dynamic fee
+    base_fee: uint256 = StableSwapNG(pool).fee()
+    fee_multiplier: uint256 = StableSwapNG(pool).offpeg_fee_multiplier()
+    dynamic_fee: uint256 = self._dynamic_fee((xp[i] + x) / 2, (xp[j] + y) / 2, base_fee, fee_multiplier)
+    dy = (dy - dynamic_fee * dy / FEE_DENOMINATOR)
 
     # If output is going via the metapool
     if j == 0:
@@ -226,6 +238,11 @@ def calc_token_amount(
 
         # Only account for fees if we are not the first to deposit
         base_fee: uint256 = StableSwapNG(pool).fee() * N_COINS / (4 * (N_COINS - 1))
+        fee_multiplier: uint256 = StableSwapNG(pool).offpeg_fee_multiplier()
+        _dynamic_fee_i: uint256 = 0
+        xs: uint256 = 0
+        ys: uint256 = (D0 + D1) / N_COINS
+
         for i in range(MAX_COINS):
             if i == N_COINS:
                 break
@@ -237,6 +254,9 @@ def calc_token_amount(
                 difference = ideal_balance - new_balance
             else:
                 difference = new_balance - ideal_balance
+
+            xs = old_balances[i] + new_balance
+            _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee, fee_multiplier)
             new_balances[i] -= base_fee * difference / FEE_DENOMINATOR
 
         for idx in range(MAX_COINS):
@@ -276,9 +296,14 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128, pool: address) -> u
     total_supply: uint256 = StableSwapNG(pool).totalSupply()
     D1: uint256 = D0 - _burn_amount * D0 / total_supply
     new_y: uint256 = self.get_y_D(amp, i, xp, D1, N_COINS)
+    ys: uint256 = (D0 + D1) / (2 * N_COINS)
 
     base_fee: uint256 = StableSwapNG(pool).fee() * N_COINS / (4 * (N_COINS - 1))
-    xp_reduced: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    fee_multiplier: uint256 = StableSwapNG(pool).offpeg_fee_multiplier()
+    xp_reduced: DynArray[uint256, MAX_COINS] = xp
+    xp_j: uint256 = 0
+    xavg: uint256 = 0
+    dynamic_fee: uint256 = 0
 
     for j in range(MAX_COINS):
 
@@ -286,12 +311,16 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128, pool: address) -> u
             break
 
         dx_expected: uint256 = 0
-        xp_j: uint256 = xp[j]
+        xp_j = xp[j]
         if convert(j, int128) == i:
             dx_expected = xp_j * D1 / D0 - new_y
+            xavg = (xp[j] + new_y) / 2
         else:
             dx_expected = xp_j - xp_j * D1 / D0
-        xp_reduced[j] = xp_j - base_fee * dx_expected / FEE_DENOMINATOR
+            xavg = xp[j]
+
+        dynamic_fee = self._dynamic_fee(xavg, ys, base_fee, fee_multiplier)
+        xp_reduced[j] = xp_j - dynamic_fee * dx_expected / FEE_DENOMINATOR
 
     dy: uint256 = xp_reduced[i] - self.get_y_D(amp, i, xp_reduced, D1, N_COINS)
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
@@ -300,7 +329,42 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128, pool: address) -> u
     return dy
 
 
+@view
+@external
+def dynamic_fee(i: int128, j: int128, pool:address) -> uint256:
+    """
+    @notice Return the fee for swapping between `i` and `j`
+    @param i Index value for the coin to send
+    @param j Index value of the coin to recieve
+    @return Swap fee expressed as an integer with 1e10 precision
+    """
+    N_COINS: uint256 = StableSwapNG(pool).N_COINS()
+    fee: uint256 = StableSwapNG(pool).fee()
+    fee_multiplier: uint256 = StableSwapNG(pool).offpeg_fee_multiplier()
+
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    balances: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    rates, balances, xp = self._get_rates_balances_xp(pool, N_COINS)
+
+    return self._dynamic_fee(xp[i], xp[j], fee, fee_multiplier)
+
+
 # ----------------------------- Utility Methods ------------------------------
+
+
+@view
+@internal
+def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256, _fee_multiplier: uint256) -> uint256:
+
+    if _fee_multiplier <= FEE_DENOMINATOR:
+        return _fee
+
+    xps2: uint256 = (xpi + xpj) ** 2
+    return (
+        (_fee_multiplier * _fee) /
+        ((_fee_multiplier - FEE_DENOMINATOR) * 4 * xpi * xpj / xps2 + FEE_DENOMINATOR)
+    )
 
 
 @internal
