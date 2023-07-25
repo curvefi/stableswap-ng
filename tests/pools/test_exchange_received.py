@@ -7,6 +7,7 @@ from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils.tokens import mint_for_testing
 
 SWAP_AMOUNT = INITIAL_AMOUNT // 1000
+pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
 @pytest.fixture(scope="function")
@@ -17,7 +18,6 @@ def transfer_and_swap(
     underlying_tokens,
     pool_type,
     base_pool,
-    mint_meta_bob,
     base_pool_lp_token,
     base_pool_tokens,
     base_pool_decimals,
@@ -111,13 +111,8 @@ def test_exchange_received_nonrebasing(
     bob,
     swap,
     pool_tokens,
-    mint_bob,
-    mint_meta_bob,
-    approve_bob,
-    approve_meta_bob,
     sending,
     receiving,
-    add_initial_liquidity_owner,
     transfer_and_swap,
 ):
     swap_data = transfer_and_swap(swap, sending, receiving, False)
@@ -131,20 +126,14 @@ def test_exchange_received_nonrebasing(
 
 @pytest.mark.only_for_token_types(0, 1)
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_exchange_not_received(
-    bob, swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
-):
-
+def test_exchange_not_received(bob, swap, pool_tokens, sending, receiving):
     with boa.env.prank(bob), boa.reverts():
         swap.exchange_received(sending, receiving, 1, 0, bob)
 
 
 @pytest.mark.only_for_token_types(2)
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_exchange_received_rebasing_reverts(
-    bob, swap, transfer_and_swap, pool_tokens, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
-):
-
+def test_exchange_received_rebasing_reverts(bob, swap, transfer_and_swap, pool_tokens, sending, receiving):
     with boa.reverts():
         transfer_and_swap(swap, sending, receiving, False)
 
@@ -157,13 +146,9 @@ def test_exchange_underlying_received_nonrebasing(
     swap,
     transfer_and_swap,
     underlying_tokens,
-    mint_bob,
-    approve_bob,
     sending,
     receiving,
-    add_initial_liquidity_owner,
 ):
-
     swap_data = transfer_and_swap(swap, sending, receiving, True)
 
     assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
@@ -189,10 +174,7 @@ def test_exchange_underlying_received_nonrebasing(
 @pytest.mark.only_for_pool_type(1)  # only for metapools
 @pytest.mark.only_for_token_types(0, 1)
 @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
-def test_exchange_underlying_not_received(
-    bob, swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
-):
-
+def test_exchange_underlying_not_received(bob, swap, sending, receiving):
     with boa.env.prank(bob), boa.reverts():
         swap.exchange_underlying_received(sending, receiving, 1, 0, bob)
 
@@ -200,10 +182,7 @@ def test_exchange_underlying_not_received(
 @pytest.mark.only_for_pool_type(1)  # only for metapools
 @pytest.mark.only_for_token_types(2)
 @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
-def test_exchange_underlying_received_rebasing_reverts(
-    swap, transfer_and_swap, mint_bob, approve_bob, sending, receiving, add_initial_liquidity_owner
-):
-
+def test_exchange_underlying_received_rebasing_reverts(swap, transfer_and_swap, sending, receiving):
     if sending == 0:
         with boa.reverts():
             transfer_and_swap(swap, sending, receiving, True)
