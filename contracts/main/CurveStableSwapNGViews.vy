@@ -57,6 +57,7 @@ def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256:
     amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
     D: uint256 = self.get_D(xp, amp, N_COINS)
 
+    # TODO: Add Dynamic fee
     y: uint256 = xp[j] - (dy * rates[j] / PRECISION + 1) * FEE_DENOMINATOR / (FEE_DENOMINATOR - StableSwapNG(pool).fee())
     x: uint256 = self.get_y(j, i, y, xp, amp, D, N_COINS)
     return (x - xp[i]) * PRECISION / rates[i]
@@ -86,7 +87,10 @@ def get_dy(i: int128, j: int128, dx: uint256, pool: address) -> uint256:
     x: uint256 = xp[i] + (dx * rates[i] / PRECISION)
     y: uint256 = self.get_y(i, j, x, xp, amp, D, N_COINS)
     dy: uint256 = xp[j] - y - 1
+
+    # TODO: Add Dynamic fee!
     fee: uint256 = StableSwapNG(pool).fee() * dy / FEE_DENOMINATOR
+
     return (dy - fee) * PRECISION / rates[j]
 
 
@@ -163,6 +167,8 @@ def get_dy_underlying(
     D: uint256 = self.get_D(xp, amp, N_COINS)
     y: uint256 = self.get_y(meta_i, meta_j, x, xp, amp, D, N_COINS)
     dy: uint256 = xp[meta_j] - y - 1
+
+    # TODO: Change static fee for dynamic fee
     dy = (dy - StableSwapNG(pool).fee() * dy / FEE_DENOMINATOR)
 
     # If output is going via the metapool
