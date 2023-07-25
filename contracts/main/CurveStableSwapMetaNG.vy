@@ -783,6 +783,7 @@ def add_liquidity(
 
         # Only account for fees if we are not the first to deposit
         base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
+
         for i in range(N_COINS_128):
 
             ideal_balance = D1 * old_balances[i] / D0

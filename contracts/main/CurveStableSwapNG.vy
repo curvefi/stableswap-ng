@@ -56,6 +56,7 @@ interface ERC1271:
 interface StableSwapViews:
     def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
     def get_dy(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def dynamic_fee(i: int128, j: int128, pool: address) -> uint256: view
     def calc_token_amount(
         _amounts: DynArray[uint256, MAX_COINS],
         _is_deposit: bool,
@@ -127,6 +128,7 @@ event StopRampA:
 
 event ApplyNewFee:
     fee: uint256
+    offpeg_fee_multiplier: uint256
 
 
 MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
@@ -141,10 +143,14 @@ PRECISION: constant(uint256) = 10 ** 18
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
-fee: public(uint256)  # fee * 1e10
 asset_types: immutable(DynArray[uint8, MAX_COINS])
 
+# Fee specific vars
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
+fee: public(uint256)  # fee * 1e10
+offpeg_fee_multiplier: public(uint256)  # * 1e10
+admin_fee: public(constant(uint256)) = 5000000000
+MAX_FEE: constant(uint256) = 5 * 10 ** 9
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -159,8 +165,6 @@ future_A_time: public(uint256)
 
 # ---------------------------- Admin Variables -------------------------------
 
-admin_fee: public(constant(uint256)) = 5000000000
-MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_RAMP_TIME: constant(uint256) = 86400
 admin_balances: public(DynArray[uint256, MAX_COINS])
 
@@ -210,6 +214,7 @@ def __init__(
     _symbol: String[10],
     _A: uint256,
     _fee: uint256,
+    _offpeg_fee_multiplier: uint256,
     _ma_exp_time: uint256,
     _coins: DynArray[address, MAX_COINS],
     _rate_multipliers: DynArray[uint256, MAX_COINS],
@@ -626,22 +631,35 @@ def add_liquidity(
 
     if total_supply > 0:
 
+        ideal_balance: uint256 = 0
+        difference: uint256 = 0
+        new_balance: uint256 = 0
+
+        ys: uint256 = (D0 + D1) / N_COINS
+        xs: uint256 = 0
+        _dynamic_fee_i: uint256 = 0
+
         # Only account for fees if we are not the first to deposit
         base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
+
         for i in range(MAX_COINS_128):
 
             if i == N_COINS_128:
                 break
 
-            ideal_balance: uint256 = D1 * old_balances[i] / D0
-            difference: uint256 = 0
-            new_balance: uint256 = new_balances[i]
+            ideal_balance = D1 * old_balances[i] / D0
+            difference = 0
+            new_balance = new_balances[i]
+
             if ideal_balance > new_balance:
                 difference = ideal_balance - new_balance
             else:
                 difference = new_balance - ideal_balance
 
-            fees.append(base_fee * difference / FEE_DENOMINATOR)
+            # fee[i] = _dynamic_fee(i, j) * difference / FEE_DENOMINATOR
+            xs = old_balances[i] + new_balance
+            _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee)
+            fees.append(_dynamic_fee_i * difference / FEE_DENOMINATOR)
             self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
             new_balances[i] -= fees[i]
 
@@ -732,22 +750,32 @@ def remove_liquidity_imbalance(
             self._transfer_out(i, _amounts[i], _receiver)
 
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
-    fees: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
+    ys: uint256 = (D0 + D1) / N_COINS
+
+    fees: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    dynamic_fee: uint256 = 0
+    xs: uint256 = 0
+    ideal_balance: uint256 = 0
+    difference: uint256 = 0
+    new_balance: uint256 = 0
 
     for i in range(MAX_COINS_128):
 
         if i == N_COINS_128:
             break
 
-        ideal_balance: uint256 = D1 * old_balances[i] / D0
-        difference: uint256 = 0
-        new_balance: uint256 = new_balances[i]
+        ideal_balance = D1 * old_balances[i] / D0
+        difference = 0
+        new_balance = new_balances[i]
+
         if ideal_balance > new_balance:
             difference = ideal_balance - new_balance
         else:
             difference = new_balance - ideal_balance
 
+        xs = new_balance + old_balances[i]
+        dynamic_fee = self._dynamic_fee(xs, ys, base_fee)
         fees[i] = base_fee * difference / FEE_DENOMINATOR
         self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
         new_balances[i] -= fees[i]
@@ -822,6 +850,21 @@ def withdraw_admin_fees():
 # ------------------------ AMM Internal Functions ----------------------------
 
 
+@view
+@internal
+def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256) -> uint256:
+
+    _offpeg_fee_multiplier: uint256 = self.offpeg_fee_multiplier
+    if _offpeg_fee_multiplier <= FEE_DENOMINATOR:
+        return _fee
+
+    xps2: uint256 = (xpi + xpj) ** 2
+    return (
+        (_offpeg_fee_multiplier * _fee) /
+        ((_offpeg_fee_multiplier - FEE_DENOMINATOR) * 4 * xpi * xpj / xps2 + FEE_DENOMINATOR)
+    )
+
+
 @internal
 def __exchange(
     dx: uint256,
@@ -837,7 +880,7 @@ def __exchange(
     y: uint256 = self.get_y(i, j, x, _xp, amp, D)
 
     dy: uint256 = _xp[j] - y - 1  # -1 just in case there were some rounding errors
-    dy_fee: uint256 = dy * self.fee / FEE_DENOMINATOR
+    dy_fee: uint256 = dy * self._dynamic_fee((_xp[i] + x) / 2, (_xp[j] + y) / 2, self.fee) / FEE_DENOMINATOR
 
     # Convert all to real units
     dy = (dy - dy_fee) * PRECISION / rates[j]
@@ -1184,20 +1227,31 @@ def _calc_withdraw_one_coin(
     new_y: uint256 = self.get_y_D(amp, i, xp, D1)
 
     base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-    xp_reduced: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    ys: uint256 = (D0 + D1) / (2 * N_COINS)
+    xp_reduced: DynArray[uint256, MAX_COINS] = xp
+
+    dx_expected: uint256 = 0
+    xp_j: uint256 = 0
+    xavg: uint256 = 0
+    dynamic_fee: uint256 = 0
 
     for j in range(MAX_COINS_128):
 
         if j == N_COINS_128:
             break
 
-        dx_expected: uint256 = 0
-        xp_j: uint256 = xp[j]
+        dx_expected = 0
+        xp_j = xp[j]
+
         if j == i:
             dx_expected = xp_j * D1 / D0 - new_y
+            xavg = (xp[j] + new_y) / 2
         else:
             dx_expected = xp_j - xp_j * D1 / D0
-        xp_reduced[j] = xp_j - base_fee * dx_expected / FEE_DENOMINATOR
+            xavg = xp[j]
+
+        dynamic_fee = self._dynamic_fee(xavg, ys, base_fee)
+        xp_reduced[j] = xp_j - dynamic_fee * dx_expected / FEE_DENOMINATOR
 
     dy: uint256 = xp_reduced[i] - self.get_y_D(amp, i, xp_reduced, D1)
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
@@ -1690,6 +1744,18 @@ def stored_rates(i: uint256) -> uint256:
     return self._stored_rates()[i]
 
 
+@view
+@external
+def dynamic_fee(i: int128, j: int128) -> uint256:
+    """
+    @notice Return the fee for swapping between `i` and `j`
+    @param i Index value for the coin to send
+    @param j Index value of the coin to recieve
+    @return Swap fee expressed as an integer with 1e10 precision
+    """
+    return StableSwapViews(factory.views_implementation()).dynamic_fee(i, j, self)
+
+
 # --------------------------- AMM Admin Functions ----------------------------
 
 
@@ -1731,13 +1797,19 @@ def stop_ramp_A():
 
 
 @external
-def apply_new_fee(_new_fee: uint256):
+def apply_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
 
     assert msg.sender == factory.admin()
+
+    # apply new fee:
     assert _new_fee <= MAX_FEE
     self.fee = _new_fee
 
-    log ApplyNewFee(_new_fee)
+    # apply new offpeg_fee_multiplier:
+    assert _new_offpeg_fee_multiplier * _new_fee <= MAX_FEE * FEE_DENOMINATOR  # dev: offpeg multiplier exceeds maximum
+    self.offpeg_fee_multiplier = _new_offpeg_fee_multiplier
+
+    log ApplyNewFee(_new_fee, _new_offpeg_fee_multiplier)
 
 
 @external
