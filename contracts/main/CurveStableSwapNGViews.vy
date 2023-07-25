@@ -19,6 +19,7 @@ interface StableSwapNG:
     def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256: view
     def totalSupply() -> uint256: view
     def calc_token_amount(amounts: DynArray[uint256, MAX_COINS], deposit: bool) -> uint256: view
+    def offpeg_fee_multiplier() -> uint256: view
 
 interface StableSwap2:
     def calc_token_amount(amounts: uint256[2], deposit: bool) -> uint256: view
@@ -306,7 +307,42 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128, pool: address) -> u
     return dy
 
 
+@view
+@external
+def dynamic_fee(i: int128, j: int128, pool:address) -> uint256:
+    """
+    @notice Return the fee for swapping between `i` and `j`
+    @param i Index value for the coin to send
+    @param j Index value of the coin to recieve
+    @return Swap fee expressed as an integer with 1e10 precision
+    """
+    N_COINS: uint256 = StableSwapNG(pool).N_COINS()
+    fee: uint256 = StableSwapNG(pool).fee()
+    fee_multiplier: uint256 = StableSwapNG(pool).offpeg_fee_multiplier()
+
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    balances: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    rates, balances, xp = self._get_rates_balances_xp(pool, N_COINS)
+
+    return self._dynamic_fee(xp[i], xp[j], fee, fee_multiplier)
+
+
 # ----------------------------- Utility Methods ------------------------------
+
+
+@view
+@internal
+def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256, _fee_multiplier: uint256) -> uint256:
+
+    if _fee_multiplier <= FEE_DENOMINATOR:
+        return _fee
+
+    xps2: uint256 = (xpi + xpj) ** 2
+    return (
+        (_fee_multiplier * _fee) /
+        ((_fee_multiplier - FEE_DENOMINATOR) * 4 * xpi * xpj / xps2 + FEE_DENOMINATOR)
+    )
 
 
 @internal

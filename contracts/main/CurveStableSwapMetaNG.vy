@@ -56,6 +56,7 @@ interface StableSwapViews:
     def get_dy(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
     def get_dx_underlying(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
     def get_dy_underlying(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def dynamic_fee(i: int128, j: int128, pool: address) -> uint256: view
     def calc_token_amount(
         _amounts: DynArray[uint256, MAX_COINS],
         _is_deposit: bool,
@@ -1747,11 +1748,7 @@ def dynamic_fee(i: int128, j: int128) -> uint256:
     @param j Index value of the coin to recieve
     @return Swap fee expressed as an integer with 1e10 precision
     """
-    balances: DynArray[uint256, MAX_COINS] = self._balances()
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
-    xp: DynArray[uint256, MAX_COINS] = self._xp_mem(balances, rates)
-
-    return self._dynamic_fee(xp[i], xp[j], self.fee)  # TODO: Check if xp is correct here
+    return StableSwapViews(factory.views_implementation()).dynamic_fee(i, j, self)
 
 
 # --------------------------- AMM Admin Functions ----------------------------
