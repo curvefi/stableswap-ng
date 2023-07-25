@@ -2,6 +2,10 @@
 
 Permissionless deployment of Curve metapools.
 
+# Wen?
+
+![STOP THE WEN!](./you_shall_not_wen.jpeg)
+
 ## Overview
 
 The metapool factory has several core components:
