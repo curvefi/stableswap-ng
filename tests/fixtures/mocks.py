@@ -2,7 +2,7 @@ import boa
 import pytest
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def callback_contract(bob, swap, pool_tokens, underlying_tokens):
 
     with boa.env.prank(bob):

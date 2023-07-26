@@ -1,3 +1,5 @@
+import math
+
 import boa
 import pytest
 from boa.environment import AddressType
@@ -33,32 +35,32 @@ def alice():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def bob():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def charlie():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def dave():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def erin():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def frank():
     return boa.env.generate_address()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def accounts(bob, charlie, dave, erin, frank):
     return [bob, charlie, dave, erin, frank]
 
@@ -76,32 +78,32 @@ def approve_account(account, pool_tokens, swap):
             pool_token.approve(swap.address, 2**256 - 1)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def mint_owner(owner, pool_tokens, initial_balance, initial_amounts):
     mint_account(owner, pool_tokens, initial_balance, initial_amounts)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def approve_owner(owner, pool_tokens, swap):
     approve_account(owner, pool_tokens, swap)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def mint_alice(alice, pool_tokens, initial_balance, initial_amounts):
     mint_account(alice, pool_tokens, initial_balance, initial_amounts)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def approve_alice(alice, pool_tokens, swap):
     approve_account(alice, pool_tokens, swap)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def mint_bob(bob, pool_tokens, initial_balance, initial_amounts):
     mint_account(bob, pool_tokens, initial_balance, initial_amounts)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def approve_bob(bob, pool_tokens, swap):
     approve_account(bob, pool_tokens, swap)
 
@@ -118,7 +120,7 @@ def add_base_pool_liquidity(user, base_pool, base_pool_tokens, base_pool_decimal
         base_pool.add_liquidity(amounts, 0)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def add_initial_liquidity_owner(
     owner,
     approve_owner,
@@ -148,7 +150,7 @@ def add_initial_liquidity_owner(
             swap.add_liquidity([to_mint_token0, lp_token_bal], 0)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def add_initial_liquidity_alice(
     alice,
     approve_alice,
@@ -171,7 +173,7 @@ def add_initial_liquidity_alice(
             swap.add_liquidity(deposit_amounts, 0)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def mint_meta_bob(
     bob,
     mint_bob,
@@ -187,7 +189,56 @@ def mint_meta_bob(
     assert underlying_tokens[0].balanceOf(bob) == base_pool_lp_token.balanceOf(bob)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="module")
 def approve_meta_bob(bob, underlying_tokens, swap):
-    for token in underlying_tokens:
-        token.approve(swap.address, 2**256 - 1)
+    with boa.env.prank(bob):
+        for token in underlying_tokens:
+            token.approve(swap.address, 2**256 - 1)
+
+
+@pytest.fixture(scope="module")
+def initial_setup(
+    alice,
+    bob,
+    approve_alice,
+    mint_alice,
+    deposit_amounts,
+    swap,
+    pool_type,
+    base_pool,
+    base_pool_tokens,
+    base_pool_decimals,
+    base_pool_lp_token,
+    initial_amounts,
+    underlying_tokens,
+):
+    with boa.env.anchor():
+        if pool_type == 0:
+            with boa.env.prank(alice):
+                swap.add_liquidity(deposit_amounts, 0)
+        else:
+            add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
+            alice_bp_balance_norm = base_pool_lp_token.balanceOf(alice) / 10**18
+            alice_mp_balance_norm = underlying_tokens[0].balanceOf(alice) / 10 ** underlying_tokens[0].decimals()
+
+            if alice_mp_balance_norm < alice_bp_balance_norm:
+                mint_for_testing(
+                    alice,
+                    int(math.ceil(alice_bp_balance_norm) * 10 ** underlying_tokens[0].decimals()),
+                    underlying_tokens[0],
+                )
+
+            with boa.env.prank(alice):
+                underlying_tokens[0].approve(swap.address, 2**256 - 1)
+                base_pool_lp_token.approve(swap.address, 2**256 - 1)
+                swap.add_liquidity(deposit_amounts, 0)
+
+        add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
+        mint_for_testing(bob, initial_amounts[0], underlying_tokens[0], False)
+        assert underlying_tokens[0].balanceOf(bob) == pytest.approx(base_pool_lp_token.balanceOf(bob))
+
+        with boa.env.prank(bob):
+            for token in underlying_tokens:
+                token.approve(swap.address, 2**256 - 1)
+
+        yield
