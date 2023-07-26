@@ -453,6 +453,7 @@ def deploy_plain_pool(
     _coins: DynArray[address, MAX_COINS],
     _A: uint256,
     _fee: uint256,
+    _offpeg_fee_multiplier: uint256,
     _ma_exp_time: uint256,
     _implementation_idx: uint256,
     _asset_types: DynArray[uint8, MAX_COINS],
@@ -519,6 +520,7 @@ def deploy_plain_pool(
         _symbol,                                        # _symbol: String[10]
         _A,                                             # _A: uint256
         _fee,                                           # _fee: uint256
+        _offpeg_fee_multiplier,                         # _offpeg_fee_multiplier: uint256
         _ma_exp_time,                                   # _ma_exp_time: uint256
         _coins,                                         # _coins: DynArray[address, MAX_COINS]
         _rate_multipliers,                              # _rate_multipliers: DynArray[uint256, MAX_COINS]
@@ -572,6 +574,7 @@ def deploy_metapool(
     _coin: address,
     _A: uint256,
     _fee: uint256,
+    _offpeg_fee_multiplier: uint256,
     _ma_exp_time: uint256,
     _implementation_idx: uint256,
     _asset_type: uint8,
@@ -642,6 +645,7 @@ def deploy_metapool(
         _symbol,                                        # _symbol: String[10]
         _A,                                             # _A: uint256
         _fee,                                           # _fee: uint256
+        _offpeg_fee_multiplier,                         # _offpeg_fee_multiplier: uint256
         _ma_exp_time,                                   # _ma_exp_time: uint256
         self.math_implementation,                       # _math_implementation: address
         _base_pool,                                     # _base_pool: address

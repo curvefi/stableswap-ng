@@ -22,6 +22,7 @@ def swap(
     set_metapool_implementations,
 ):
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
+    offpeg_fee_multiplier = 20000000000
     if pool_type == 0:
         A = 2000
         fee = 1000000
@@ -50,7 +51,17 @@ def swap(
 
         with boa.env.prank(deployer):
             pool = factory.deploy_plain_pool(
-                "test", "test", [t.address for t in pool_tokens], A, fee, 866, 0, asset_types, method_ids, oracles
+                "test",
+                "test",
+                [t.address for t in pool_tokens],
+                A,
+                fee,
+                offpeg_fee_multiplier,
+                866,
+                0,
+                asset_types,
+                method_ids,
+                oracles,
             )
         return amm_interface.at(pool)
 
@@ -85,6 +96,7 @@ def swap(
             underlying_tokens[0].address,  # _coin: address,
             A,  # _A: uint256,
             fee,  # _fee: uint256,
+            offpeg_fee_multiplier,
             866,  # _ma_exp_time: uint256,
             0,  # _implementation_idx: uint256
             metapool_token_type,  # _asset_type: uint8
