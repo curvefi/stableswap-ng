@@ -1,3 +1,5 @@
+import math
+
 import boa
 import pytest
 from boa.environment import AddressType
@@ -216,13 +218,24 @@ def initial_setup(
                 swap.add_liquidity(deposit_amounts, 0)
         else:
             add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
+            alice_bp_balance_norm = base_pool_lp_token.balanceOf(alice) / 10**18
+            alice_mp_balance_norm = underlying_tokens[0].balanceOf(alice) / 10 ** underlying_tokens[0].decimals()
+
+            if alice_mp_balance_norm < alice_bp_balance_norm:
+                mint_for_testing(
+                    alice,
+                    int(math.ceil(alice_bp_balance_norm) * 10 ** underlying_tokens[0].decimals()),
+                    underlying_tokens[0],
+                )
+
             with boa.env.prank(alice):
+                underlying_tokens[0].approve(swap.address, 2**256 - 1)
                 base_pool_lp_token.approve(swap.address, 2**256 - 1)
                 swap.add_liquidity(deposit_amounts, 0)
 
         add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
         mint_for_testing(bob, initial_amounts[0], underlying_tokens[0], False)
-        assert underlying_tokens[0].balanceOf(bob) == base_pool_lp_token.balanceOf(bob)
+        assert underlying_tokens[0].balanceOf(bob) == pytest.approx(base_pool_lp_token.balanceOf(bob))
 
         with boa.env.prank(bob):
             for token in underlying_tokens:
