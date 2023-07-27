@@ -25,7 +25,7 @@
         2. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        3. Adds feature: `exchange_received`: swaps that expect an ERC20 transfer to have occurred
+        3. `exchange_received`: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
                     then calling `exchange_received` will REVERT.
@@ -35,6 +35,7 @@
         4. Adds `get_dx`, `get_dx_underlying`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
+        5. Fees are dynamic: AMM will charge a higher fee if pool depegs.
 """
 
 from vyper.interfaces import ERC20
