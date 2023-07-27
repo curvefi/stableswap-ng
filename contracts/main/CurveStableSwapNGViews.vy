@@ -58,8 +58,12 @@ def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256:
     amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
     D: uint256 = self.get_D(xp, amp, N_COINS)
 
-    # TODO: Add Dynamic fee
-    y: uint256 = xp[j] - (dy * rates[j] / PRECISION + 1) * FEE_DENOMINATOR / (FEE_DENOMINATOR - StableSwapNG(pool).fee())
+    base_fee: uint256 = StableSwapNG(pool).fee()
+    fee_multiplier: uint256 = StableSwapNG(pool).offpeg_fee_multiplier()
+    dy_with_fee: uint256 = dy * rates[j] / PRECISION + 1
+    dynamic_fee: uint256 = self._dynamic_fee(xp[i], xp[j], base_fee, fee_multiplier)
+
+    y: uint256 = xp[j] - dy_with_fee * FEE_DENOMINATOR / (FEE_DENOMINATOR - dynamic_fee)
     x: uint256 = self.get_y(j, i, y, xp, amp, D, N_COINS)
     return (x - xp[i]) * PRECISION / rates[i]
 
