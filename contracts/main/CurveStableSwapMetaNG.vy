@@ -271,7 +271,6 @@ def __init__(
     @notice Initialize the pool contract
     @param _name Name of the new plain pool.
     @param _symbol Symbol for the new plain pool.
-    @param _coins List of addresses of the coins being used in the pool.
     @param _A Amplification co-efficient - a lower value here means
               less tolerance for imbalance within the pool's assets.
               Suggested values include:
@@ -281,8 +280,17 @@ def __init__(
     @param _fee Trade fee, given as an integer with 1e10 precision. The
                 the maximum is 1% (100000000).
                 50% of the fee is distributed to veCRV holders.
+    @param _offpeg_fee_multiplier A multiplier that determines how much to increase
+                                  Fees by when assets in the AMM depeg. Example: 20000000000
     @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
+    @param _math_implementation Contract containing Math methods
+    @param _base_pool The underlying AMM of the LP token _coins[0] is paired against
+    @param _coins List of addresses of the coins being used in the pool. For metapool this is
+                  the coin (say LUSD) vs (say) 3crv as: [LUSD, 3CRV]. Length is always 2.
+    @params _base_coins coins in the underlying base pool.
+    @params _rate_multipliers Rate multipliers of the individual coins. For Metapools it is:
+                              [10 ** (36 - _coins[0].decimals()), 10 ** 18].
     @param _asset_types Array of uint8 representing tokens in pool
     @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.

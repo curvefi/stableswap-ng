@@ -75,6 +75,9 @@ event LiquidityGaugeDeployed:
 MAX_COINS: constant(uint256) = 8
 ADDRESS_PROVIDER: constant(address) = 0x0000000022D53366457F9d5E68Ec105046FC4383
 
+MAX_FEE: constant(uint256) = 5 * 10 ** 9
+FEE_DENOMINATOR: constant(uint256) = 10 ** 10
+
 admin: public(address)
 future_admin: public(address)
 
@@ -486,10 +489,11 @@ def deploy_plain_pool(
     @param _oracles Array of rate oracle addresses.
     @return Address of the deployed pool
     """
-    assert _fee <= 100000000, "Invalid fee"
     assert len(_coins) == len(_method_ids), "All coin arrays should be same length"
     assert len(_coins) ==  len(_oracles), "All coin arrays should be same length"
     assert len(_coins) ==  len(_asset_types), "All coin arrays should be same length"
+    assert _fee <= 100000000, "Invalid fee"
+    assert _offpeg_fee_multiplier * _fee <= MAX_FEE * FEE_DENOMINATOR
 
     n_coins: uint256 = len(_coins)
     _rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -614,6 +618,8 @@ def deploy_metapool(
     """
     assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
     assert _fee <= 100000000, "Invalid fee"
+    assert _offpeg_fee_multiplier * _fee <= MAX_FEE * FEE_DENOMINATOR
+
 
     base_pool_n_coins: uint256 = len(self.base_pool_data[_base_pool].coins)
     assert base_pool_n_coins != 0, "Base pool is not added"
