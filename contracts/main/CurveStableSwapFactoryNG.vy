@@ -75,6 +75,9 @@ event LiquidityGaugeDeployed:
 MAX_COINS: constant(uint256) = 8
 ADDRESS_PROVIDER: constant(address) = 0x0000000022D53366457F9d5E68Ec105046FC4383
 
+MAX_FEE: constant(uint256) = 5 * 10 ** 9
+FEE_DENOMINATOR: constant(uint256) = 10 ** 10
+
 admin: public(address)
 future_admin: public(address)
 
@@ -453,6 +456,7 @@ def deploy_plain_pool(
     _coins: DynArray[address, MAX_COINS],
     _A: uint256,
     _fee: uint256,
+    _offpeg_fee_multiplier: uint256,
     _ma_exp_time: uint256,
     _implementation_idx: uint256,
     _asset_types: DynArray[uint8, MAX_COINS],
@@ -485,10 +489,11 @@ def deploy_plain_pool(
     @param _oracles Array of rate oracle addresses.
     @return Address of the deployed pool
     """
-    assert _fee <= 100000000, "Invalid fee"
     assert len(_coins) == len(_method_ids), "All coin arrays should be same length"
     assert len(_coins) ==  len(_oracles), "All coin arrays should be same length"
     assert len(_coins) ==  len(_asset_types), "All coin arrays should be same length"
+    assert _fee <= 100000000, "Invalid fee"
+    assert _offpeg_fee_multiplier * _fee <= MAX_FEE * FEE_DENOMINATOR
 
     n_coins: uint256 = len(_coins)
     _rate_multipliers: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -519,6 +524,7 @@ def deploy_plain_pool(
         _symbol,                                        # _symbol: String[10]
         _A,                                             # _A: uint256
         _fee,                                           # _fee: uint256
+        _offpeg_fee_multiplier,                         # _offpeg_fee_multiplier: uint256
         _ma_exp_time,                                   # _ma_exp_time: uint256
         _coins,                                         # _coins: DynArray[address, MAX_COINS]
         _rate_multipliers,                              # _rate_multipliers: DynArray[uint256, MAX_COINS]
@@ -572,6 +578,7 @@ def deploy_metapool(
     _coin: address,
     _A: uint256,
     _fee: uint256,
+    _offpeg_fee_multiplier: uint256,
     _ma_exp_time: uint256,
     _implementation_idx: uint256,
     _asset_type: uint8,
@@ -611,6 +618,8 @@ def deploy_metapool(
     """
     assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
     assert _fee <= 100000000, "Invalid fee"
+    assert _offpeg_fee_multiplier * _fee <= MAX_FEE * FEE_DENOMINATOR
+
 
     base_pool_n_coins: uint256 = len(self.base_pool_data[_base_pool].coins)
     assert base_pool_n_coins != 0, "Base pool is not added"
@@ -642,6 +651,7 @@ def deploy_metapool(
         _symbol,                                        # _symbol: String[10]
         _A,                                             # _A: uint256
         _fee,                                           # _fee: uint256
+        _offpeg_fee_multiplier,                         # _offpeg_fee_multiplier: uint256
         _ma_exp_time,                                   # _ma_exp_time: uint256
         self.math_implementation,                       # _math_implementation: address
         _base_pool,                                     # _base_pool: address

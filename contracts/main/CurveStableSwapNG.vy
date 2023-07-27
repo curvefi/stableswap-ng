@@ -17,26 +17,23 @@
         2. ERC20 tokens can have arbitrary decimals (<=18).
         3. ERC20 tokens that rebase (either positive or fee on transfer)
         4. ERC20 tokens that have a rate oracle (e.g. wstETH, cbETH, sDAI, etc.)
-     Additional features include:
-        1. Support for rebasing tokens: but this disables
-           `exchange_received`.
-        2. Support for ERC20 tokens with rate oracles (e.g. wstETH, sDAI)
            Note: Oracle precision _must_ be 10**18.
-        3. Adds oracles based on AMM State Price (and _not_ last traded price).
-        4. Adds exchanging tokens with callbacks that allows for:
+     Additional features include:
+        1. Adds oracles based on AMM State Price (and _not_ last traded price).
+        2. Adds exchanging tokens with callbacks that allows for:
             a. reduced ERC20 token transfers in zap contracts
             b. swaps without transferFrom (no need for token approvals)
-        5. Adds feature: `exchange_received`, which is inspired
-           by Uniswap V2: swaps that expect an ERC20 transfer to have occurred
+        3. `exchange_received`: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
                     then calling `exchange_received` will REVERT.
                  b. If pool contains rebasing token and `asset_types` does not contain 2 (Rebasing)
                     then this is an incorrect implementation and rebases can be
                     stolen.
-        6. Adds `get_dx`: Similar to `get_dy` which returns an expected output
+        4. Adds `get_dx`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
+        5. Fees are dynamic: AMM will charge a higher fee if pool depegs.
 """
 
 from vyper.interfaces import ERC20
@@ -226,7 +223,6 @@ def __init__(
     @notice Initialize the pool contract
     @param _name Name of the new plain pool.
     @param _symbol Symbol for the new plain pool.
-    @param _coins List of addresses of the coins being used in the pool.
     @param _A Amplification co-efficient - a lower value here means
               less tolerance for imbalance within the pool's assets.
               Suggested values include:
@@ -236,8 +232,12 @@ def __init__(
     @param _fee Trade fee, given as an integer with 1e10 precision. The
                 the maximum is 1% (100000000).
                 50% of the fee is distributed to veCRV holders.
+    @param _offpeg_fee_multiplier A multiplier that determines how much to increase
+                                  Fees by when assets in the AMM depeg. Example value: 20000000000
     @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
+    @param _coins List of addresses of the coins being used in the pool.
+    @param _rate_multipliers An array of: [10 ** (36 - _coins[n].decimals()), ... for n in range(N_COINS)]
     @param _asset_types Array of uint8 representing tokens in pool
     @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.
