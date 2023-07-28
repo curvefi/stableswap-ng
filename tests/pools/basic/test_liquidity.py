@@ -1,13 +1,14 @@
 import boa
 import pytest
 
+from tests.fixtures.accounts import add_base_pool_liquidity, mint_account
 from tests.fixtures.constants import INITIAL_AMOUNT
+from tests.utils.tokens import mint_for_testing
 from tests.utils.transactions import call_returning_result_and_logs
-
-pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
 class TestLiquidityMethods:
+    @pytest.mark.usefixtures("initial_setup")
     class TestAddLiquidity:
         def test_add_liquidity(
             self,
@@ -155,3 +156,83 @@ class TestLiquidityMethods:
         def test_send_eth(self, bob, swap, deposit_amounts):
             with boa.reverts():
                 swap.add_liquidity(deposit_amounts, 0, sender=bob, value=1)
+
+    class TestInitialLiquidity:
+        @pytest.fixture(scope="module")
+        def initial_setup_alice(
+            self,
+            alice,
+            deposit_amounts,
+            swap,
+            pool_type,
+            base_pool,
+            base_pool_tokens,
+            base_pool_decimals,
+            base_pool_lp_token,
+            initial_balance,
+            initial_amounts,
+            pool_tokens,
+            underlying_tokens,
+        ):
+            with boa.env.anchor():
+                mint_for_testing(alice, 1 * 10**18, None, True)
+
+                if pool_type == 0:
+
+                    mint_account(alice, pool_tokens, initial_balance, initial_amounts)
+                    with boa.env.prank(alice):
+                        for token in pool_tokens:
+                            token.approve(swap.address, 2**256 - 1)
+
+                else:
+                    add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
+                    mint_for_testing(alice, initial_amounts[0], underlying_tokens[0], False)
+
+                    with boa.env.prank(alice):
+                        for token in underlying_tokens:
+                            token.approve(swap.address, 2**256 - 1)
+
+                yield
+
+        @pytest.mark.parametrize("min_amount", [0, 10**18])
+        def test_initial(
+            self,
+            alice,
+            initial_setup_alice,
+            swap,
+            pool_type,
+            pool_tokens,
+            pool_token_types,
+            metapool_token_type,
+            min_amount,
+            decimals,
+            meta_decimals,
+            initial_amounts,
+        ):
+            swap_decimals = decimals if pool_type == 0 else [meta_decimals, 18]
+            amounts = [10**i for i in swap_decimals]
+
+            swap.add_liquidity(
+                amounts,
+                len(pool_tokens) * min_amount,
+                sender=alice,
+            )
+
+            token_types = pool_token_types if pool_type == 0 else [metapool_token_type, 18]
+
+            for coin, amount, initial, pool_token_type in zip(pool_tokens, amounts, initial_amounts, token_types):
+                if pool_token_type == 0:
+                    assert coin.balanceOf(alice) == initial - amount
+                    assert coin.balanceOf(swap) == amount
+
+        # TODO: boa hangs with it, with added single print it passes
+        # @pytest.mark.parametrize("idx", (0, 1))
+        # def test_initial_liquidity_missing_coin(
+        #     self, alice, initial_setup_alice, swap, pool_type, decimals, meta_decimals, idx
+        # ):
+        #     swap_decimals = decimals if pool_type == 0 else [meta_decimals, 18]
+        #     amounts = [10**i for i in swap_decimals]
+        #     amounts[idx] = 0
+        #
+        #     with boa.reverts():
+        #         swap.add_liquidity(amounts, 0, sender=alice)
