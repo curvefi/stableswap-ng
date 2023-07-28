@@ -264,6 +264,7 @@ def __init__(
     self.initial_A = A
     self.future_A = A
     self.fee = _fee
+    self.offpeg_fee_multiplier = _offpeg_fee_multiplier
 
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
