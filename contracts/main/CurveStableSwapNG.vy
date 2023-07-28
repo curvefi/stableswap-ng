@@ -20,20 +20,17 @@
            Note: Oracle precision _must_ be 10**18.
      Additional features include:
         1. Adds oracles based on AMM State Price (and _not_ last traded price).
-        2. Adds exchanging tokens with callbacks that allows for:
-            a. reduced ERC20 token transfers in zap contracts
-            b. swaps without transferFrom (no need for token approvals)
-        3. `exchange_received`: swaps that expect an ERC20 transfer to have occurred
+        2. `exchange_received`: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
                     then calling `exchange_received` will REVERT.
                  b. If pool contains rebasing token and `asset_types` does not contain 2 (Rebasing)
                     then this is an incorrect implementation and rebases can be
                     stolen.
-        4. Adds `get_dx`: Similar to `get_dy` which returns an expected output
+        3. Adds `get_dx`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
-        5. Fees are dynamic: AMM will charge a higher fee if pool depegs.
+        4. Fees are dynamic: AMM will charge a higher fee if pool depegs.
 """
 
 from vyper.interfaces import ERC20
@@ -314,29 +311,16 @@ def _transfer_in(
     coin_idx: int128,
     dx: uint256,
     dy: uint256,
-    callbacker: address,
-    callback_sig: bytes32,
     sender: address,
     receiver: address,
     expect_optimistic_transfer: bool,
 ) -> uint256:
     """
-    @notice Contains all logic to handle ERC20 or native token transfers
-    @dev The callback sig must have the following args:
-            sender: address
-            receiver: address
-            coin: address
-            dx: uint256
-            dy: uint256
-         The `dy` that the pool enforces is actually min_dy.
-         Callback only occurs for `exchange_extended`.
-    @dev If callback_sig is empty, `_transfer_in` does a transferFrom.
+    @notice Contains all logic to handle ERC20 token transfers.
     @params _coin address of the coin to transfer in.
     @params dx amount of `_coin` to transfer into the pool.
     @params dy amount of `_coin` to transfer out of the pool.
     @params mvalue msg.value if the transfer is ETH, 0 otherwise.
-    @params callbacker address to call `callback_sig` on.
-    @params callback_sig signature of the callback function.
     @params sender address to transfer `_coin` from.
     @params receiver address to transfer `_coin` to.
     @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
@@ -350,18 +334,6 @@ def _transfer_in(
 
         assert _incoming_coin_asset_type != 2  # dev: rebasing coins not supported
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
-
-    elif callback_sig != empty(bytes32):
-
-        raw_call(
-                callbacker,
-                concat(
-                    slice(callback_sig, 0, 4),
-                    _abi_encode(sender, receiver, coins[coin_idx], dx, dy)
-                )
-            )
-
-        _dx = ERC20(coins[coin_idx]).balanceOf(self) - _dx
 
     else:
 
@@ -493,44 +465,6 @@ def exchange(
         _dx,
         _min_dy,
         _receiver,
-        empty(address),
-        empty(bytes32),
-        False
-    )
-
-
-@external
-@nonreentrant('lock')
-def exchange_extended(
-    i: int128,
-    j: int128,
-    _dx: uint256,
-    _min_dy: uint256,
-    _sender: address,
-    _receiver: address,
-    _cb: bytes32
-) -> uint256:
-    """
-    @notice Perform an exchange between two coins after a callback
-    @dev Index values can be found via the `coins` public getter method
-         Not payable (does not accept eth). Users of this method are dex aggregators,
-         arbitrageurs, or other users who do not wish to grant approvals to the contract.
-    @param i Index value for the coin to send
-    @param j Index valie of the coin to recieve
-    @param _dx Amount of `i` being exchanged
-    @param _min_dy Minimum amount of `j` to receive
-    @return Actual amount of `j` received
-    """
-    assert _cb != empty(bytes32)  # dev: No callback specified
-    return self._exchange(
-        _sender,
-        i,
-        j,
-        _dx,
-        _min_dy,
-        _receiver,
-        msg.sender,  # <---------------------------- callbacker is msg.sender.
-        _cb,
         False
     )
 
@@ -565,8 +499,6 @@ def exchange_received(
         _dx,
         _min_dy,
         _receiver,
-        empty(address),
-        empty(bytes32),
         True,  # <--------------------------------------- swap optimistically.
     )
 
@@ -608,8 +540,6 @@ def add_liquidity(
                 i,
                 _amounts[i],
                 0,
-                empty(address),
-                empty(bytes32),
                 msg.sender,
                 empty(address),
                 False,  # expect_optimistic_transfer
@@ -908,8 +838,6 @@ def _exchange(
     _dx: uint256,
     _min_dy: uint256,
     receiver: address,
-    callbacker: address,
-    callback_sig: bytes32,
     expect_optimistic_transfer: bool
 ) -> uint256:
 
@@ -927,8 +855,6 @@ def _exchange(
         i,
         _dx,
         _min_dy,
-        callbacker,
-        callback_sig,
         sender,
         receiver,
         expect_optimistic_transfer
