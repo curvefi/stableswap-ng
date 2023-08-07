@@ -7,8 +7,8 @@ from tests.utils.tokens import mint_for_testing
 from tests.utils.transactions import call_returning_result_and_logs
 
 
+@pytest.mark.usefixtures("initial_setup")
 class TestLiquidityMethods:
-    @pytest.mark.usefixtures("initial_setup")
     class TestAddLiquidity:
         def test_add_liquidity(
             self,
@@ -236,3 +236,195 @@ class TestLiquidityMethods:
         #
         #     with boa.reverts():
         #         swap.add_liquidity(amounts, 0, sender=alice)
+
+    class TestRemoveLiquidity:
+        @pytest.mark.parametrize("min_amount", (0, 1))
+        def test_remove_liquidity(
+            self, alice, swap, pool_type, pool_tokens, underlying_tokens, min_amount, deposit_amounts
+        ):
+            swap.remove_liquidity(swap.balanceOf(alice), [i * min_amount for i in deposit_amounts], sender=alice)
+
+            coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+
+            for coin, amount in zip(coins, deposit_amounts):
+                assert coin.balanceOf(alice) == amount
+                assert coin.balanceOf(swap) == 0
+
+            assert swap.balanceOf(alice) == 0
+            assert swap.totalSupply() == 0
+
+        def test_remove_partial(
+            self, alice, swap, pool_type, pool_tokens, underlying_tokens, deposit_amounts, pool_size
+        ):
+            initial_amount = swap.balanceOf(alice)
+            withdraw_amount = initial_amount // 2
+            swap.remove_liquidity(withdraw_amount, [0] * pool_size, sender=alice)
+
+            coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+
+            for coin, amount in zip(coins, deposit_amounts):
+                assert coin.balanceOf(swap) + coin.balanceOf(alice) == amount
+
+            assert swap.balanceOf(alice) == initial_amount - withdraw_amount
+            assert swap.totalSupply() == initial_amount - withdraw_amount
+
+        @pytest.mark.parametrize("idx", range(2))
+        def test_below_min_amount(self, alice, swap, initial_amounts, idx):
+            min_amount = initial_amounts.copy()
+            min_amount[idx] += 1
+
+            with boa.reverts():
+                swap.remove_liquidity(swap.balanceOf(alice), min_amount, sender=alice)
+
+        def test_amount_exceeds_balance(self, alice, swap, plain_pool_size):
+            with boa.reverts():
+                swap.remove_liquidity(swap.balanceOf(alice) + 1, [0] * plain_pool_size, sender=alice)
+
+        def test_event(self, alice, bob, swap, pool_type, pool_tokens, underlying_tokens, plain_pool_size):
+            swap.transfer(bob, 10**18, sender=alice)
+            _, events = call_returning_result_and_logs(
+                swap, "remove_liquidity", 10**18, [0] * plain_pool_size, sender=alice
+            )
+
+            # coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+            # event = events[0]
+            # TODO: add event
+
+    class TestRemoveLiquidityImbalance:
+        @pytest.mark.parametrize("divisor", [2, 5, 10])
+        def test_remove_balanced(
+            self, alice, swap, pool_type, pool_tokens, underlying_tokens, divisor, deposit_amounts
+        ):
+            initial_balance = swap.balanceOf(alice)
+            amounts = [i // divisor for i in deposit_amounts]
+            swap.remove_liquidity_imbalance(amounts, initial_balance, sender=alice)
+
+            coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+
+            for i, coin in enumerate(coins):
+                assert coin.balanceOf(alice) == amounts[i]
+                assert coin.balanceOf(swap) == deposit_amounts[i] - amounts[i]
+
+            assert swap.balanceOf(alice) / initial_balance == 1 - 1 / divisor
+
+        @pytest.mark.parametrize("idx", range(2))
+        def test_remove_one(
+            self, alice, swap, pool_type, pool_tokens, underlying_tokens, pool_size, idx, deposit_amounts
+        ):
+            amounts = [0] * pool_size
+            amounts[idx] = deposit_amounts[idx] // 2
+
+            lp_balance = pool_size * 1_000_000 * 10**18
+            swap.remove_liquidity_imbalance(amounts, lp_balance, sender=alice)
+
+            coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+
+            for i, coin in enumerate(coins):
+                assert coin.balanceOf(alice) == amounts[i]
+                assert coin.balanceOf(swap) == deposit_amounts[i] - amounts[i]
+
+            actual_balance = swap.balanceOf(alice)
+            actual_total_supply = swap.totalSupply()
+            ideal_balance = (2 * pool_size - 1) * lp_balance / (2 * pool_size)
+
+            assert actual_balance == actual_total_supply
+            assert ideal_balance * 0.9994 < actual_balance < ideal_balance
+
+        @pytest.mark.parametrize("divisor", [1, 2, 10])
+        def test_exceed_max_burn(self, alice, swap, pool_size, divisor, deposit_amounts):
+            amounts = [i // divisor for i in deposit_amounts]
+            max_burn = pool_size * 1_000_000 * 10**18 // divisor
+
+            with boa.reverts():
+                swap.remove_liquidity_imbalance(amounts, max_burn - 1, sender=alice)
+
+        def test_cannot_remove_zero(self, alice, swap, pool_size):
+            with boa.reverts():
+                swap.remove_liquidity_imbalance([0] * pool_size, 0, sender=alice)
+
+        def test_no_totalsupply(self, alice, swap, pool_size):
+            swap.remove_liquidity(swap.totalSupply(), [0] * pool_size, sender=alice)
+            with boa.reverts():
+                swap.remove_liquidity_imbalance([0] * pool_size, 0, sender=alice)
+
+        def test_event(self, alice, bob, swap, pool_type, pool_tokens, underlying_tokens, pool_size, deposit_amounts):
+            swap.transfer(bob, swap.balanceOf(alice), sender=alice)
+            amounts = [i // 5 for i in deposit_amounts]
+            max_burn = pool_size * 1_000_000 * 10**18
+
+            # coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+
+            _, events = call_returning_result_and_logs(
+                swap, "remove_liquidity_imbalance", amounts, max_burn, sender=bob
+            )
+
+            # event = events[0]
+            # TODO: add test event
+
+    class TestRemoveLiquidityOneCoin:
+        @pytest.mark.parametrize("idx", range(2))
+        def test_amount_received(self, alice, swap, pool_type, pool_tokens, underlying_tokens, decimals, idx):
+            coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+
+            decimals = decimals[idx]
+            wrapped = coins[idx]
+
+            swap.remove_liquidity_one_coin(10**18, idx, 0, sender=alice)
+
+            ideal = 10**decimals
+
+            assert ideal * 0.99 <= wrapped.balanceOf(alice) <= ideal
+
+        @pytest.mark.parametrize("idx", range(2))
+        @pytest.mark.parametrize("divisor", [1, 5, 42])
+        def test_lp_token_balance(self, alice, swap, idx, divisor):
+            initial_amount = swap.balanceOf(alice)
+            amount = initial_amount // divisor
+
+            swap.remove_liquidity_one_coin(amount, idx, 0, sender=alice)
+
+            assert swap.balanceOf(alice) + amount == initial_amount
+
+        @pytest.mark.parametrize("idx", range(2))
+        def test_expected_vs_actual(self, alice, swap, pool_type, pool_tokens, underlying_tokens, idx):
+            amount = swap.balanceOf(alice) // 10
+
+            expected = swap.calc_withdraw_one_coin(amount, idx)
+            swap.remove_liquidity_one_coin(amount, idx, 0, sender=alice)
+
+            coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+            assert coins[idx].balanceOf(alice) == expected
+
+        @pytest.mark.parametrize("idx", range(2))
+        def test_below_min_amount(self, alice, swap, idx):
+            amount = swap.balanceOf(alice)
+
+            expected = swap.calc_withdraw_one_coin(amount, idx)
+            with boa.reverts():
+                swap.remove_liquidity_one_coin(amount, idx, expected + 1, sender=alice)
+
+        @pytest.mark.parametrize("idx", range(2))
+        def test_amount_exceeds_balance(self, bob, swap, idx):
+            with boa.reverts():
+                swap.remove_liquidity_one_coin(1, idx, 0, sender=bob)
+
+        def test_below_zero(self, alice, swap):
+            with boa.reverts():
+                swap.remove_liquidity_one_coin(1, -1, 0, sender=alice)
+
+        def test_above_n_coins(self, alice, swap, pool_size):
+            with boa.reverts():
+                swap.remove_liquidity_one_coin(1, pool_size, 0, sender=alice)
+
+        @pytest.mark.parametrize("idx", range(2))
+        def test_event(self, alice, bob, swap, idx, pool_type, pool_tokens, underlying_tokens):
+            swap.transfer(bob, 10**18, sender=alice)
+
+            tx = swap.remove_liquidity_one_coin(10**18, idx, 0, sender=bob)
+
+            event = tx.events["RemoveLiquidityOne"]
+            assert event["provider"] == bob
+            assert event["token_amount"] == 10**18
+
+            coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
+            assert coins[idx].balanceOf(bob) == event["coin_amount"]

@@ -440,7 +440,6 @@ def is_meta(_pool: address) -> bool:
 def get_pool_asset_types(_pool: address) -> DynArray[uint8, MAX_COINS]:
     """
     @notice Query the asset type of `_pool`
-    @dev 0 = Plain, 1 = Oracle, 2 = Rebasing
     @param _pool Pool Address
     @return Integer indicating the pool asset type
     """
@@ -482,7 +481,6 @@ def deploy_plain_pool(
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
     @param _implementation_idx Index of the implementation to use
     @param _asset_types Asset types for pool, as an integer
-                       0 = Plain, 1 = Oracle, 2 = Rebasing
     @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
@@ -609,7 +607,6 @@ def deploy_metapool(
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
     @param _implementation_idx Index of the implementation to use
     @param _asset_type Asset type for token, as an integer
-                       0 = Plain, 1 = Oracle, 2 = Rebasing
     @param _method_id  First four bytes of the Keccak-256 hash of the function signatures
                        of the oracle addresses that gives rate oracles.
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
@@ -733,7 +730,7 @@ def add_base_pool(
     @notice Add a base pool to the registry, which may be used in factory metapools
     @dev Only callable by admin
     @param _base_pool Pool address to add
-    @param _asset_types Asset type for pool, as an integer  0 = Plain, 1 = Oracle, 2 = Rebasing
+    @param _asset_types Asset type for pool, as an integer
     """
     assert msg.sender == self.admin  # dev: admin-only function
     assert len(self.base_pool_data[_base_pool].coins) == 0  # dev: pool exists

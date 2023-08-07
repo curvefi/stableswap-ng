@@ -40,7 +40,7 @@ implements: ERC20
 # ------------------------------- Interfaces ---------------------------------
 
 interface Factory:
-    def get_fee_receiver() -> address: view
+    def fee_receiver() -> address: view
     def admin() -> address: view
     def views_implementation() -> address: view
 
@@ -879,8 +879,7 @@ def _exchange(
 
 @internal
 def _withdraw_admin_fees():
-
-    fee_receiver: address = factory.get_fee_receiver()
+    fee_receiver: address = factory.fee_receiver()
     assert fee_receiver != empty(address)  # dev: fee receiver not set
 
     admin_balances: DynArray[uint256, MAX_COINS] = self.admin_balances
