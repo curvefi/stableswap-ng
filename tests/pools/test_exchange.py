@@ -8,6 +8,9 @@ class TestExchange:
     @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
     def test_min_dy(self, bob, swap, pool_type, pool_tokens, underlying_tokens, sending, receiving, decimals):
         amount = 10 ** decimals[sending]
+        initial_receiving = (
+            pool_tokens[receiving].balanceOf(bob) if pool_type == 0 else underlying_tokens[receiving].balanceOf(bob)
+        )
 
         min_dy = swap.get_dy(sending, receiving, amount)
         swap.exchange(sending, receiving, amount, min_dy - 1, sender=bob)
@@ -16,13 +19,12 @@ class TestExchange:
             received = pool_tokens[receiving].balanceOf(bob)
         else:
             received = underlying_tokens[receiving].balanceOf(bob)
-        assert abs(received - min_dy) <= 1
+        assert abs(received - min_dy - initial_receiving) <= 1
 
     @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
     def test_min_dy_imbalanced(
         self, bob, swap, pool_type, pool_tokens, underlying_tokens, sending, receiving, decimals
     ):
-
         amounts = [10**i for i in decimals]
         scaler = amounts.copy()  # used to scale token amounts when decimals are different
 
@@ -88,17 +90,29 @@ class TestExchange:
             assert swap.balanceOf(charlie) > 0
 
         def test_exchange(self, bob, charlie, swap, pool_type, pool_tokens, underlying_tokens, decimals):
+            initial_balance = pool_tokens[0].balanceOf(bob) if pool_type == 0 else underlying_tokens[0].balanceOf(bob)
+
             swap.exchange(1, 0, 10**18, 0, charlie, sender=bob)
             if pool_type == 0:
                 assert pool_tokens[0].balanceOf(charlie) > 0
-                assert pool_tokens[0].balanceOf(bob) == 0
+                assert pool_tokens[0].balanceOf(bob) == initial_balance
             else:
                 assert underlying_tokens[0].balanceOf(charlie) > 0
-                assert underlying_tokens[0].balanceOf(bob) == 0
+                assert underlying_tokens[0].balanceOf(bob) == initial_balance
 
         def test_remove_liquidity(
-            self, bob, swap, charlie, pool_type, pool_tokens, underlying_tokens, initial_amounts, pool_size
+            self,
+            bob,
+            swap,
+            charlie,
+            pool_type,
+            pool_tokens,
+            underlying_tokens,
+            initial_amounts,
+            pool_size,
+            deposit_amounts,
         ):
+            swap.add_liquidity(deposit_amounts, 0, sender=bob)
             initial_amount = swap.balanceOf(bob)
             withdraw_amount = initial_amount // 4
             swap.remove_liquidity(withdraw_amount, [0] * pool_size, charlie, sender=bob)
@@ -114,8 +128,9 @@ class TestExchange:
             assert swap.totalSupply() == initial_amount - withdraw_amount
 
         def test_remove_imbalanced(
-            self, bob, swap, charlie, pool_type, pool_tokens, underlying_tokens, initial_amounts
+            self, bob, swap, charlie, pool_type, pool_tokens, underlying_tokens, initial_amounts, deposit_amounts
         ):
+            swap.add_liquidity(deposit_amounts, 0, sender=bob)
             initial_balance = swap.balanceOf(bob)
             amounts = [i // 4 for i in initial_amounts]
             swap.remove_liquidity_imbalance(amounts, initial_balance, charlie, sender=bob)

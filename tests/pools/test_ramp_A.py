@@ -3,89 +3,86 @@ import boa
 MIN_RAMP_TIME = 86400
 
 
-def test_ramp_A(chain, alice, swap):
+def test_ramp_A(owner, swap):
     initial_A = swap.initial_A() // 100
-    future_time = chain.time() + MIN_RAMP_TIME + 5
+    future_time = boa.env.vm.state.timestamp + MIN_RAMP_TIME + 5
 
-    tx = swap.ramp_A(initial_A * 2, future_time, sender=alice)
+    swap.ramp_A(initial_A * 2, future_time, sender=owner)
 
     assert swap.initial_A() // 100 == initial_A
     assert swap.future_A() // 100 == initial_A * 2
-    assert swap.initial_A_time() == tx.timestamp
+    assert swap.initial_A_time() == boa.env.vm.state.timestamp
     assert swap.future_A_time() == future_time
 
 
-def test_ramp_A_final(chain, alice, swap):
+def test_ramp_A_final(owner, swap):
     initial_A = swap.initial_A() // 100
-    future_time = chain.time() + 1000000
+    future_time = boa.env.vm.state.timestamp + 1000000
 
-    swap.ramp_A(initial_A * 2, future_time, sender=alice)
+    swap.ramp_A(initial_A * 2, future_time, sender=owner)
 
-    chain.sleep(1000000)
-    chain.mine()
-
+    boa.env.time_travel(1000000)
     assert swap.A() == initial_A * 2
 
 
-def test_ramp_A_value_up(chain, alice, swap):
+def test_ramp_A_value_up(owner, swap):
+    initial_timestamp = boa.env.vm.state.timestamp
     initial_A = swap.initial_A() // 100
-    future_time = chain.time() + 1000000
-    tx = swap.ramp_A(initial_A * 2, future_time, sender=alice)
+    future_time = initial_timestamp + 1000000
+    swap.ramp_A(initial_A * 2, future_time, sender=owner)
 
-    initial_time = tx.timestamp
-    duration = future_time - tx.timestamp
+    duration = future_time - initial_timestamp
 
-    while chain.time() < future_time:
-        chain.sleep(100000)
-        chain.mine()
-        expected = int(initial_A + ((chain.time() - initial_time) / duration) * initial_A)
+    while boa.env.vm.state.timestamp < future_time:
+        boa.env.time_travel(100000)
+        expected = int(initial_A + ((boa.env.vm.state.timestamp - initial_timestamp) / duration) * initial_A)
         assert 0.999 < expected / swap.A() <= 1
 
 
-def test_ramp_A_value_down(chain, alice, swap):
+def test_ramp_A_value_down(owner, swap):
+    initial_timestamp = boa.env.vm.state.timestamp
     initial_A = swap.initial_A() // 100
-    future_time = chain.time() + 1000000
-    tx = swap.ramp_A(initial_A // 10, future_time, sender=alice)
+    future_time = initial_timestamp + 1000000
+    swap.ramp_A(initial_A // 10, future_time, sender=owner)
 
-    initial_time = tx.timestamp
-    duration = future_time - tx.timestamp
+    duration = future_time - initial_timestamp
 
-    while chain.time() < future_time:
-        chain.sleep(100000)
-        chain.mine()
-        expected = int(initial_A - ((chain.time() - initial_time) / duration) * (initial_A // 10 * 9))
+    while boa.env.vm.state.timestamp < future_time:
+        boa.env.time_travel(100000)
+        expected = int(
+            initial_A - ((boa.env.vm.state.timestamp - initial_timestamp) / duration) * (initial_A // 10 * 9)
+        )
         if expected == 0:
             assert swap.A() == initial_A // 10
         else:
             assert abs(swap.A() - expected) <= 1
 
 
-def test_stop_ramp_A(chain, alice, swap):
+def test_stop_ramp_A(owner, swap):
     initial_A = swap.initial_A() // 100
-    future_time = chain.time() + 1000000
-    swap.ramp_A(initial_A * 2, future_time, sender=alice)
+    future_time = boa.env.vm.state.timestamp + 1000000
+    swap.ramp_A(initial_A * 2, future_time, sender=owner)
 
-    chain.sleep(31337)
+    boa.env.time_travel(31337)
 
-    tx = swap.A.transact(sender=alice)
-    current_A = tx.return_value
+    current_A = swap.A()
 
-    tx = swap.stop_ramp_A(sender=alice)
+    swap.stop_ramp_A(sender=owner)
 
     assert swap.initial_A() // 100 == current_A
     assert swap.future_A() // 100 == current_A
-    assert swap.initial_A_time() == tx.timestamp
-    assert swap.future_A_time() == tx.timestamp
+    assert swap.initial_A_time() == boa.env.vm.state.timestamp
+    assert swap.future_A_time() == boa.env.vm.state.timestamp
 
 
-def test_ramp_A_only_owner(chain, bob, swap):
+def test_ramp_A_only_owner(bob, swap):
     with boa.reverts():
-        swap.ramp_A(0, chain.time() + 1000000, sender=bob)
+        swap.ramp_A(0, boa.env.vm.state.timestamp + 1000000, sender=bob)
 
 
-def test_ramp_A_insufficient_time(chain, alice, swap):
+def test_ramp_A_insufficient_time(owner, swap):
     with boa.reverts():
-        swap.ramp_A(0, chain.time() + MIN_RAMP_TIME - 1, sender=alice)
+        swap.ramp_A(0, boa.env.vm.state.timestamp + MIN_RAMP_TIME - 1, sender=owner)
 
 
 def test_stop_ramp_A_only_owner(bob, swap):

@@ -86,7 +86,7 @@ class TestFees:
                 assert coin.balanceOf(fee_receiver) == 0
                 fees.append(swap.admin_balances(i))
 
-        swap.withdraw_admin_fees({"from": bob})
+        swap.withdraw_admin_fees(sender=bob)
         if pool_type == 0:
             for i, coin in enumerate(pool_tokens):
                 assert coin.balanceOf(fee_receiver) == fees[i]
