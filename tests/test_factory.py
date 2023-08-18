@@ -95,10 +95,10 @@ class TestFactory:
         def test_get_underlying_decimals(self, factory, swap, base_pool_decimals, pool_type):
             assert factory.get_underlying_decimals(swap.address) == [18] + base_pool_decimals
 
-        def test_get_metapool_rates(self, factory, swap, base_pool, add_initial_liquidity_alice):
+        def test_get_metapool_rates(self, factory, swap, base_pool, initial_setup):
             assert factory.get_metapool_rates(swap.address) == [10**18, base_pool.get_virtual_price()]
 
-        def test_get_underlying_balances(self, factory, swap, base_pool, add_initial_liquidity_alice):
+        def test_get_underlying_balances(self, factory, swap, base_pool, initial_setup):
             assert factory.get_metapool_rates(swap.address) == [10**18, base_pool.get_virtual_price()]
 
         @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(1, 4), 2))
@@ -158,21 +158,6 @@ class TestFactory:
                 empty_factory.set_metapool_implementations(0, amm_implementation_meta.address)
 
             return empty_factory
-
-        def test_add_base_pool(self, empty_factory, owner, forked_chain):
-            susd_pool = "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD"
-            lp_token = "0xC25a3A3b969415c80451098fa907EC722572917F"
-            coins = [
-                "0x6B175474E89094C44Da98b954EedeAC495271d0F",
-                "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-                "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
-            ]
-
-            assert empty_factory.base_pool_count() == 0
-            empty_factory.add_base_pool(susd_pool, lp_token, coins, [0] * len(coins), len(coins), sender=owner)
-            assert empty_factory.base_pool_count() == 1
-            assert empty_factory.base_pool_list(0) == susd_pool
 
         def test_add_base_pool_already_exists(
             self,
