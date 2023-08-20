@@ -1188,6 +1188,14 @@ def _calc_withdraw_one_coin(
     if new_y > 0:
         last_p = self._get_p(xp, amp, D1)
 
+    else:
+        for j in range(1, MAX_COINS_128):
+            if j == N_COINS_128:
+                break
+
+            pp: uint256 = self.last_prices_packed[j - 1]
+            last_p.append(pp & (2**128 - 1))
+
     return dy, dy_0 - dy, last_p
 
 
