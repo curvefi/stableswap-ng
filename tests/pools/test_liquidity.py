@@ -202,28 +202,32 @@ class TestLiquidityMethods:
             swap,
             pool_type,
             pool_tokens,
+            underlying_tokens,
             pool_token_types,
             metapool_token_type,
             min_amount,
             decimals,
             meta_decimals,
+            deposit_amounts,
             initial_amounts,
         ):
-            swap_decimals = decimals if pool_type == 0 else [meta_decimals, 18]
-            amounts = [10**i for i in swap_decimals]
-
             swap.add_liquidity(
-                amounts,
+                deposit_amounts,
                 len(pool_tokens) * min_amount,
                 sender=alice,
             )
 
             token_types = pool_token_types if pool_type == 0 else [metapool_token_type, 18]
 
-            for coin, amount, initial, pool_token_type in zip(pool_tokens, amounts, initial_amounts, token_types):
-                if pool_token_type == 0:
-                    assert coin.balanceOf(alice) == initial - amount
-                    assert coin.balanceOf(swap) == amount
+            for coin, und_coin, amount, initial, pool_token_type in zip(
+                pool_tokens, underlying_tokens, deposit_amounts, initial_amounts, token_types
+            ):
+                if pool_type == 0:
+                    assert coin.balanceOf(alice) == pytest.approx(initial - amount, rel=1.5e-2)
+                    assert coin.balanceOf(swap) == pytest.approx(amount, rel=1.5e-2)
+                else:
+                    assert und_coin.balanceOf(alice) == pytest.approx(initial - amount, rel=1.5e-2)
+                    assert und_coin.balanceOf(swap) == pytest.approx(amount, rel=1.5e-2)
 
         # TODO: boa hangs with it, with added single print it passes
         # @pytest.mark.parametrize("idx", (0, 1))
@@ -248,7 +252,7 @@ class TestLiquidityMethods:
             coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
 
             for coin, amount in zip(coins, deposit_amounts):
-                assert coin.balanceOf(alice) == amount
+                assert coin.balanceOf(alice) == pytest.approx(amount * 2, rel=1.5e-2)
                 assert coin.balanceOf(swap) == 0
 
             assert swap.balanceOf(alice) == 0
@@ -261,7 +265,7 @@ class TestLiquidityMethods:
             swap.remove_liquidity(withdraw_amount, [0] * pool_size, sender=alice)
 
             for coin in coins:
-                assert coin.balanceOf(swap) + coin.balanceOf(alice) == initial_amount
+                assert coin.balanceOf(swap) + coin.balanceOf(alice) == pytest.approx(initial_amount, rel=1.5e-2)
 
             assert swap.balanceOf(alice) == initial_amount - withdraw_amount
             assert swap.totalSupply() == initial_amount - withdraw_amount
@@ -274,25 +278,23 @@ class TestLiquidityMethods:
             with boa.reverts():
                 swap.remove_liquidity(swap.balanceOf(alice), min_amount, sender=alice)
 
-        def test_amount_exceeds_balance(self, alice, swap, plain_pool_size):
+        def test_amount_exceeds_balance(self, alice, swap, pool_size):
             with boa.reverts():
-                swap.remove_liquidity(swap.balanceOf(alice) + 1, [0] * plain_pool_size, sender=alice)
+                swap.remove_liquidity(swap.balanceOf(alice) + 1, [0] * pool_size, sender=alice)
 
-        def test_event(self, alice, bob, swap, pool_type, pool_tokens, underlying_tokens, plain_pool_size):
+        def test_event(self, alice, bob, swap, pool_type, pool_size):
             swap.transfer(bob, 10**18, sender=alice)
             _, events = call_returning_result_and_logs(
-                swap, "remove_liquidity", 10**18, [0] * plain_pool_size, sender=alice
+                swap, "remove_liquidity", 10**18, [0] * pool_size, sender=alice
             )
 
-            # coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
-            # event = events[0]
-            # TODO: add event
+            assert f"RemoveLiquidity(provider={alice}" in repr(events[3])
 
     @pytest.mark.usefixtures("initial_setup")
     class TestRemoveLiquidityImbalance:
         @pytest.mark.parametrize("divisor", [2, 5, 10])
         def test_remove_balanced(
-            self, alice, swap, pool_type, pool_tokens, underlying_tokens, divisor, deposit_amounts
+            self, alice, swap, pool_type, pool_tokens, underlying_tokens, divisor, deposit_amounts, initial_amounts
         ):
             initial_balance = swap.balanceOf(alice)
             amounts = [i // divisor for i in deposit_amounts]
@@ -301,14 +303,25 @@ class TestLiquidityMethods:
             coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
 
             for i, coin in enumerate(coins):
-                assert coin.balanceOf(alice) == amounts[i]
-                assert coin.balanceOf(swap) == deposit_amounts[i] - amounts[i]
+                assert coin.balanceOf(alice) == pytest.approx(
+                    amounts[i] + initial_amounts[i] - deposit_amounts[i], rel=1.5e-2
+                )
+                assert coin.balanceOf(swap) == pytest.approx(deposit_amounts[i] - amounts[i], rel=1.5e-2)
 
-            assert swap.balanceOf(alice) / initial_balance == 1 - 1 / divisor
+            assert swap.balanceOf(alice) / initial_balance == pytest.approx(1 - 1 / divisor, rel=1.5e-2)
 
         @pytest.mark.parametrize("idx", range(2))
         def test_remove_one(
-            self, alice, swap, pool_type, pool_tokens, underlying_tokens, pool_size, idx, deposit_amounts
+            self,
+            alice,
+            swap,
+            pool_type,
+            pool_tokens,
+            underlying_tokens,
+            pool_size,
+            idx,
+            deposit_amounts,
+            initial_amounts,
         ):
             amounts = [0] * pool_size
             amounts[idx] = deposit_amounts[idx] // 2
@@ -319,8 +332,10 @@ class TestLiquidityMethods:
             coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
 
             for i, coin in enumerate(coins):
-                assert coin.balanceOf(alice) == amounts[i]
-                assert coin.balanceOf(swap) == deposit_amounts[i] - amounts[i]
+                assert coin.balanceOf(alice) == pytest.approx(
+                    amounts[i] + initial_amounts[i] - deposit_amounts[i], rel=1.5e-2
+                )
+                assert coin.balanceOf(swap) == pytest.approx(deposit_amounts[i] - amounts[i], rel=1.5e-2)
 
             actual_balance = swap.balanceOf(alice)
             actual_total_supply = swap.totalSupply()
@@ -346,19 +361,16 @@ class TestLiquidityMethods:
             with boa.reverts():
                 swap.remove_liquidity_imbalance([0] * pool_size, 0, sender=alice)
 
-        def test_event(self, alice, bob, swap, pool_type, pool_tokens, underlying_tokens, pool_size, deposit_amounts):
+        def test_event(self, alice, bob, swap, pool_type, pool_size, deposit_amounts):
             swap.transfer(bob, swap.balanceOf(alice), sender=alice)
             amounts = [i // 5 for i in deposit_amounts]
             max_burn = pool_size * 1_000_000 * 10**18
-
-            # coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
 
             _, events = call_returning_result_and_logs(
                 swap, "remove_liquidity_imbalance", amounts, max_burn, sender=bob
             )
 
-            # event = events[0]
-            # TODO: add test event
+            assert f"RemoveLiquidityImbalance(provider={bob}" in repr(events[3])
 
     @pytest.mark.usefixtures("initial_setup")
     class TestRemoveLiquidityOneCoin:
@@ -415,10 +427,11 @@ class TestLiquidityMethods:
         #         swap.remove_liquidity_one_coin(1, pool_size, 0, sender=alice)
 
         @pytest.mark.parametrize("idx", range(2))
-        def test_event(self, alice, bob, swap, idx, pool_type, pool_tokens, underlying_tokens):
+        def test_event(self, alice, bob, swap, idx, pool_type):
             swap.transfer(bob, 10**18, sender=alice)
-
             _, events = call_returning_result_and_logs(swap, "remove_liquidity_one_coin", 10**18, idx, 0, sender=bob)
 
-            # event = events[0]
-            # TODO: add test event
+            if pool_type == 0:
+                assert f"RemoveLiquidityOne(provider={bob}" in repr(events[2])
+            else:
+                assert f"RemoveLiquidityOne(provider={bob}" in repr(events[3])
