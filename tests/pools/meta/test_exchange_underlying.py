@@ -3,8 +3,6 @@ import itertools
 import pytest
 from pytest import approx
 
-from tests.utils.transactions import call_returning_result_and_logs
-
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
@@ -64,9 +62,6 @@ class TestMetaExchangeUnderlying:
         underlying_tokens[sending]._mint_for_testing(bob, amount, sender=bob)
 
         expected = swap.get_dy_underlying(sending, receiving, amount)
-        _, events = call_returning_result_and_logs(
-            swap, "exchange_underlying", sending, receiving, amount, 0, sender=bob
-        )
-        received = events[0]
+        received = swap.exchange_underlying(sending, receiving, amount, 0, sender=bob)
 
         assert abs(expected - received) / received < 0.00001

@@ -15,7 +15,7 @@ class TestMetaExchangeUnderlyingReverts:
         amount = 10 ** underlying_decimals[sending]
         underlying_tokens[sending]._mint_for_testing(bob, amount, sender=bob)
 
-        min_dy = swap.get_dy_underlying(sending, receiving, amount * 1.0001)
+        min_dy = swap.get_dy_underlying(sending, receiving, int(amount * 1.0001))
         with boa.reverts():
             swap.exchange_underlying(sending, receiving, amount, min_dy, sender=bob)
 
