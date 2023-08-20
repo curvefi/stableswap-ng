@@ -27,8 +27,8 @@ def test_remove_one_coin(alice, swap, idx):
 
 
 @pytest.mark.parametrize("idx", range(2))
-def test_remove_imbalance(alice, swap, idx, initial_amounts, pool_size):
-    amounts = [i // 2 for i in initial_amounts]
+def test_remove_imbalance(alice, swap, idx, deposit_amounts, pool_size):
+    amounts = [i // 2 for i in deposit_amounts]
     amounts[idx] = 0
 
     virtual_price = swap.get_virtual_price()
@@ -37,8 +37,8 @@ def test_remove_imbalance(alice, swap, idx, initial_amounts, pool_size):
     assert swap.get_virtual_price() > virtual_price
 
 
-def test_remove(alice, swap, pool_size, initial_amounts):
-    withdraw_amount = sum(initial_amounts) // 2
+def test_remove(alice, swap, pool_size, deposit_amounts):
+    withdraw_amount = sum(deposit_amounts) // 2
 
     virtual_price = swap.get_virtual_price()
     swap.remove_liquidity(withdraw_amount, [0] * pool_size, sender=alice)
