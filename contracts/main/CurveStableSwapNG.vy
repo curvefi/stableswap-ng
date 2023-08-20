@@ -707,7 +707,7 @@ def remove_liquidity_imbalance(
 
         xs = new_balance + old_balances[i]
         dynamic_fee = self._dynamic_fee(xs, ys, base_fee)
-        fees[i] = base_fee * difference / FEE_DENOMINATOR
+        fees.append(base_fee * difference / FEE_DENOMINATOR)
         self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
         new_balances[i] -= fees[i]
 
@@ -755,7 +755,7 @@ def remove_liquidity(
 
         value: uint256 = balances[i] * _burn_amount / total_supply
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
-        amounts[i] = value
+        amounts.append(value)
         self._transfer_out(i, value, _receiver)
 
     total_supply -= _burn_amount

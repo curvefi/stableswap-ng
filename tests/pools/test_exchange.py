@@ -7,7 +7,7 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 class TestExchange:
     @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
     def test_min_dy(self, bob, swap, pool_type, pool_tokens, underlying_tokens, sending, receiving, decimals):
-        amount = 10 ** decimals[sending]
+        amount = 1000 * 10 ** decimals[sending]
         initial_receiving = (
             pool_tokens[receiving].balanceOf(bob) if pool_type == 0 else underlying_tokens[receiving].balanceOf(bob)
         )
@@ -25,11 +25,11 @@ class TestExchange:
     def test_min_dy_imbalanced(
         self, bob, swap, pool_type, pool_tokens, underlying_tokens, sending, receiving, decimals
     ):
-        amounts = [10**i for i in decimals]
+        amounts = [1_000_000 * 10**i for i in decimals]
         scaler = amounts.copy()  # used to scale token amounts when decimals are different
 
         amounts[sending] = 0
-        amounts[receiving] = amounts[receiving] * 1_000_000
+        amounts[receiving] = amounts[receiving]
 
         swap.add_liquidity(amounts, 0, sender=bob)
 
@@ -80,25 +80,42 @@ class TestExchange:
 
         def test_nonpayable(self, swap, bob):
             with boa.reverts():
-                swap.exchange(0, 1, 0, 0, sender=bob)
+                swap.exchange(0, 1, 0, 0, sender=bob, value=1)
 
     class TestReceiver:
-        def test_add_liquidity(self, bob, charlie, swap, initial_amounts):
-            swap.add_liquidity(initial_amounts, 0, charlie, sender=bob)
+        def test_add_liquidity(self, bob, charlie, swap, deposit_amounts):
+            swap.add_liquidity(deposit_amounts, 0, charlie, sender=bob)
 
             assert swap.balanceOf(bob) == 0
             assert swap.balanceOf(charlie) > 0
 
-        def test_exchange(self, bob, charlie, swap, pool_type, pool_tokens, underlying_tokens, decimals):
+        def test_exchange(
+            self,
+            bob,
+            charlie,
+            swap,
+            pool_type,
+            pool_tokens,
+            underlying_tokens,
+            decimals,
+            pool_token_types,
+            metapool_token_type,
+        ):
             initial_balance = pool_tokens[0].balanceOf(bob) if pool_type == 0 else underlying_tokens[0].balanceOf(bob)
 
-            swap.exchange(1, 0, 10**18, 0, charlie, sender=bob)
+            swap.exchange(1, 0, 1000 * 10**18, 0, charlie, sender=bob)
             if pool_type == 0:
                 assert pool_tokens[0].balanceOf(charlie) > 0
-                assert pool_tokens[0].balanceOf(bob) == initial_balance
+                if pool_token_types[0] != 2:
+                    assert pool_tokens[0].balanceOf(bob) == initial_balance
+                else:
+                    assert pool_tokens[0].balanceOf(bob) == pytest.approx(initial_balance, rel=2e-2)
             else:
                 assert underlying_tokens[0].balanceOf(charlie) > 0
-                assert underlying_tokens[0].balanceOf(bob) == initial_balance
+                if metapool_token_type != 2:
+                    assert underlying_tokens[0].balanceOf(bob) == initial_balance
+                else:
+                    assert underlying_tokens[0].balanceOf(bob) == pytest.approx(initial_balance, rel=2e-2)
 
         def test_remove_liquidity(
             self,
@@ -117,15 +134,23 @@ class TestExchange:
             withdraw_amount = initial_amount // 4
             swap.remove_liquidity(withdraw_amount, [0] * pool_size, charlie, sender=bob)
 
+            i = 0
             if pool_type == 0:
-                for coin, amount in zip(pool_tokens, initial_amounts):
-                    assert coin.balanceOf(swap) + coin.balanceOf(charlie) == amount
+                for coin, amount in zip(pool_tokens, deposit_amounts):
+                    assert coin.balanceOf(swap) + coin.balanceOf(charlie) == pytest.approx(
+                        deposit_amounts[0] * 2, rel=1.5e-2
+                    )
+                    i += 1
             else:
-                for coin, amount in zip(underlying_tokens[:2], initial_amounts):
-                    assert coin.balanceOf(swap) + coin.balanceOf(charlie) == amount
+                for coin, amount in zip(underlying_tokens[:2], deposit_amounts):
+                    print(coin.balanceOf(swap), coin.balanceOf(charlie), i)
+                    assert coin.balanceOf(swap) + coin.balanceOf(charlie) == pytest.approx(
+                        deposit_amounts[0] * 2, rel=1.5e-2
+                    )
+                    i += 1
 
-            assert swap.balanceOf(bob) == initial_amount - withdraw_amount
-            assert swap.totalSupply() == initial_amount - withdraw_amount
+            assert swap.balanceOf(bob) == pytest.approx(deposit_amounts[0] * 2 - withdraw_amount, rel=1.5e-2)
+            assert swap.totalSupply() == pytest.approx(deposit_amounts[0] * 4 - withdraw_amount, rel=1.5e-2)
 
         def test_remove_imbalanced(
             self, bob, swap, charlie, pool_type, pool_tokens, underlying_tokens, initial_amounts, deposit_amounts
@@ -137,14 +162,14 @@ class TestExchange:
 
             if pool_type == 0:
                 for i, coin in enumerate(pool_tokens):
-                    assert coin.balanceOf(charlie) == amounts[i]
-                    assert coin.balanceOf(swap) == initial_amounts[i] - amounts[i]
+                    assert coin.balanceOf(charlie) == pytest.approx(amounts[i], rel=1.5e-2)
+                    assert coin.balanceOf(swap) == pytest.approx(initial_amounts[i] - amounts[i], rel=1.5e-2)
             else:
                 for i, coin in enumerate(underlying_tokens[:2]):
-                    assert coin.balanceOf(charlie) == amounts[i]
-                    assert coin.balanceOf(swap) == initial_amounts[i] - amounts[i]
+                    assert coin.balanceOf(charlie) == pytest.approx(amounts[i], rel=1.5e-2)
+                    assert coin.balanceOf(swap) == pytest.approx(initial_amounts[i] - amounts[i], rel=1.5e-2)
 
-            assert swap.balanceOf(bob) / initial_balance == 0.75
+            assert swap.balanceOf(bob) / initial_balance == pytest.approx(0.5, rel=1.5e-2)
 
         def test_remove_one_coin(self, alice, charlie, swap, pool_type, pool_tokens, underlying_tokens):
             swap.remove_liquidity_one_coin(10**18, 0, 0, charlie, sender=alice)

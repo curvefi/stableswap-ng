@@ -820,7 +820,7 @@ def remove_liquidity_imbalance(
         # base_fee * difference / FEE_DENOMINATOR
         xs = new_balance + old_balances[i]
         dynamic_fee = self._dynamic_fee(xs, ys, base_fee)
-        fees[i] = unsafe_div(dynamic_fee * difference, FEE_DENOMINATOR)
+        fees.append(unsafe_div(dynamic_fee * difference, FEE_DENOMINATOR))
 
         # fees[i] * admin_fee / FEE_DENOMINATOR
         self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
