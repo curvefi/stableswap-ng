@@ -168,7 +168,7 @@ rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
 oracles: DynArray[uint256, MAX_COINS]
 
-last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_price
+last_prices_packed: public(DynArray[uint256, MAX_COINS])  #  packing: last_price, ma_price
 ma_exp_time: public(uint256)
 ma_last_time: public(uint256)
 
@@ -248,9 +248,9 @@ def __init__(
     N_COINS_128 = convert(__n_coins, int128)
 
     for i in range(MAX_COINS):
-        if i == __n_coins:
+        if i == __n_coins - 1:  # __n_coins == 2
             break
-        self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
+        self.last_prices_packed.append(self.pack_prices(10**18, 10**18))  # length of 1 maximally
 
     rate_multipliers = _rate_multipliers
     asset_types = _asset_types
@@ -1202,7 +1202,7 @@ def pack_prices(p1: uint256, p2: uint256) -> uint256:
 
 
 @internal
-@view
+@pure
 def _get_p(
     xp: DynArray[uint256, MAX_COINS],
     amp: uint256,
@@ -1222,7 +1222,9 @@ def _get_p(
 
     p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     xp0_A: uint256 = ANN * xp[0] / A_PRECISION
+
     for i in range(1, MAX_COINS):
+
         if i == N_COINS:
             break
 
@@ -1239,7 +1241,8 @@ def save_p_from_price(last_prices: DynArray[uint256, MAX_COINS]):
     ma_last_time: uint256 = self.ma_last_time
 
     for i in range(MAX_COINS):
-        if i == N_COINS - 1:
+
+        if i == N_COINS - 1:  # 1 (N_COINS is 2)
             break
 
         if last_prices[i] != 0:

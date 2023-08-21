@@ -1315,13 +1315,13 @@ def _ma_price() -> uint256:
 @view
 @external
 def last_price(i: uint256) -> uint256:
-    return self.last_prices_packed[0] & (2**128 - 1)
+    return self.last_prices_packed[i] & (2**128 - 1)
 
 
 @view
 @external
 def ema_price(i: uint256) -> uint256:
-    return (self.last_prices_packed[0] >> 128)
+    return (self.last_prices_packed[i] >> 128)
 
 
 @external
