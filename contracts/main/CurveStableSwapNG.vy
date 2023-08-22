@@ -19,7 +19,8 @@
         4. ERC20 tokens that have a rate oracle (e.g. wstETH, cbETH, sDAI, etc.)
            Note: Oracle precision _must_ be 10**18.
      Additional features include:
-        1. Adds oracles based on AMM State Price (and _not_ last traded price).
+        1. Adds price oracles based on AMM State Price (and _not_ last traded price)
+           and a TVL oracle based on D.
         2. `exchange_received`: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
@@ -168,7 +169,8 @@ rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
 oracles: DynArray[uint256, MAX_COINS]
 
-last_prices_packed: public(DynArray[uint256, MAX_COINS])  #  packing: last_price, ma_price
+last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_price
+last_D_packed: uint256                            #  packing: last_D, ma_D
 ma_exp_time: public(uint256)
 ma_last_time: public(uint256)
 
@@ -248,9 +250,9 @@ def __init__(
     N_COINS_128 = convert(__n_coins, int128)
 
     for i in range(MAX_COINS):
-        if i == __n_coins - 1:  # __n_coins == 2
+        if i == __n_coins - 1:
             break
-        self.last_prices_packed.append(self.pack_prices(10**18, 10**18))  # length of 1 maximally
+        self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
 
     rate_multipliers = _rate_multipliers
     asset_types = _asset_types
@@ -597,11 +599,14 @@ def add_liquidity(
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
         D2: uint256 = self.get_D(xp, amp)
         mint_amount = total_supply * (D2 - D0) / D0
-        self.save_p(xp, amp, D2)
+        self.upkeep_oracles(xp, amp, D2)
 
     else:
 
         mint_amount = D1  # Take the dust if there was any
+
+        # instantiate D oracle
+        self.last_D_packed = self.pack_prices(D1, D1)
 
     assert mint_amount >= _min_mint_amount, "Slippage screwed you"
 
@@ -634,8 +639,11 @@ def remove_liquidity_one_coin(
     """
     dy: uint256 = 0
     fee: uint256 = 0
-    p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    dy, fee, p = self._calc_withdraw_one_coin(_burn_amount, i)
+    xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    amp: uint256 = empty(uint256)
+    D: uint256 = empty(uint256)
+
+    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i)
     assert dy >= _min_received, "Not enough coins removed"
 
     self.admin_balances[i] += fee * admin_fee / FEE_DENOMINATOR
@@ -646,7 +654,7 @@ def remove_liquidity_one_coin(
 
     log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, self.total_supply)
 
-    self.save_p_from_price(p)
+    self.upkeep_oracles(xp, amp, D)
 
     return dy
 
@@ -713,7 +721,7 @@ def remove_liquidity_imbalance(
 
     D2: uint256 = self.get_D_mem(rates, new_balances, amp)
 
-    self.save_p(new_balances, amp, D2)
+    self.upkeep_oracles(new_balances, amp, D2)
 
     total_supply: uint256 = self.total_supply
     burn_amount: uint256 = ((D0 - D2) * total_supply / D0) + 1
@@ -825,7 +833,7 @@ def __exchange(
     xp[i] = x
     xp[j] = y
     # D is not changed because we did not apply a fee
-    self.save_p(xp, amp, D)
+    self.upkeep_oracles(xp, amp, D)
 
     return dy
 
@@ -1138,7 +1146,9 @@ def _calc_withdraw_one_coin(
 ) -> (
     uint256,
     uint256,
-    DynArray[uint256, MAX_COINS]
+    DynArray[uint256, MAX_COINS],
+    uint256,
+    uint256
 ):
     # First, need to calculate
     # * Get current D
@@ -1183,20 +1193,10 @@ def _calc_withdraw_one_coin(
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
     dy = (dy - 1) * PRECISION / rates[i]  # Withdraw less to account for rounding errors
 
+    # update xp with new_y for p calculations.
     xp[i] = new_y
-    last_p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    if new_y > 0:
-        last_p = self._get_p(xp, amp, D1)
 
-    else:
-        for j in range(1, MAX_COINS_128):
-            if j == N_COINS_128:
-                break
-
-            pp: uint256 = self.last_prices_packed[j - 1]
-            last_p.append(pp & (2**128 - 1))
-
-    return dy, dy_0 - dy, last_p
+    return dy, dy_0 - dy, xp, amp, D1
 
 
 # -------------------------- AMM Price Methods -------------------------------
@@ -1242,50 +1242,63 @@ def _get_p(
 
 
 @internal
-def save_p_from_price(last_prices: DynArray[uint256, MAX_COINS]):
+def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
     """
-    Saves current price and its EMA
+    @notice Upkeeps price and D oracles.
     """
     ma_last_time: uint256 = self.ma_last_time
+    last_prices_packed_current: DynArray[uint256, MAX_COINS] = self.last_prices_packed
+    last_prices_packed_new: DynArray[uint256, MAX_COINS] = last_prices_packed_current
+
+    spot_price: DynArray[uint256, MAX_COINS] = self._get_p(xp, amp, D)
+
+    # -------------------------- Upkeep price oracle -------------------------
 
     for i in range(MAX_COINS):
 
-        if i == N_COINS - 1:  # 1 (N_COINS is 2)
+        if i == N_COINS - 1:
             break
 
-        if last_prices[i] != 0:
+        if spot_price[i] != 0:
 
             # Upate packed prices -----------------
-            self.last_prices_packed[i] = self.pack_prices(last_prices[i], self._ma_price(i))
+            last_prices_packed_new[i] = self.pack_prices(
+                spot_price[i],
+                self._calc_moving_average(last_prices_packed_current[i])
+            )
 
-            # Update ma_last_time ------------------
-            if ma_last_time < block.timestamp:
-                self.ma_last_time = block.timestamp
+    self.last_prices_packed = last_prices_packed_new
 
+    # ---------------------------- Upkeep D oracle ---------------------------
 
-@internal
-def save_p(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
-    """
-    Saves current price and its EMA
-    """
-    self.save_p_from_price(self._get_p(xp, amp, D))
+    last_D_packed_current: uint256 = self.last_D_packed
+    self.last_D_packed = self.pack_prices(
+        D,
+        self._calc_moving_average(last_D_packed_current)
+    )
+
+    # Housekeeping: Update ma_last_time ------------------
+    if ma_last_time < block.timestamp:
+        self.ma_last_time = block.timestamp
 
 
 @internal
 @view
-def _ma_price(i: uint256) -> uint256:
+def _calc_moving_average(packed_value: uint256) -> uint256:
     ma_last_time: uint256 = self.ma_last_time
 
-    pp: uint256 = self.last_prices_packed[i]
-    last_price: uint256 = pp & (2**128 - 1)
-    last_ema_price: uint256 = (pp >> 128)
+    last_spot_value: uint256 = packed_value & (2**128 - 1)
+    last_ema_value: uint256 = (packed_value >> 128)
 
-    if ma_last_time < block.timestamp:
-        alpha: uint256 = self.exp(- convert((block.timestamp - ma_last_time) * 10**18 / self.ma_exp_time, int256))
-        return (last_price * (10**18 - alpha) + last_ema_price * alpha) / 10**18
+    if ma_last_time < block.timestamp:  # calculate new_ema_value and return that.
+        alpha: uint256 = self.exp(
+            -convert(
+                (block.timestamp - ma_last_time) * 10**18 / self.ma_exp_time, int256
+            )
+        )
+        return (last_spot_value * (10**18 - alpha) + last_ema_value * alpha) / 10**18
 
-    else:
-        return last_ema_price
+    return last_ema_value
 
 
 @view
@@ -1321,7 +1334,14 @@ def get_p(i: uint256) -> uint256:
 @view
 @nonreentrant('lock')
 def price_oracle(i: uint256) -> uint256:
-    return self._ma_price(i)
+    return self._calc_moving_average(self.last_prices_packed[i])
+
+
+@external
+@view
+@nonreentrant('lock')
+def D_oracle() -> uint256:
+    return self._calc_moving_average(self.last_D_packed)
 
 
 # ----------------------------- Math Utils -----------------------------------
@@ -1607,7 +1627,9 @@ def get_virtual_price() -> uint256:
     @return LP token virtual price normalized to 1e18
     """
     amp: uint256 = self._A()
-    xp: DynArray[uint256, MAX_COINS] = self._xp_mem(self._stored_rates(), self._balances())
+    xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
+        self._stored_rates(), self._balances()
+    )
     D: uint256 = self.get_D(xp, amp)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio

@@ -21,7 +21,7 @@
      Additional features include:
         1. Adds oracles based on AMM State Price (and _not_ last traded price).
            State prices are calculated _after_ liquidity operations, using bonding
-           curve math.
+           curve math. Also adds an exponential moving average oracle for D.
         2. `exchange_received`: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
