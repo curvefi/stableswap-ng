@@ -42,3 +42,8 @@ jobs:
         run: |
           source .venv/bin/activate
           pytest tests/test_factory.py --token-types=plain -n auto
+
+      - name: Run Tests Forked
+        run: |
+          source .venv/bin/activate
+          pytest tests/test_factory_forked.py --token-types=plain -n auto

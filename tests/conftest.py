@@ -173,7 +173,7 @@ def skip_by_token_type(request, swap):
     only_for_token_types = request.node.get_closest_marker("only_for_token_types")
     if only_for_token_types:
         asset_types = swap._immutables.asset_types
-        if not all(asset_type in only_for_token_types.args for asset_type in asset_types):
+        if not any(asset_type in only_for_token_types.args for asset_type in asset_types):
             pytest.skip("skipped because no tokens for these types")
 
 

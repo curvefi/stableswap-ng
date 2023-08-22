@@ -209,13 +209,23 @@ def initial_setup(
     base_pool_tokens,
     base_pool_decimals,
     base_pool_lp_token,
+    initial_balance,
     initial_amounts,
+    pool_tokens,
     underlying_tokens,
 ):
     with boa.env.anchor():
+        mint_for_testing(bob, 1 * 10**18, None, True)
+
         if pool_type == 0:
             with boa.env.prank(alice):
                 swap.add_liquidity(deposit_amounts, 0)
+
+            mint_account(bob, pool_tokens, initial_balance, initial_amounts)
+            with boa.env.prank(bob):
+                for token in pool_tokens:
+                    token.approve(swap.address, 2**256 - 1)
+
         else:
             add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
             alice_bp_balance_norm = base_pool_lp_token.balanceOf(alice) / 10**18
@@ -233,12 +243,12 @@ def initial_setup(
                 base_pool_lp_token.approve(swap.address, 2**256 - 1)
                 swap.add_liquidity(deposit_amounts, 0)
 
-        add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
-        mint_for_testing(bob, initial_amounts[0], underlying_tokens[0], False)
-        assert underlying_tokens[0].balanceOf(bob) == pytest.approx(base_pool_lp_token.balanceOf(bob))
+            add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
+            mint_for_testing(bob, initial_amounts[0], underlying_tokens[0], False)
+            assert underlying_tokens[0].balanceOf(bob) == pytest.approx(base_pool_lp_token.balanceOf(bob))
 
-        with boa.env.prank(bob):
-            for token in underlying_tokens:
-                token.approve(swap.address, 2**256 - 1)
+            with boa.env.prank(bob):
+                for token in underlying_tokens:
+                    token.approve(swap.address, 2**256 - 1)
 
         yield

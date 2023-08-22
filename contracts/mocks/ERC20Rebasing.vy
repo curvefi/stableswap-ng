@@ -13,12 +13,6 @@ event Transfer:
     _value: uint256
 
 
-event TransferShares:
-    _from: indexed(address)
-    _to: indexed(address)
-    _value: uint256
-
-
 event Approval:
     _owner: indexed(address)
     _spender: indexed(address)
@@ -75,7 +69,6 @@ def transfer(_to: address, _value: uint256) -> bool:
     self.shares[msg.sender] -= _shares
     self.shares[_to] += _shares
     log Transfer(msg.sender, _to, _value)
-    log TransferShares(msg.sender, _to, _shares)
     return True
 
 
@@ -92,7 +85,6 @@ def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     self.allowances[_from][msg.sender] -= _new_value
 
     log Transfer(_from, _to, _new_value)
-    log TransferShares(_from, _to, _new_value)
     return True
 
 
@@ -132,9 +124,9 @@ def share_price() -> uint256:
 @internal
 def _rebase():
     if IS_UP:
-        self.totalCoin = self.totalCoin * 101 / 100
+        self.totalCoin = self.totalCoin * 1000001 / 1000000
     else:
-        self.totalCoin = self.totalCoin * 99 / 100
+        self.totalCoin = self.totalCoin * 999999 / 1000000
 
 
 @external
@@ -154,6 +146,5 @@ def _mint_for_testing(_target: address, _value: uint256) -> bool:
     self.shares[_target] += _shares
 
     log Transfer(empty(address), _target, _value)
-    log TransferShares(empty(address), _target, _shares)
 
     return True

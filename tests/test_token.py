@@ -5,7 +5,7 @@ from eth_account._utils.signing import to_bytes32
 
 from tests.utils.transactions import call_returning_result_and_logs
 
-added_liquidity = pytest.mark.usefixtures("add_initial_liquidity_alice")
+added_liquidity = pytest.mark.usefixtures("initial_setup")
 
 
 class TestPoolToken:
