@@ -214,6 +214,7 @@ rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 oracles: DynArray[uint256, MAX_COINS]
 
 last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_price
+last_D_packed: uint256                            #  packing: last_D, ma_D
 ma_exp_time: public(uint256)
 ma_last_time: public(uint256)
 
@@ -713,11 +714,14 @@ def add_liquidity(
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
         D2: uint256 = math.get_D(xp, amp, N_COINS)
         mint_amount = total_supply * (D2 - D0) / D0
-        self.save_p(xp, amp, D2)
+        self.upkeep_oracles(xp, amp, D2)
 
     else:
 
         mint_amount = D1  # Take the dust if there was any
+
+        # (re)instantiate D oracle if totalSupply is zero.
+        self.last_D_packed = self.pack_prices(D1, D1)
 
     assert mint_amount >= _min_mint_amount, "Slippage screwed you"
 
@@ -750,8 +754,11 @@ def remove_liquidity_one_coin(
     """
     dy: uint256 = 0
     fee: uint256 = 0
-    p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    dy, fee, p = self._calc_withdraw_one_coin(_burn_amount, i)
+    xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    amp: uint256 = empty(uint256)
+    D: uint256 = empty(uint256)
+
+    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i)
     assert dy >= _min_received, "Not enough coins removed"
 
     # fee * admin_fee / FEE_DENOMINATOR
@@ -765,7 +772,7 @@ def remove_liquidity_one_coin(
 
     log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, self.total_supply)
 
-    self.save_p_from_price(p)
+    self.upkeep_oracles(xp, amp, D)
 
     return dy
 
@@ -829,7 +836,7 @@ def remove_liquidity_imbalance(
 
     D2: uint256 = self.get_D_mem(rates, new_balances, amp)
 
-    self.save_p(new_balances, amp, D2)
+    self.upkeep_oracles(new_balances, amp, D2)
 
     total_supply: uint256 = self.total_supply
     burn_amount: uint256 = ((D0 - D2) * total_supply / D0) + 1
@@ -938,7 +945,7 @@ def __exchange(
     xp[i] = x
     xp[j] = y
     # D is not changed because we did not apply a fee
-    self.save_p(xp, amp, D)
+    self.upkeep_oracles(xp, amp, D)
 
     return dy
 
@@ -1184,7 +1191,16 @@ def get_D_mem(
 
 @view
 @internal
-def _calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> (uint256, uint256, DynArray[uint256, MAX_COINS]):
+def _calc_withdraw_one_coin(
+    _burn_amount: uint256,
+    i: int128
+) -> (
+    uint256,
+    uint256,
+    DynArray[uint256, MAX_COINS],
+    uint256,
+    uint256
+):
 
     # First, need to:
     # * Get current D
@@ -1230,23 +1246,8 @@ def _calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> (uint256, uint2
 
     # calculate state price
     xp[i] = new_y
-    last_p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
 
-    last_prices_packed: DynArray[uint256, MAX_COINS] = self.last_prices_packed
-    pp: uint256 = 0
-
-    if new_y > 0:
-        last_p = self._get_p(xp, amp, D1)
-
-    else:
-        for j in range(1, MAX_COINS_128):
-            if j == N_COINS_128:
-                break
-
-            pp = last_prices_packed[j - 1]
-            last_p.append(pp & (2**128 - 1))
-
-    return dy, dy_0 - dy, last_p
+    return dy, dy_0 - dy, xp, amp, D1
 
 
 # -------------------------- AMM Price Methods -------------------------------
@@ -1260,7 +1261,7 @@ def pack_prices(p1: uint256, p2: uint256) -> uint256:
 
 
 @internal
-@view
+@pure
 def _get_p(
     xp: DynArray[uint256, MAX_COINS],
     amp: uint256,
@@ -1285,43 +1286,59 @@ def _get_p(
 
 
 @internal
-def save_p_from_price(last_prices: DynArray[uint256, MAX_COINS]):
+def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
     """
-    Saves current price and its EMA
+    @notice Upkeeps price and D oracles.
     """
-    if last_prices[0] != 0:
+    ma_last_time: uint256 = self.ma_last_time
+    last_prices_packed_current: DynArray[uint256, MAX_COINS] = self.last_prices_packed
+    last_prices_packed_new: DynArray[uint256, MAX_COINS] = last_prices_packed_current
+
+    spot_price: DynArray[uint256, MAX_COINS] = self._get_p(xp, amp, D)
+
+    # -------------------------- Upkeep price oracle -------------------------
+
+    # Metapools are always 2-coin pools, so we care about idx=0 only:
+    if spot_price[0] != 0:
 
         # Upate packed prices -----------------
-        self.last_prices_packed[0] = self.pack_prices(last_prices[0], self._ma_price())
+        last_prices_packed_new[0] = self.pack_prices(
+            spot_price[0],
+            self._calc_moving_average(last_prices_packed_current[0])
+        )
 
-        # Update ma_last_time ------------------
-        if self.ma_last_time < block.timestamp:
-            self.ma_last_time = block.timestamp
+    self.last_prices_packed = last_prices_packed_new
 
+    # ---------------------------- Upkeep D oracle ---------------------------
 
-@internal
-def save_p(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
-    """
-    Saves current price and its EMA
-    """
-    self.save_p_from_price(self._get_p(xp, amp, D))
+    last_D_packed_current: uint256 = self.last_D_packed
+    self.last_D_packed = self.pack_prices(
+        D,
+        self._calc_moving_average(last_D_packed_current)
+    )
+
+    # Housekeeping: Update ma_last_time ------------------
+    if ma_last_time < block.timestamp:
+        self.ma_last_time = block.timestamp
 
 
 @internal
 @view
-def _ma_price() -> uint256:
+def _calc_moving_average(packed_value: uint256) -> uint256:
     ma_last_time: uint256 = self.ma_last_time
 
-    pp: uint256 = self.last_prices_packed[0]
-    last_price: uint256 = pp & (2**128 - 1)
-    last_ema_price: uint256 = (pp >> 128)
+    last_spot_value: uint256 = packed_value & (2**128 - 1)
+    last_ema_value: uint256 = (packed_value >> 128)
 
-    if ma_last_time < block.timestamp:
-        alpha: uint256 = math.exp(- convert((block.timestamp - ma_last_time) * 10**18 / self.ma_exp_time, int256))
-        return unsafe_div(last_price * (10**18 - alpha) + last_ema_price * alpha, 10**18)
+    if ma_last_time < block.timestamp:  # calculate new_ema_value and return that.
+        alpha: uint256 = math.exp(
+            -convert(
+                (block.timestamp - ma_last_time) * 10**18 / self.ma_exp_time, int256
+            )
+        )
+        return (last_spot_value * (10**18 - alpha) + last_ema_value * alpha) / 10**18
 
-    else:
-        return last_ema_price
+    return last_ema_value
 
 
 @view
@@ -1345,6 +1362,8 @@ def get_p(i: uint256) -> uint256:
     @param i index of state price (0 for coin[1], 1 for coin[2], ...)
     @return uint256 The state price quoted by the AMM for coin[i+1]
     """
+    assert i == 0  # dev: metapools do not have price oracle indices greater than 0.
+
     amp: uint256 = self._A()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
         self._stored_rates(), self._balances()
@@ -1357,7 +1376,15 @@ def get_p(i: uint256) -> uint256:
 @view
 @nonreentrant('lock')
 def price_oracle(i: uint256) -> uint256:
-    return self._ma_price()
+    assert i == 0  # dev: metapools do not have price oracle indices greater than 0.
+    return self._calc_moving_average(self.last_prices_packed[0])
+
+
+@external
+@view
+@nonreentrant('lock')
+def D_oracle() -> uint256:
+    return self._calc_moving_average(self.last_D_packed)
 
 
 # ---------------------------- ERC20 Utils -----------------------------------

@@ -143,7 +143,6 @@ class TestExchange:
                     i += 1
             else:
                 for coin, amount in zip(underlying_tokens[:2], deposit_amounts):
-                    print(coin.balanceOf(swap), coin.balanceOf(charlie), i)
                     assert coin.balanceOf(swap) + coin.balanceOf(charlie) == pytest.approx(
                         deposit_amounts[0] * 2, rel=1.5e-2
                     )

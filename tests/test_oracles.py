@@ -13,13 +13,13 @@ SETTINGS = {"max_examples": 1000, "deadline": None}
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
-def get_D(swap):
+def get_D(swap, math):
 
     _rates = [swap.stored_rates(i) for i in range(swap.N_COINS())]
     _balances = swap.internal._balances()
     xp = swap.internal._xp_mem(_rates, _balances)
     amp = swap.internal._A()
-    return swap.internal.get_D(xp, amp)
+    return math.get_D(xp, amp, swap.N_COINS())
 
 
 @given(
@@ -109,14 +109,13 @@ def test_price_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, 
         assert approx(swap.price_oracle(n), p1, 1e-5)
 
 
-@pytest.mark.only_for_pool_type(0)
 @given(
     amount=strategy("uint256", min_value=1, max_value=10**5),
     dt0=strategy("uint256", min_value=0, max_value=10**6),
     dt=strategy("uint256", min_value=0, max_value=10**6),
 )
 @settings(**SETTINGS)
-def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt):
+def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt, math_implementation):
 
     for token in pool_tokens:
         if "IS_UP" in token._immutables.__dict__.keys() and not token._immutables.IS_UP:
@@ -135,7 +134,7 @@ def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0,
     swap.exchange(i, j, amount, 0, sender=bob)
 
     # check D oracle before time travel (shouldnt really change):
-    D0 = get_D(swap)
+    D0 = get_D(swap, math_implementation)
     assert approx(swap.D_oracle(), D0, 1e-5)
 
     # time travel dt amount:
@@ -145,6 +144,6 @@ def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0,
     w = exp(-dt / 866)
 
     # check:
-    D1 = get_D(swap)
+    D1 = get_D(swap, math_implementation)
     D1 = int(D0 * w + D1 * (1 - w))
     assert approx(swap.D_oracle(), D1, 1e-5)

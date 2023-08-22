@@ -605,7 +605,7 @@ def add_liquidity(
 
         mint_amount = D1  # Take the dust if there was any
 
-        # instantiate D oracle
+        # (re)instantiate D oracle if totalSupply is zero.
         self.last_D_packed = self.pack_prices(D1, D1)
 
     assert mint_amount >= _min_mint_amount, "Slippage screwed you"
