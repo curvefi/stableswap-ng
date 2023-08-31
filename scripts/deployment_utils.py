@@ -60,6 +60,7 @@ class CurveNetworkSettings:
     fee_receiver_address: Address
     metaregistry_address: Address = ""
     base_pool_address: Address = ""
+    address_provider: Address = "0x0000000022d53366457f9d5e68ec105046fc4383"
 
 
 curve_dao_network_settings = {
@@ -67,7 +68,7 @@ curve_dao_network_settings = {
         dao_ownership_contract="0x40907540d8a6C65c637785e8f8B742ae6b0b9968",
         fee_receiver_address="0xeCb456EA5365865EbAb8a2661B0c503410e9B347",
         metaregistry_address="0xF98B45FA17DE75FB1aD0e7aFD971b0ca00e379fC",
-        base_pool_address="0xDE3eAD9B2145bBA2EB74007e58ED07308716B725",
+        base_pool_registry_address="0xDE3eAD9B2145bBA2EB74007e58ED07308716B725",
     ),
     "ethereum:sepolia": CurveNetworkSettings(
         dao_ownership_contract="0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17",
