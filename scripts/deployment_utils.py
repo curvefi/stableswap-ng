@@ -6,6 +6,7 @@ from ape import networks, project
 from ape.api.address import Address
 
 DOLLAR_VALUE_OF_TOKENS_TO_DEPOSIT = 5
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 def _get_tx_params():
@@ -59,12 +60,18 @@ class CurveNetworkSettings:
     dao_ownership_contract: Address
     fee_receiver_address: Address
     metaregistry_address: Address = ""
-    base_pool_address: Address = ""
+    base_pool_registry_address: Address = ""
     address_provider: Address = "0x0000000022d53366457f9d5e68ec105046fc4383"
 
 
 curve_dao_network_settings = {
     "ethereum:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0x40907540d8a6C65c637785e8f8B742ae6b0b9968",
+        fee_receiver_address="0xeCb456EA5365865EbAb8a2661B0c503410e9B347",
+        metaregistry_address="0xF98B45FA17DE75FB1aD0e7aFD971b0ca00e379fC",
+        base_pool_registry_address="0xDE3eAD9B2145bBA2EB74007e58ED07308716B725",
+    ),
+    "ethereum:mainnet-fork": CurveNetworkSettings(
         dao_ownership_contract="0x40907540d8a6C65c637785e8f8B742ae6b0b9968",
         fee_receiver_address="0xeCb456EA5365865EbAb8a2661B0c503410e9B347",
         metaregistry_address="0xF98B45FA17DE75FB1aD0e7aFD971b0ca00e379fC",
@@ -136,7 +143,7 @@ class BasePoolSettings:
     n_coins: int
 
 
-base_pool_list = {
+_base_pool_list = {
     "ethereum:mainnet": [
         BasePoolSettings(  # 3pool
             pool="0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7",
@@ -186,7 +193,8 @@ base_pool_list = {
     "polygon:mainnet": [],
     "base:mainnet": [],
 }
-
+_base_pool_list["ethereum:mainnet-fork"] = _base_pool_list["ethereum:mainnet"]
+base_pool_list = _base_pool_list
 
 # -------------------------- POOL SETUP --------------------------
 
@@ -206,52 +214,29 @@ class PoolSettings:
     oracles: List[Address]
 
 
-plain = {
-    "ethereum:mainnet": PoolSettings(name=""),
-    "arbitrum:mainnet": PoolSettings(),
-    "optimism:mainnet": PoolSettings(),
-    "gnosis:mainnet": PoolSettings(),
-    "polygon:mainnet": PoolSettings(),
-    "base:mainnet": PoolSettings(),
-}
-oracle = {
-    "ethereum:mainnet": PoolSettings(),
-    "arbitrum:mainnet": PoolSettings(),
-    "optimism:mainnet": PoolSettings(),
-    "gnosis:mainnet": PoolSettings(),
-    "polygon:mainnet": PoolSettings(),
-    "base:mainnet": PoolSettings(),
-}
-rebasing = {
-    "ethereum:mainnet": PoolSettings(),
-    "arbitrum:mainnet": PoolSettings(),
-    "optimism:mainnet": PoolSettings(),
-    "gnosis:mainnet": PoolSettings(),
-    "polygon:mainnet": PoolSettings(),
-    "base:mainnet": PoolSettings(),
-}
-
-meta_plain = {
-    "ethereum:mainnet": PoolSettings(),
-    "arbitrum:mainnet": PoolSettings(),
-    "optimism:mainnet": PoolSettings(),
-    "gnosis:mainnet": PoolSettings(),
-    "polygon:mainnet": PoolSettings(),
-    "base:mainnet": PoolSettings(),
-}
-meta_oracle = {
-    "ethereum:mainnet": PoolSettings(),
-    "arbitrum:mainnet": PoolSettings(),
-    "optimism:mainnet": PoolSettings(),
-    "gnosis:mainnet": PoolSettings(),
-    "polygon:mainnet": PoolSettings(),
-    "base:mainnet": PoolSettings(),
-}
-meta_rebasing = {
-    "ethereum:mainnet": PoolSettings(),
-    "arbitrum:mainnet": PoolSettings(),
-    "optimism:mainnet": PoolSettings(),
-    "gnosis:mainnet": PoolSettings(),
-    "polygon:mainnet": PoolSettings(),
-    "base:mainnet": PoolSettings(),
+pool_settings = {
+    "gnosis:mainnet": {
+        "plain": [
+            "WXDAI<>USDC<>USDT",  # name
+            "3pool-ng",  # symbol
+            [
+                "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",  # wxdai
+                "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83",  # usdc
+                "0x4ECaBa5870353805a9F068101A40E0f32ed605C6",  # usdt
+            ],
+            1000,  # A
+            4000000,  # fee
+            20000000000,  # offpeg_fee_multiplier
+            865,  # ma_exp_time
+            0,  # implementation index
+            [0, 0, 0],  # asset_types
+            [0, 0, 0],  # method_ids
+            [ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
+        ],
+        "oracle": [],
+        "rebasing": [],
+        "meta-plain": [],
+        "meta-oracle": [],
+        "meta-rebasing": [],
+    }
 }

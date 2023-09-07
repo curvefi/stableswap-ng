@@ -600,9 +600,6 @@ def deploy_metapool(
     @param _fee Trade fee, given as an integer with 1e10 precision. The
                 the maximum is 1% (100000000).
                 50% of the fee is distributed to veCRV holders.
-    @param _implementation_idx Index of the implementation to use. All possible
-                implementations for a BASE_POOL can be publicly accessed
-                via `metapool_implementations(BASE_POOL)`
     @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
     @param _implementation_idx Index of the implementation to use
@@ -794,7 +791,7 @@ def set_math_implementation(_math_implementation: address):
     """
     @notice Set implementation contracts for StableSwap Math
     @dev Only callable by admin
-    @param _implementation Implementation address to use when stableswap pools
+    @param _math_implementation Address of the math implementation contract
     """
     assert msg.sender == self.admin  # dev: admin-only function
     self.math_implementation = _math_implementation
@@ -805,7 +802,7 @@ def set_gauge_implementation(_gauge_implementation: address):
     """
     @notice Set implementation contracts for liquidity gauge
     @dev Only callable by admin
-    @param _implementation Implementation address to use when deploying gauges
+    @param _gauge_implementation Address of the gauge blueprint implementation contract
     """
     assert msg.sender == self.admin  # dev: admin-only function
     self.gauge_implementation = _gauge_implementation
@@ -816,7 +813,7 @@ def set_views_implementation(_views_implementation: address):
     """
     @notice Set implementation contracts for Views methods
     @dev Only callable by admin
-    @param _implementation Implementation address of views contract
+    @param _views_implementation Implementation address of views contract
     """
     assert msg.sender == self.admin  # dev: admin-only function
     self.views_implementation = _views_implementation

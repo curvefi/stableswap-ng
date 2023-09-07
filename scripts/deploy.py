@@ -24,7 +24,7 @@ def deploy_infra(network, account):
         if _network in network:
 
             owner = data.dao_ownership_contract
-            fee_receiver = data.fee_receiver_address2
+            fee_receiver = data.fee_receiver_address
 
     assert owner, f"Curve's DAO contracts may not be on {network}."
     assert fee_receiver, f"Curve's DAO contracts may not be on {network}."
@@ -34,8 +34,14 @@ def deploy_infra(network, account):
         # --------------------- Deploy math, views, blueprints ---------------------
 
         logger.info("Deploying AMM components ...")
-        math_contract = project.CurveStableSwapNGMath.deploy()
-        views_contract = project.CurveStableSwapNGViews.deploy()
+        math_contract = account.deploy(
+            project.CurveStableSwapNGMath,
+            **deploy_utils._get_tx_params(),
+        )
+        views_contract = account.deploy(
+            project.CurveStableSwapNGViews,
+            **deploy_utils._get_tx_params(),
+        )
         plain_blueprint_contract = deploy_utils.deploy_blueprint(project.CurveStableSwapNG, account)
         meta_blueprint_contract = deploy_utils.deploy_blueprint(project.CurveStableSwapMetaNG, account)
         gauge_blueprint_contract = deploy_utils.deploy_blueprint(project.LiquidityGauge, account)
@@ -43,9 +49,10 @@ def deploy_infra(network, account):
         # --------------------- DEPLOY FACTORY ---------------------------
 
         logger.info("Deploying factory ...")
-        factory = project.CurveStableSwapFactoryNG.deploy(
-            deploy_utils.curve_dao_network_settings[network],  # fee_receiver
-            deploy_utils.FIDDYRESEARCH,  # owner (temporary)
+        factory = account.deploy(
+            project.CurveStableSwapFactoryNG,
+            deploy_utils.curve_dao_network_settings[network].fee_receiver_address,  # fee_receiver
+            account,  # owner (temporary)
         )
 
         logger.info("Integrating AMM components into factory ...")
@@ -149,6 +156,7 @@ def set_up_registries(network, account, factory):
         # -------------------------- Set up metaregistry --------------------------
 
         metaregistry_address = deploy_utils.curve_dao_network_settings[network].metaregistry_address
+        base_pool_registry_address = deploy_utils.curve_dao_network_settings[network].base_pool_registry_address
 
         if metaregistry_address:
 
@@ -161,7 +169,7 @@ def set_up_registries(network, account, factory):
             factory_handler = account.deploy(
                 project.CurveStableSwapFactoryNGHandler,
                 factory.address,
-                deploy_utils.curve_dao_network_settings[network].base_pool_registry_address,
+                base_pool_registry_address,
                 **deploy_utils._get_tx_params(),
             )
 
