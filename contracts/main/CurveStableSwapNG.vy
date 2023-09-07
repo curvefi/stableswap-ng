@@ -347,7 +347,7 @@ def _transfer_in(
     # --------------------------- Check Transfer -----------------------------
 
     if _incoming_coin_asset_type == 2:
-        assert _dx > 0  # dev: pool did not receive tokens for swap  # TODO: Check this!!
+        assert _dx > 0  # dev: pool did not receive tokens for swap
     else:
         assert dx == _dx  # dev: pool did not receive tokens for swap
 
@@ -765,7 +765,7 @@ def remove_liquidity(
     total_supply -= _burn_amount
     self._burnFrom(msg.sender, _burn_amount)
 
-    log RemoveLiquidity(msg.sender, amounts, empty(DynArray[uint256, MAX_COINS]), total_supply)  # TODO: check this!
+    log RemoveLiquidity(msg.sender, amounts, empty(DynArray[uint256, MAX_COINS]), total_supply)
 
     # Withdraw admin fees if _claim_admin_fees is set to True. Helps automate.
     if _claim_admin_fees:

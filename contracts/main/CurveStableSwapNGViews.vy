@@ -573,9 +573,16 @@ def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256, N_COINS: uint256) ->
 
     D: uint256 = S
     Ann: uint256 = _amp * N_COINS
+    D_P: uint256 = 0
+    Dprev: uint256 = 0
+
     for i in range(255):
-        D_P: uint256 = D * D / _xp[0] * D / _xp[1] / pow_mod256(N_COINS, N_COINS)
-        Dprev: uint256 = D
+
+        D_P = D
+        for x in _xp:
+            D_P = D_P * D / (x * N_COINS)
+        Dprev = D
+
         D = (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
         # Equality with the precision of 1
         if D > Dprev:

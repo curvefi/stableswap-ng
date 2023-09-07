@@ -4,6 +4,7 @@ from typing import List
 import click
 from ape import networks, project
 from ape.api.address import Address
+from eth_utils import function_signature_to_4byte_selector
 
 DOLLAR_VALUE_OF_TOKENS_TO_DEPOSIT = 5
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -225,7 +226,7 @@ pool_settings = {
                 "0x4ECaBa5870353805a9F068101A40E0f32ed605C6",  # usdt
             ],
             1000,  # A
-            4000000,  # fee
+            1000000,  # fee
             20000000000,  # offpeg_fee_multiplier
             865,  # ma_exp_time
             0,  # implementation index
@@ -233,8 +234,37 @@ pool_settings = {
             [0, 0, 0],  # method_ids
             [ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
         ],
-        "oracle": [],
-        "rebasing": [],
+        "oracles": [
+            "WETH<>wstETH",  # name
+            "wstETH-ng",  # symbol
+            [
+                "0x6C76971f98945AE98dD7d4DFcA8711ebea946eA6",  # wsteth
+                "0x6A023CCd1ff6F2045C3309768eAd9E68F978f6e1",  # weth
+            ],
+            500,
+            1000000,  # fee
+            20000000000,  # offpeg_fee_multiplier
+            865,  # ma_exp_time
+            0,  # implementation index
+            [1, 0],  # asset_types
+            [function_signature_to_4byte_selector("exchangeRate()"), 0],  # method_ids
+            ["0x6C76971f98945AE98dD7d4DFcA8711ebea946eA6", ZERO_ADDRESS],  # oracles
+        ],
+        "rebasing": [
+            "sGNO<>GNO" "sGNO-ng",  # name  # symbol
+            [
+                "0xA4eF9Da5BA71Cc0D2e5E877a910A37eC43420445",  # sGNO
+                "0x9C58BAcC331c9aa871AFD802DB6379a98e80CEdb",  # GNO
+            ],
+            50,  # A,
+            1000000,  # fee
+            20000000000,  # offpeg_fee_multiplier
+            865,  # ma_exp_time
+            0,  # implementation index
+            [2, 0],  # asset_types
+            [0, 0],  # method_ids
+            [ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
+        ],
         "meta-plain": [],
         "meta-oracle": [],
         "meta-rebasing": [],
