@@ -54,7 +54,7 @@ geth:
     mainnet:
       uri: http://localhost:9090
     sepolia:
-      uri: https://eth-sepolia.g.alchemy.com/v2/VB6tsD4y8EjCXVNTks8FrjzwR7eVwbJl
+      uri: https://eth-sepolia.g.alchemy.com/v2/{some_key}
   arbitrum:
     mainnet:
       uri: https://arb-mainnet.g.alchemy.com/v2/{some_key}
