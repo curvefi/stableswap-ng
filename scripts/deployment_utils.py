@@ -51,6 +51,7 @@ def deploy_blueprint(contract, account):
 GAUGE_CONTROLLER = "0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB"
 ADDRESS_PROVIDER = "0x0000000022d53366457f9d5e68ec105046fc4383"
 FIDDYRESEARCH = "0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17"
+FIDDYRESEARCHDEPLOYER = "0x2d12D0907A388811e3AA855A550F959501d303EE"
 
 
 # -------------- CURVE DATA --------------
@@ -79,8 +80,8 @@ curve_dao_network_settings = {
         base_pool_registry_address="0xDE3eAD9B2145bBA2EB74007e58ED07308716B725",
     ),
     "ethereum:sepolia": CurveNetworkSettings(
-        dao_ownership_contract="0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17",
-        fee_receiver_address="0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17",
+        dao_ownership_contract=FIDDYRESEARCHDEPLOYER,
+        fee_receiver_address=FIDDYRESEARCHDEPLOYER,
     ),
     "arbitrum:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xb055ebbacc8eefc166c169e9ce2886d0406ab49b",

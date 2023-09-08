@@ -1,4 +1,4 @@
-# @version 0.3.9
+# @version 0.3.10rc2
 """
 @title CurveStableswapFactoryNG
 @author Curve.Fi

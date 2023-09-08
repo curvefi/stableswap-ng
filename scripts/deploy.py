@@ -14,7 +14,8 @@ def cli():
 @cli.command(cls=NetworkBoundCommand)
 @network_option()
 @account_option()
-def deploy_infra(network, account):
+@click.option("--mock", required=False, default=False, type=bool)
+def deploy_infra(network, account, mock):
 
     if account.alias == "fiddydeployer":
         account.set_autosign(True)
@@ -48,10 +49,15 @@ def deploy_infra(network, account):
 
         # --------------------- DEPLOY FACTORY ---------------------------
 
-        logger.info("Deploying factory ...")
+        fee_receiver = account
+        for curve_network in deploy_utils.curve_dao_network_settings.keys():
+            if curve_network in network:
+                fee_receiver = deploy_utils.curve_dao_network_settings[curve_network].fee_receiver_address
+
+        logger.info(f"Deploying factory with fee_receiver: {fee_receiver}...")
         factory = account.deploy(
             project.CurveStableSwapFactoryNG,
-            deploy_utils.curve_dao_network_settings[network].fee_receiver_address,  # fee_receiver
+            fee_receiver,  # fee_receiver
             account,  # owner (temporary)
         )
 
@@ -66,18 +72,19 @@ def deploy_infra(network, account):
 
         # -------------------------- Add base pools --------------------------
 
-        logger.info("Setting up base pools ...")
-        base_pool_data = deploy_utils.base_pool_list[network]
-        if base_pool_data:  # check if network has base pools:
-            for data in base_pool_data:
-                factory.add_base_pool(
-                    data.pool,
-                    data.lp_token,
-                    data.coins,
-                    data.asset_types,
-                    data.n_coins,
-                    **deploy_utils._get_tx_params(),
-                )
+        if not mock:
+            logger.info("Setting up base pools ...")
+            base_pool_data = deploy_utils.base_pool_list[network]
+            if base_pool_data:  # check if network has base pools:
+                for data in base_pool_data:
+                    factory.add_base_pool(
+                        data.pool,
+                        data.lp_token,
+                        data.coins,
+                        data.asset_types,
+                        data.n_coins,
+                        **deploy_utils._get_tx_params(),
+                    )
 
 
 @cli.command(cls=NetworkBoundCommand)

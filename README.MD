@@ -59,3 +59,22 @@ Testing swaps
 ```shell
 pytest tests/pools/
 ```
+
+# Deployments
+
+To deploy:
+
+```shell
+ape run deploy deploy-infra --mock True --network <choose_network> --account <your_ape_account>
+```
+
+Setting `--mock` to `True` will not add base pools, etc. to the factory.
+
+## ethereum:sepolia
+
+1. [CurveStableSwapNGMath](./contracts/main/CurveStableSwapNGMath.vy) deployed to: [0x7C2085419BE6a04f4ad88ea91bC9F5C6E6C463D8](https://sepolia.etherscan.io/address/0x7C2085419BE6a04f4ad88ea91bC9F5C6E6C463D8)
+2. [CurveStableSwapNGViews](./contracts/main/CurveStableSwapNGViews.vy) deployed to: [0x604388Bb1159AFd21eB5191cE22b4DeCdEE2Ae22](https://sepolia.etherscan.io/address/0x604388Bb1159AFd21eB5191cE22b4DeCdEE2Ae22)
+3. Blueprint for [CurveStableSwapNG](./contracts/main/CurveStableSwapNG.vy) deployed at: [0x06452f9c013fc37169B57Eab8F50A7A48c9198A3](https://sepolia.etherscan.io/address/0x06452f9c013fc37169B57Eab8F50A7A48c9198A3)
+4. Blueprint for [CurveStableSwapMetaNG](./contracts/main/CurveStableSwapMetaNG.vy) deployed at: [0xd7E72f3615aa65b92A4DBdC211E296a35512988B](https://sepolia.etherscan.io/address/0xd7E72f3615aa65b92A4DBdC211E296a35512988B)
+5. Blueprint for [LiquidityGauge](./contracts/main/LiquidityGauge.vy) deployed at: [0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8](https://sepolia.etherscan.io/address/0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8)
+6. [CurveStableSwapFactoryNG](./contracts/main/CurveStableSwapFactoryNG.vy) deployed to: [0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3](https://sepolia.etherscan.io/address/0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3)
