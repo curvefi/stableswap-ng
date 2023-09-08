@@ -9,8 +9,8 @@
      exchanges token 0 <> token b1, b2, .. bn, where b is base pool and bn is the
      nth coin index of the base pool.
      Asset Types:
-        0. Basic ERC20 token with no additional features
-        1. Oracle - token with rate oracle
+        0. Standard ERC20 token with no additional features
+        1. Oracle - token with rate oracle (e.g. wstETH)
         2. Rebasing - token with rebase (e.g. stETH)
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
@@ -286,8 +286,8 @@ def __init__(
     @param _base_pool The underlying AMM of the LP token _coins[0] is paired against
     @param _coins List of addresses of the coins being used in the pool. For metapool this is
                   the coin (say LUSD) vs (say) 3crv as: [LUSD, 3CRV]. Length is always 2.
-    @params _base_coins coins in the underlying base pool.
-    @params _rate_multipliers Rate multipliers of the individual coins. For Metapools it is:
+    @param _base_coins coins in the underlying base pool.
+    @param _rate_multipliers Rate multipliers of the individual coins. For Metapools it is:
                               [10 ** (36 - _coins[0].decimals()), 10 ** 18].
     @param _asset_types Array of uint8 representing tokens in pool
     @param _method_ids Array of first four bytes of the Keccak-256 hash of the function signatures
@@ -371,12 +371,12 @@ def _transfer_in(
 ) -> uint256:
     """
     @notice Contains all logic to handle ERC20 token transfers.
-    @params _coin address of the coin to transfer in.
-    @params dx amount of `_coin` to transfer into the pool.
-    @params dy amount of `_coin` to transfer out of the pool.
-    @params sender address to transfer `_coin` from.
-    @params receiver address to transfer `_coin` to.
-    @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
+    @param _coin address of the coin to transfer in.
+    @param dx amount of `_coin` to transfer into the pool.
+    @param dy amount of `_coin` to transfer out of the pool.
+    @param sender address to transfer `_coin` from.
+    @param receiver address to transfer `_coin` to.
+    @param expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _input_coin: ERC20 = ERC20(coins[coin_metapool_idx])
     _incoming_coin_asset_type: uint8 = asset_types[coin_metapool_idx]
@@ -405,7 +405,7 @@ def _transfer_in(
     # --------------------------- Check Transfer -----------------------------
 
     if _incoming_coin_asset_type == 2:
-        assert _dx > 0  # dev: pool did not receive tokens for swap  # TODO: Check this!!
+        assert _dx > 0  # dev: pool did not receive tokens for swap
     else:
         assert dx == _dx  # dev: pool did not receive tokens for swap
 
@@ -424,9 +424,9 @@ def _transfer_out(
     @notice Transfer a single token from the pool to receiver.
     @dev This function is called by `remove_liquidity` and
          `remove_liquidity_one` and `_exchange` methods.
-    @params _coin Address of the token to transfer out
-    @params _amount Amount of token to transfer out
-    @params receiver Address to send the tokens to
+    @param _coin Address of the token to transfer out
+    @param _amount Amount of token to transfer out
+    @param receiver Address to send the tokens to
     """
 
     # ------------------------- Handle Transfers -----------------------------
@@ -543,7 +543,6 @@ def exchange_received(
          this method are dex aggregators, arbitrageurs, or other users who do not
          wish to grant approvals to the contract: they would instead send tokens
          directly to the contract and call `exchange_received`.
-         The method is non-payable: does not accept native token.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -881,7 +880,7 @@ def remove_liquidity(
 
     self._burnFrom(msg.sender, _burn_amount)  # dev: insufficient funds
 
-    log RemoveLiquidity(msg.sender, amounts, empty(DynArray[uint256, MAX_COINS]), total_supply)  # TODO: check this!
+    log RemoveLiquidity(msg.sender, amounts, empty(DynArray[uint256, MAX_COINS]), total_supply)
 
     # Withdraw admin fees if _claim_admin_fees is set to True. Helps automate.
     if _claim_admin_fees:
@@ -1593,8 +1592,7 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256:
 def totalSupply() -> uint256:
     """
     @notice The total supply of pool LP tokens
-    @dev reentrancy guarded, just in case.
-    @returns self.total_supply, 18 decimals.
+    @return self.total_supply, 18 decimals.
     """
     return self.total_supply
 

@@ -9,8 +9,8 @@
         The Pool contract also records exponential moving averages for coins
         1, 2 and 3 relative to coin 0.
 @dev Asset Types:
-        0. Basic ERC20 token with no additional features
-        1. Oracle - token with rate oracle
+        0. Standard ERC20 token with no additional features
+        1. Oracle - token with rate oracle (e.g. wstETH)
         2. Rebasing - token with rebase (e.g. stETH)
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
@@ -319,13 +319,12 @@ def _transfer_in(
 ) -> uint256:
     """
     @notice Contains all logic to handle ERC20 token transfers.
-    @params _coin address of the coin to transfer in.
-    @params dx amount of `_coin` to transfer into the pool.
-    @params dy amount of `_coin` to transfer out of the pool.
-    @params mvalue msg.value if the transfer is ETH, 0 otherwise.
-    @params sender address to transfer `_coin` from.
-    @params receiver address to transfer `_coin` to.
-    @params expect_optimistic_transfer True if contract expects an optimistic coin transfer
+    @param _coin address of the coin to transfer in.
+    @param dx amount of `_coin` to transfer into the pool.
+    @param dy amount of `_coin` to transfer out of the pool.
+    @param sender address to transfer `_coin` from.
+    @param receiver address to transfer `_coin` to.
+    @param expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
     _incoming_coin_asset_type: uint8 = asset_types[coin_idx]
@@ -348,7 +347,7 @@ def _transfer_in(
     # --------------------------- Check Transfer -----------------------------
 
     if _incoming_coin_asset_type == 2:
-        assert _dx > 0  # dev: pool did not receive tokens for swap  # TODO: Check this!!
+        assert _dx > 0  # dev: pool did not receive tokens for swap
     else:
         assert dx == _dx  # dev: pool did not receive tokens for swap
 
@@ -365,9 +364,9 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     @notice Transfer a single token from the pool to receiver.
     @dev This function is called by `remove_liquidity` and
          `remove_liquidity_one` and `_exchange` methods.
-    @params _coin Address of the token to transfer out
-    @params _amount Amount of token to transfer out
-    @params receiver Address to send the tokens to
+    @param _coin Address of the token to transfer out
+    @param _amount Amount of token to transfer out
+    @param receiver Address to send the tokens to
     """
 
     # ------------------------- Handle Transfers -----------------------------
@@ -452,8 +451,6 @@ def exchange(
     """
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
-         Allows for native token swaps (e.g. ETH <> whatever)
-         If native token is not in coin list and msg.value > 0, swap will revert
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -487,7 +484,6 @@ def exchange_received(
          this method are dex aggregators, arbitrageurs, or other users who do not
          wish to grant approvals to the contract: they would instead send tokens
          directly to the contract and call `exchange_received`.
-         The method is non-payable: does not accept native token.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -769,7 +765,7 @@ def remove_liquidity(
     total_supply -= _burn_amount
     self._burnFrom(msg.sender, _burn_amount)
 
-    log RemoveLiquidity(msg.sender, amounts, empty(DynArray[uint256, MAX_COINS]), total_supply)  # TODO: check this!
+    log RemoveLiquidity(msg.sender, amounts, empty(DynArray[uint256, MAX_COINS]), total_supply)
 
     # Withdraw admin fees if _claim_admin_fees is set to True. Helps automate.
     if _claim_admin_fees:
@@ -1001,15 +997,15 @@ def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
     Ann: uint256 = _amp * N_COINS
     D_P: uint256 = 0
     Dprev: uint256 = 0
-    N_pow_N: uint256 = pow_mod256(N_COINS, N_COINS)
 
     for i in range(255):
 
-        # D * D / _xp[0] * D / _xp[1] / N_COINS**N_COINS
-        D_P = unsafe_div(D * D / _xp[0] * D / _xp[1], N_pow_N)
+        D_P = D
+        for x in _xp:
+            D_P = D_P * D / (x * N_COINS)
         Dprev = D
 
-        # (Ann * S / A_PRECISION + D_P * _n_coins) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (_n_coins + 1) * D_P)
+        # (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
         D = (
             (unsafe_div(Ann * S, A_PRECISION) + D_P * N_COINS) *
             D / (
@@ -1017,6 +1013,7 @@ def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
                 unsafe_add(N_COINS, 1) * D_P
             )
         )
+
         # Equality with the precision of 1
         if D > Dprev:
             if D - Dprev <= 1:
@@ -1611,8 +1608,7 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256:
 def totalSupply() -> uint256:
     """
     @notice The total supply of pool LP tokens
-    @dev reentrancy guarded, just in case.
-    @returns self.total_supply, 18 decimals.
+    @return self.total_supply, 18 decimals.
     """
     return self.total_supply
 

@@ -148,8 +148,8 @@ class TestExchange:
                     )
                     i += 1
 
-            assert swap.balanceOf(bob) == pytest.approx(deposit_amounts[0] * 2 - withdraw_amount, rel=1.5e-2)
-            assert swap.totalSupply() == pytest.approx(deposit_amounts[0] * 4 - withdraw_amount, rel=1.5e-2)
+            assert swap.balanceOf(bob) == pytest.approx(deposit_amounts[0] * pool_size - withdraw_amount, rel=1.5e-2)
+            assert swap.totalSupply() == pytest.approx(deposit_amounts[0] * 2 * pool_size - withdraw_amount, rel=1.5e-2)
 
         def test_remove_imbalanced(
             self, bob, swap, charlie, pool_type, pool_tokens, underlying_tokens, initial_amounts, deposit_amounts
