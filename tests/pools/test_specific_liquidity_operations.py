@@ -132,3 +132,15 @@ def test_swap(swap, charlie, pool_tokens):
 
     pool_tokens[i].approve(swap, 2**256 - 1, sender=charlie)
     swap.exchange(i, j, amount_in, 0, sender=charlie)
+
+
+def test_rebase(swap, charlie, bob, pool_tokens):
+
+    amount_rewards = 10**4 * 10**18
+    i = 1
+    if amount_rewards > pool_tokens[i].balanceOf(charlie):
+        mint_for_testing(charlie, amount_rewards, pool_tokens[i], False)
+
+    pool_tokens[i].transfer(swap, amount_rewards, sender=charlie)  # <---- donate.
+    bob_lp_tokens = swap.balanceOf(bob)
+    swap.remove_liquidity(bob_lp_tokens, [0, 0, 0], sender=bob)  # <--- should not revert

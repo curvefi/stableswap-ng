@@ -327,13 +327,13 @@ def _transfer_in(
     @param expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
-    _incoming_coin_asset_type: uint8 = asset_types[coin_idx]
+    _incoming_asset_is_rebasing: bool = asset_types[coin_idx] == 2
 
     # ------------------------- Handle Transfers -----------------------------
 
     if expect_optimistic_transfer:
 
-        assert _incoming_coin_asset_type != 2  # dev: rebasing coins not supported
+        assert not _incoming_asset_is_rebasing  # dev: rebasing coins not supported
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
 
     else:
@@ -346,14 +346,12 @@ def _transfer_in(
 
     # --------------------------- Check Transfer -----------------------------
 
-    if _incoming_coin_asset_type == 2:
+    if _incoming_asset_is_rebasing:
         assert _dx > 0  # dev: pool did not receive tokens for swap
     else:
         assert dx == _dx  # dev: pool did not receive tokens for swap
-
-    # ----------------------- Update Stored Balances -------------------------
-
-    self.stored_balances[coin_idx] += _dx
+        # Update stored_balances (not for rebasing tokens):
+        self.stored_balances[coin_idx] += _dx
 
     return _dx
 
@@ -369,6 +367,10 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     @param receiver Address to send the tokens to
     """
 
+    # 'gulp' coin balance of the pool to stored_balances here to account for
+    # donations etc.
+    coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
+
     # ------------------------- Handle Transfers -----------------------------
 
     assert ERC20(coins[_coin_idx]).transfer(
@@ -377,7 +379,7 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
 
     # ----------------------- Update Stored Balances -------------------------
 
-    self.stored_balances[_coin_idx] -= _amount
+    self.stored_balances[_coin_idx] = coin_balance - _amount
 
 
 # -------------------------- AMM Special Methods -----------------------------
@@ -753,12 +755,13 @@ def remove_liquidity(
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
 
+    value: uint256 = 0
     for i in range(MAX_COINS_128):
 
         if i == N_COINS_128:
             break
 
-        value: uint256 = balances[i] * _burn_amount / total_supply
+        value = balances[i] * _burn_amount / total_supply
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
         amounts.append(value)
         self._transfer_out(i, value, _receiver)

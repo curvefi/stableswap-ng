@@ -177,6 +177,15 @@ def skip_by_token_type(request, swap):
             pytest.skip("skipped because no tokens for these types")
 
 
+@pytest.fixture(autouse=True)
+def skip_rebasing(request, swap):
+    only_for_token_types = request.node.get_closest_marker("skip_rebasing_tokens")
+    if only_for_token_types:
+        asset_types_contains_rebasing = 2 in swap._immutables.asset_types
+        if asset_types_contains_rebasing:
+            pytest.skip("skipped because test excludes rebasing tokens")
+
+
 # Usage
 # @pytest.mark.only_for_pool_type(1)
 # class TestMetaPool...

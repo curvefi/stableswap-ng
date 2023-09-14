@@ -429,6 +429,10 @@ def _transfer_out(
     @param receiver Address to send the tokens to
     """
 
+    # 'gulp' coin balance of the pool to stored_balances here to account for
+    # donations etc.
+    coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
+
     # ------------------------- Handle Transfers -----------------------------
 
     assert ERC20(coins[_coin_idx]).transfer(
@@ -437,7 +441,7 @@ def _transfer_out(
 
     # ----------------------- Update Stored Balances -------------------------
 
-    self.stored_balances[_coin_idx] -= _amount
+    self.stored_balances[_coin_idx] = coin_balance - _amount
 
 
 # -------------------------- AMM Special Methods -----------------------------
