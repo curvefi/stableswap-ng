@@ -186,6 +186,24 @@ def skip_rebasing(request, swap):
             pytest.skip("skipped because test excludes rebasing tokens")
 
 
+@pytest.fixture(autouse=True)
+def skip_oracle(request, swap):
+    only_for_token_types = request.node.get_closest_marker("skip_oracle_tokens")
+    if only_for_token_types:
+        asset_types_contains_oracle = 1 in swap._immutables.asset_types
+        if asset_types_contains_oracle:
+            pytest.skip("skipped because test excludes oraclised tokens")
+
+
+@pytest.fixture(autouse=True)
+def only_oracle(request, swap):
+    only_for_token_types = request.node.get_closest_marker("only_oracle_tokens")
+    if only_for_token_types:
+        asset_types_contains_rebasing = 1 in swap._immutables.asset_types
+        if not asset_types_contains_rebasing:
+            pytest.skip("skipped because test excludes oraclised tokens")
+
+
 # Usage
 # @pytest.mark.only_for_pool_type(1)
 # class TestMetaPool...

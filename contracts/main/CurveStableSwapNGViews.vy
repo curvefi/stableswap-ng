@@ -172,18 +172,24 @@ def get_dy_underlying(
         meta_j = 1
 
     if i == 0:
-        x = xp[i] + dx * (rates[0] / 10**18)
+
+        x = xp[i] + dx * rates[0] / 10**18
+
     else:
+
         if j == 0:
+
             # i is from BasePool
             base_n_coins: uint256 = StableSwapNG(pool).BASE_N_COINS()
             x = self._base_calc_token_amounts(
                 dx, base_i, rates[1], base_n_coins, BASE_POOL, True
             )
+
             # Accounting for deposit/withdraw fees approximately
             x -= x * StableSwapNG(BASE_POOL).fee() / (2 * FEE_DENOMINATOR)
             # Adding number of pool tokens
             x += xp[MAX_COIN]
+
         else:
             # If both are from the base pool
             return StableSwapNG(BASE_POOL).get_dy(base_i, base_j, dx)
