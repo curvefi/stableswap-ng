@@ -614,7 +614,6 @@ def deploy_metapool(
     assert _fee <= 100000000, "Invalid fee"
     assert _offpeg_fee_multiplier * _fee <= MAX_FEE * FEE_DENOMINATOR
 
-
     base_pool_n_coins: uint256 = len(self.base_pool_data[_base_pool].coins)
     assert base_pool_n_coins != 0, "Base pool is not added"
 

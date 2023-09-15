@@ -300,13 +300,14 @@ def __init__(
     BASE_POOL = _base_pool
     BASE_COINS = _base_coins
     BASE_N_COINS = len(_base_coins)
-    coins = _coins
+    coins = _coins  # <---------------- coins[1] is always base pool LP token.
     rate_multipliers = _rate_multipliers
     asset_types = _asset_types  # contains asset types for all pool tokens including base pool tokens
 
     for i in range(MAX_COINS):
         if i < BASE_N_COINS:
-            # Approval needed for add_liquidity operation on base pool in _exchange_underlying
+            # Approval needed for add_liquidity operation on base pool in
+            # _exchange_underlying:
             ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))
 
     self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
@@ -381,12 +382,14 @@ def _transfer_in(
     _input_coin: ERC20 = ERC20(coins[coin_metapool_idx])
     _incoming_coin_asset_type: uint8 = asset_types[coin_metapool_idx]
     _stored_balance: uint256 = self.stored_balances[coin_metapool_idx]
+    _input_coin_is_in_base_pool: bool = False
 
-    if coin_basepool_idx >= 0 and coin_metapool_idx == 1:  # self._exchange_underlying
+    # Check if _transfer_in is being called by _exchange_underlying:
+    if coin_basepool_idx >= 0 and coin_metapool_idx == 1:
 
         _input_coin = ERC20(BASE_COINS[coin_basepool_idx])
         _incoming_coin_asset_type = asset_types[coin_basepool_idx + 2]
-        _stored_balance = 0
+        _input_coin_is_in_base_pool = True
 
     _dx: uint256 = _input_coin.balanceOf(self)
 
@@ -395,11 +398,18 @@ def _transfer_in(
     if expect_optimistic_transfer:
 
         assert _incoming_coin_asset_type != 2  # dev: rebasing coins not supported
-        _dx -= _stored_balance  # <--- for base_pool coins, stored balance is 0.
+        if not _input_coin_is_in_base_pool:
+            _dx -= _stored_balance  # <- for base_pool coins, stored balance is 0.
+            #   So, we do not check _stored_balance for incoming base pool tokens.
 
     else:
 
-        assert _input_coin.transferFrom(sender, self, dx, default_return_value=True)
+        assert _input_coin.transferFrom(
+            sender,
+            self,
+            dx,
+            default_return_value=True
+        )
         _dx = _input_coin.balanceOf(self) - _dx
 
     # --------------------------- Check Transfer -----------------------------
@@ -408,6 +418,11 @@ def _transfer_in(
         assert _dx > 0  # dev: pool did not receive tokens for swap
     else:
         assert dx == _dx  # dev: pool did not receive tokens for swap
+
+    # ------------ Check if liquidity needs to be added somewhere ------------
+
+    if _input_coin_is_in_base_pool:
+        _dx = self._meta_add_liquidity(_dx, coin_basepool_idx)
 
     # ----------------------- Update Stored Balances -------------------------
 
@@ -422,8 +437,6 @@ def _transfer_out(
 ):
     """
     @notice Transfer a single token from the pool to receiver.
-    @dev This function is called by `remove_liquidity` and
-         `remove_liquidity_one` and `_exchange` methods.
     @param _coin Address of the token to transfer out
     @param _amount Amount of token to transfer out
     @param receiver Address to send the tokens to
@@ -1045,6 +1058,8 @@ def _exchange_underlying(
 
     # --------------------------- Do Transfer in -----------------------------
 
+    # If incoming coin is supposed to go to the base pool, the _transfer_in
+    # method will add_liquidity in the base pool and return dx_w_fee LP tokens
     dx_w_fee: uint256 =  self._transfer_in(
         meta_i,
         base_i,
@@ -1066,8 +1081,6 @@ def _exchange_underlying(
 
         else:
 
-            dx_w_fee = self._meta_add_liquidity(dx_w_fee, base_i)
-
             # dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX] / PRECISION
             x = unsafe_div(dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX], PRECISION)
             x += xp[MAX_METAPOOL_COIN_INDEX]
@@ -1075,7 +1088,6 @@ def _exchange_underlying(
         dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
 
         # Adjust stored balances of meta-level tokens:
-        # TODO: refactor this stray self.stored_balances to self._transfer_out somehow
         self.stored_balances[meta_j] -= dy
 
         # Withdraw from the base pool if needed
@@ -1098,7 +1110,7 @@ def _exchange_underlying(
 
     # ------------------------------------------------------------------------
 
-    log TokenExchangeUnderlying(sender, i, _dx, j, dy)  # TODO: check this!
+    log TokenExchangeUnderlying(sender, i, _dx, j, dy)
 
     return dy
 
