@@ -371,6 +371,7 @@ def _transfer_in(
     sender: address,
     receiver: address,
     expect_optimistic_transfer: bool,
+    is_base_pool_swap: bool = False,
 ) -> uint256:
     """
     @notice Contains all logic to handle ERC20 token transfers.
@@ -380,6 +381,8 @@ def _transfer_in(
     @param sender address to transfer `_coin` from.
     @param receiver address to transfer `_coin` to.
     @param expect_optimistic_transfer True if contract expects an optimistic coin transfer
+    @param is_base_pool_swap Default is set to False.
+    @return amount of coins received
     """
     _input_coin: ERC20 = ERC20(coins[coin_metapool_idx])
     _incoming_coin_asset_type: uint8 = asset_types[coin_metapool_idx]
@@ -424,6 +427,13 @@ def _transfer_in(
     # ------------ Check if liquidity needs to be added somewhere ------------
 
     if _input_coin_is_in_base_pool:
+        if is_base_pool_swap:
+            return _dx  # <----- _exchange_underlying: all input goes to swap.
+            # So, we will not increment self.stored_balances for metapool_idx.
+
+        # Swap involves base <> meta pool interaction. Add incoming base pool
+        # token to the base pool, mint _dx base pool LP token (idx 1) and add
+        # that to self.stored_balances and return that instead.
         _dx = self._meta_add_liquidity(_dx, coin_basepool_idx)
 
     # ----------------------- Update Stored Balances -------------------------
@@ -1070,6 +1080,7 @@ def _exchange_underlying(
         sender,
         receiver,
         expect_optimistic_transfer,
+        (i > 0 and j > 0),  # <--- if True: do not add liquidity to base pool.
     )
 
     # ------------------------------- Exchange -------------------------------
