@@ -172,6 +172,7 @@ oracles: DynArray[uint256, MAX_COINS]
 last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_price
 last_D_packed: uint256                            #  packing: last_D, ma_D
 ma_exp_time: public(uint256)
+D_ma_time: public(uint256)
 ma_last_time: public(uint256)
 
 # shift(2**32 - 1, 224)
@@ -267,6 +268,7 @@ def __init__(
 
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
+    self.D_ma_time = 62324  # <--------- 12 hours default on contract start.
     self.ma_last_time = block.timestamp
 
     for i in range(MAX_COINS_128):
@@ -1265,7 +1267,10 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
             # Upate packed prices -----------------
             last_prices_packed_new[i] = self.pack_prices(
                 spot_price[i],
-                self._calc_moving_average(last_prices_packed_current[i])
+                self._calc_moving_average(
+                    last_prices_packed_current[i],
+                    self.ma_exp_time
+                )
             )
 
     self.last_prices_packed = last_prices_packed_new
@@ -1275,7 +1280,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
     last_D_packed_current: uint256 = self.last_D_packed
     self.last_D_packed = self.pack_prices(
         D,
-        self._calc_moving_average(last_D_packed_current)
+        self._calc_moving_average(last_D_packed_current, self.D_ma_time)
     )
 
     # Housekeeping: Update ma_last_time ------------------
@@ -1285,7 +1290,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
 
 @internal
 @view
-def _calc_moving_average(packed_value: uint256) -> uint256:
+def _calc_moving_average(packed_value: uint256, averaging_window: uint256) -> uint256:
     ma_last_time: uint256 = self.ma_last_time
 
     last_spot_value: uint256 = packed_value & (2**128 - 1)
@@ -1294,7 +1299,7 @@ def _calc_moving_average(packed_value: uint256) -> uint256:
     if ma_last_time < block.timestamp:  # calculate new_ema_value and return that.
         alpha: uint256 = self.exp(
             -convert(
-                (block.timestamp - ma_last_time) * 10**18 / self.ma_exp_time, int256
+                (block.timestamp - ma_last_time) * 10**18 / averaging_window, int256
             )
         )
         return (last_spot_value * (10**18 - alpha) + last_ema_value * alpha) / 10**18
@@ -1335,14 +1340,14 @@ def get_p(i: uint256) -> uint256:
 @view
 @nonreentrant('lock')
 def price_oracle(i: uint256) -> uint256:
-    return self._calc_moving_average(self.last_prices_packed[i])
+    return self._calc_moving_average(self.last_prices_packed[i], self.ma_exp_time)
 
 
 @external
 @view
 @nonreentrant('lock')
 def D_oracle() -> uint256:
-    return self._calc_moving_average(self.last_D_packed)
+    return self._calc_moving_average(self.last_D_packed, self.D_ma_time)
 
 
 # ----------------------------- Math Utils -----------------------------------
@@ -1772,12 +1777,13 @@ def apply_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
 
 
 @external
-def set_ma_exp_time(_ma_exp_time: uint256):
+def set_ma_exp_time(_ma_exp_time: uint256, _D_ma_time: uint256):
     """
-    @notice Set the moving average window of the price oracle.
+    @notice Set the moving average window of the price oracles.
     @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
     """
     assert msg.sender == factory.admin()  # dev: only owner
-    assert _ma_exp_time != 0
+    assert 0 not in [_ma_exp_time, _D_ma_time]
 
     self.ma_exp_time = _ma_exp_time
+    self.D_ma_time = _D_ma_time
