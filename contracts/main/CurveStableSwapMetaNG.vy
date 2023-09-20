@@ -635,6 +635,7 @@ def exchange_underlying_received(
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
+    assert not POOL_IS_REBASING_IMPLEMENTATION  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange_underlying(
         msg.sender,
         i,
