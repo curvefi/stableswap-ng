@@ -724,11 +724,13 @@ def add_base_pool(
 ):
     """
     @notice Add a base pool to the registry, which may be used in factory metapools
-    @dev Only callable by admin
+    @dev 1. Only callable by admin
+         2. Rebasing tokens are not allowed in the base pool.
     @param _base_pool Pool address to add
     @param _asset_types Asset type for pool, as an integer
     """
     assert msg.sender == self.admin  # dev: admin-only function
+    assert 2 not in _asset_types  # dev: rebasing tokens cannot be in base pool
     assert len(self.base_pool_data[_base_pool].coins) == 0  # dev: pool exists
     assert _n_coins < MAX_COINS  # dev: base pool can only have (MAX_COINS - 1) coins.
 

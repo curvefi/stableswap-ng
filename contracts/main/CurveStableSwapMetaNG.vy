@@ -174,6 +174,8 @@ N_COINS: public(constant(uint256)) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 
+POOL_IS_REBASING_IMPLEMENTATION: immutable(bool)
+
 BASE_POOL: public(immutable(address))
 BASE_N_COINS: public(immutable(uint256))
 BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
@@ -305,6 +307,8 @@ def __init__(
     rate_multipliers = _rate_multipliers
     asset_types = _asset_types  # contains asset types for all pool tokens including base pool tokens
 
+    POOL_IS_REBASING_IMPLEMENTATION = 2 in _asset_types
+
     for i in range(MAX_COINS):
         if i < BASE_N_COINS:
             # Approval needed for add_liquidity operation on base pool in
@@ -367,9 +371,7 @@ def _transfer_in(
     coin_metapool_idx: int128,
     coin_basepool_idx: int128,
     dx: uint256,
-    dy: uint256,
     sender: address,
-    receiver: address,
     expect_optimistic_transfer: bool,
     is_base_pool_swap: bool = False,
 ) -> uint256:
@@ -377,15 +379,12 @@ def _transfer_in(
     @notice Contains all logic to handle ERC20 token transfers.
     @param _coin address of the coin to transfer in.
     @param dx amount of `_coin` to transfer into the pool.
-    @param dy amount of `_coin` to transfer out of the pool.
     @param sender address to transfer `_coin` from.
-    @param receiver address to transfer `_coin` to.
     @param expect_optimistic_transfer True if contract expects an optimistic coin transfer
     @param is_base_pool_swap Default is set to False.
     @return amount of coins received
     """
     _input_coin: ERC20 = ERC20(coins[coin_metapool_idx])
-    _incoming_coin_asset_type: uint8 = asset_types[coin_metapool_idx]
     _stored_balance: uint256 = self.stored_balances[coin_metapool_idx]
     _input_coin_is_in_base_pool: bool = False
 
@@ -393,7 +392,6 @@ def _transfer_in(
     if coin_basepool_idx >= 0 and coin_metapool_idx == 1:
 
         _input_coin = ERC20(BASE_COINS[coin_basepool_idx])
-        _incoming_coin_asset_type = asset_types[coin_basepool_idx + 2]
         _input_coin_is_in_base_pool = True
 
     _dx: uint256 = _input_coin.balanceOf(self)
@@ -402,10 +400,9 @@ def _transfer_in(
 
     if expect_optimistic_transfer:
 
-        assert _incoming_coin_asset_type != 2  # dev: rebasing coins not supported
         if not _input_coin_is_in_base_pool:
-            _dx -= _stored_balance  # <- for base_pool coins, stored balance is 0.
-            #   So, we do not check _stored_balance for incoming base pool tokens.
+            _dx = _dx - _stored_balance
+            assert _dx >= dx  # dev: pool did not receive tokens for swap
 
     else:
 
@@ -416,13 +413,6 @@ def _transfer_in(
             default_return_value=True
         )
         _dx = _input_coin.balanceOf(self) - _dx
-
-    # --------------------------- Check Transfer -----------------------------
-
-    if _incoming_coin_asset_type == 2:
-        assert _dx > 0  # dev: pool did not receive tokens for swap
-    else:
-        assert dx == _dx  # dev: pool did not receive tokens for swap
 
     # ------------ Check if liquidity needs to be added somewhere ------------
 
@@ -518,8 +508,16 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
     @dev This method ensures LPs keep all rebases and admin only claims swap fees.
     """
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    balances_i: uint256 = 0
+
     for i in range(N_COINS_128):
-        result.append(ERC20(coins[i]).balanceOf(self) - self.admin_balances[i])
+
+        if POOL_IS_REBASING_IMPLEMENTATION:
+            balances_i = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
+        else:
+            balances_i = self.stored_balances[i] - self.admin_balances[i]
+
+        result.append(balances_i)
 
     return result
 
@@ -578,6 +576,7 @@ def exchange_received(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
+    assert not POOL_IS_REBASING_IMPLEMENTATION  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange(
         msg.sender,
         i,
@@ -681,9 +680,7 @@ def add_liquidity(
                 i,
                 -1,  # <--- we're not handling underlying coins here
                 _amounts[i],
-                0,
                 msg.sender,
-                empty(address),
                 False,  # expect_optimistic_transfer
             )
 
@@ -1003,9 +1000,7 @@ def _exchange(
         i,
         -1,  # <----- we're not handling underlying coins here.
         _dx,
-        _min_dy,
         sender,
-        receiver,
         expect_optimistic_transfer
     )
 
@@ -1076,9 +1071,7 @@ def _exchange_underlying(
         meta_i,
         base_i,
         _dx,
-        _min_dy,
         sender,
-        receiver,
         expect_optimistic_transfer,
         (i > 0 and j > 0),  # <--- if True: do not add liquidity to base pool.
     )
@@ -1093,6 +1086,9 @@ def _exchange_underlying(
             x = xp[i] + unsafe_div(dx_w_fee * rates[i], PRECISION)
 
         else:
+
+            # dx_w_fee is the number of base_pool LP tokens minted after
+            # base_pool.add_liquidity in self._transfer_in
 
             # dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX] / PRECISION
             x = unsafe_div(dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX], PRECISION)

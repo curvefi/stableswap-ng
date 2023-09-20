@@ -183,7 +183,7 @@ def skip_rebasing(request, swap):
     if only_for_token_types:
         asset_types_contains_rebasing = 2 in swap._immutables.asset_types
         if asset_types_contains_rebasing:
-            pytest.skip("skipped because test excludes rebasing tokens")
+            pytest.skip("skipped because test includes rebasing tokens")
 
 
 @pytest.fixture(autouse=True)
@@ -192,7 +192,7 @@ def skip_oracle(request, swap):
     if only_for_token_types:
         asset_types_contains_oracle = 1 in swap._immutables.asset_types
         if asset_types_contains_oracle:
-            pytest.skip("skipped because test excludes oraclised tokens")
+            pytest.skip("skipped because test includes oraclised tokens")
 
 
 @pytest.fixture(autouse=True)
@@ -202,6 +202,15 @@ def only_oracle(request, swap):
         asset_types_contains_rebasing = 1 in swap._immutables.asset_types
         if not asset_types_contains_rebasing:
             pytest.skip("skipped because test excludes oraclised tokens")
+
+
+@pytest.fixture(autouse=True)
+def only_rebasing(request, swap):
+    marker = request.node.get_closest_marker("contains_rebasing_tokens")
+    if marker:
+        asset_types_contains_rebasing = 2 in swap._immutables.asset_types
+        if not asset_types_contains_rebasing:
+            pytest.skip("skipped because test excludes rebasing tokens")
 
 
 # Usage

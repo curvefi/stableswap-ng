@@ -135,6 +135,8 @@ N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
 
+POOL_IS_REBASING_IMPLEMENTATION: immutable(bool)
+
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
@@ -257,6 +259,7 @@ def __init__(
 
     rate_multipliers = _rate_multipliers
     asset_types = _asset_types
+    POOL_IS_REBASING_IMPLEMENTATION = 2 in _asset_types
 
     factory = Factory(msg.sender)
 
@@ -329,14 +332,13 @@ def _transfer_in(
     @param expect_optimistic_transfer True if contract expects an optimistic coin transfer
     """
     _dx: uint256 = ERC20(coins[coin_idx]).balanceOf(self)
-    _incoming_asset_is_rebasing: bool = asset_types[coin_idx] == 2
 
     # ------------------------- Handle Transfers -----------------------------
 
     if expect_optimistic_transfer:
 
-        assert not _incoming_asset_is_rebasing  # dev: rebasing coins not supported
-        _dx = ERC20(coins[coin_idx]).balanceOf(self) - self.stored_balances[coin_idx]
+        _dx = _dx - self.stored_balances[coin_idx]
+        assert _dx >= dx
 
     else:
 
@@ -346,14 +348,9 @@ def _transfer_in(
 
         _dx = ERC20(coins[coin_idx]).balanceOf(self) - _dx
 
-    # --------------------------- Check Transfer -----------------------------
+    # --------------------------- Store transferred in amount ---------------------------
 
-    if _incoming_asset_is_rebasing:
-        assert _dx > 0  # dev: pool did not receive tokens for swap
-    else:
-        assert dx == _dx  # dev: pool did not receive tokens for swap
-        # Update stored_balances (not for rebasing tokens):
-        self.stored_balances[coin_idx] += _dx
+    self.stored_balances[coin_idx] += _dx
 
     return _dx
 
@@ -429,13 +426,19 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
     @dev This method ensures LPs keep all rebases and admin only claims swap fees.
     """
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    balances_i: uint256 = 0
 
     for i in range(MAX_COINS_128):
 
         if i == N_COINS_128:
             break
 
-        result.append(ERC20(coins[i]).balanceOf(self) - self.admin_balances[i])
+        if POOL_IS_REBASING_IMPLEMENTATION:
+            balances_i = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
+        else:
+            balances_i = self.stored_balances[i] - self.admin_balances[i]
+
+        result.append(balances_i)
 
     return result
 
@@ -494,6 +497,7 @@ def exchange_received(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
+    assert not POOL_IS_REBASING_IMPLEMENTATION  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange(
         msg.sender,
         i,
