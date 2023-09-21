@@ -594,7 +594,7 @@ def add_liquidity(
                 difference = new_balance - ideal_balance
 
             # fee[i] = _dynamic_fee(i, j) * difference / FEE_DENOMINATOR
-            xs = old_balances[i] + new_balance
+            xs = unsafe_div(rates[i] * (old_balances[i] + new_balance), PRECISION)
             _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee)
             fees.append(_dynamic_fee_i * difference / FEE_DENOMINATOR)
             self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
@@ -717,7 +717,7 @@ def remove_liquidity_imbalance(
         else:
             difference = new_balance - ideal_balance
 
-        xs = new_balance + old_balances[i]
+        xs = unsafe_div(rates[i] * (old_balances[i] + new_balance), PRECISION)
         dynamic_fee = self._dynamic_fee(xs, ys, base_fee)
         fees.append(dynamic_fee * difference / FEE_DENOMINATOR)
 
@@ -1123,14 +1123,10 @@ def _xp_mem(
 ) -> DynArray[uint256, MAX_COINS]:
 
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-
     for i in range(MAX_COINS_128):
-
         if i == N_COINS_128:
             break
-
         result.append(_rates[i] * _balances[i] / PRECISION)
-
     return result
 
 

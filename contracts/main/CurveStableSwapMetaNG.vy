@@ -505,7 +505,11 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
 def _balances() -> DynArray[uint256, MAX_COINS]:
     """
     @notice Calculates the pool's balances _excluding_ the admin's balances.
-    @dev This method ensures LPs keep all rebases and admin only claims swap fees.
+    @dev If the pool contains rebasing tokens, this method ensures LPs keep all
+         rebases and admin only claims swap fees. This also means that, since
+         admin's balances are stored in an array and not inferred from read balances,
+         the fees in the rebasing token that the admin collects is immune to
+         slashing events.
     """
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances_i: uint256 = 0
@@ -724,7 +728,7 @@ def add_liquidity(
                 difference = new_balance - ideal_balance
 
             # fee[i] = _dynamic_fee(i, j) * difference / FEE_DENOMINATOR
-            xs = old_balances[i] + new_balance
+            xs = unsafe_div(rates[i] * (old_balances[i] + new_balance), PRECISION)
             _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee)
             fees.append(
                 unsafe_div(
@@ -851,7 +855,7 @@ def remove_liquidity_imbalance(
             difference = new_balance - ideal_balance
 
         # base_fee * difference / FEE_DENOMINATOR
-        xs = new_balance + old_balances[i]
+        xs = unsafe_div(rates[i] * (old_balances[i] + new_balance), PRECISION)
         dynamic_fee = self._dynamic_fee(xs, ys, base_fee)
         fees.append(unsafe_div(dynamic_fee * difference, FEE_DENOMINATOR))
 
