@@ -24,7 +24,7 @@ def test_donate_get_D(bob, swap, underlying_tokens, pool_tokens):
         assert swap.balances(i) == 0
 
     # donate 1 wei and attempt adding liquidity:
-    pool_tokens[0].transfer(swap, 1, sender=bob)
+    pool_tokens[0].transfer(swap, 10, sender=bob)
 
     if 2 in swap._immutables.asset_types:
         with boa.reverts():
