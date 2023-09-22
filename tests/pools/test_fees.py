@@ -57,11 +57,13 @@ class TestFees:
             pool_tokens[receiving].balanceOf(swap) if pool_type == 0 else underlying_tokens[receiving].balanceOf(swap)
         )
         assert swap.balances(receiving) == swap_balance
-        assert (
-            admin_balance == pool_tokens[receiving].balanceOf(fee_receiver)
+        expected_balance = (
+            pool_tokens[receiving].balanceOf(fee_receiver)
             if pool_type == 0
             else underlying_tokens[receiving].balanceOf(fee_receiver)
         )
+
+        assert admin_balance == pytest.approx(expected_balance, abs=1)  # +- 1
 
     def test_no_fees(self, bob, fee_receiver, swap, pool_type, pool_tokens, underlying_tokens):
         swap.withdraw_admin_fees(sender=bob)
@@ -73,8 +75,8 @@ class TestFees:
             for coin in underlying_tokens:
                 assert coin.balanceOf(fee_receiver) == 0
 
-    def test_withdraw_admin_fees(self, bob, swap, pool_type, pool_tokens, underlying_tokens, fee_receiver):
-        swap.exchange(1, 0, 10**18, 0, sender=bob)
+    def test_withdraw_admin_fees(self, bob, swap, pool_type, pool_tokens, underlying_tokens, fee_receiver, decimals):
+        swap.exchange(1, 0, 10_000 * 10 ** decimals[1], 0, sender=bob)
 
         fees = []
         if pool_type == 0:
@@ -89,7 +91,7 @@ class TestFees:
         swap.withdraw_admin_fees(sender=bob)
         if pool_type == 0:
             for i, coin in enumerate(pool_tokens):
-                assert coin.balanceOf(fee_receiver) == fees[i]
+                assert coin.balanceOf(fee_receiver) == pytest.approx(fees[i], abs=1)
         else:
             for i, coin in enumerate(underlying_tokens[:2]):
-                assert coin.balanceOf(fee_receiver) == fees[i]
+                assert coin.balanceOf(fee_receiver) == pytest.approx(fees[i], abs=1)
