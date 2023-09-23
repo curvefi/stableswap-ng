@@ -36,7 +36,7 @@ jobs:
         run: |
           pip install poetry==1.5.1
           poetry config virtualenvs.in-project true
-          poetry install --no-interaction
+          poetry install --no-interaction --without dev
 
       - name: Run Tests
         run: |
