@@ -1657,17 +1657,7 @@ def calc_token_amount(
     @param _is_deposit set True for deposits, False for withdrawals
     @return Expected amount of LP tokens received
     """
-    amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
-
-        amounts[i] = _amounts[i]
-
-    views: address = factory.views_implementation()
-    return StableSwapViews(views).calc_token_amount(amounts, _is_deposit, self)
+    return StableSwapViews(factory.views_implementation()).calc_token_amount(_amounts, _is_deposit, self)
 
 
 @view
