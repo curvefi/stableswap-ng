@@ -103,8 +103,6 @@ def get_dx_underlying(
     if min(i, j) > 0:
         raise "Not a Metapool Swap. Use Base pool."
 
-    meta_v_price: uint256 = StableSwapNG(pool).stored_rates(1)
-
     # CASE 2:
     #    1. meta token_0 of (unknown amount) > base pool lp_token
     #    2. base pool lp_token > calc_withdraw_one_coin gives dy amount of (j-1)th base coin
@@ -113,7 +111,7 @@ def get_dx_underlying(
     #    2. get_dx on metapool for i = 0, and j = 1 (base lp token) with amt calculated in (1).
     if i == 0:
         # Calculate LP tokens that are burnt to receive dy amount of base_j tokens.
-        lp_amount_burnt: uint256 = self._base_calc_token_amounts(
+        lp_amount_burnt: uint256 = self._base_calc_token_amount(
             dy, j - 1, BASE_N_COINS, BASE_POOL, False
         )
         return self._get_dx(0, 1, lp_amount_burnt, pool, False, N_COINS)
@@ -181,7 +179,7 @@ def get_dy_underlying(
 
             # i is from BasePool
             base_n_coins: uint256 = StableSwapNG(pool).BASE_N_COINS()
-            x = self._base_calc_token_amounts(
+            x = self._base_calc_token_amount(
                 dx, base_i, base_n_coins, BASE_POOL, True
             ) * rates[1] / PRECISION
 
@@ -452,7 +450,7 @@ def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256, _fee_multiplier: uin
 
 @internal
 @view
-def _base_calc_token_amounts(
+def _base_calc_token_amount(
     dx: uint256,
     base_i: int128,
     base_n_coins: uint256,
