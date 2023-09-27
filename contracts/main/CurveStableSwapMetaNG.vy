@@ -406,6 +406,7 @@ def _transfer_in(
 
     else:
 
+        assert dx > 0  # dev : do not transferFrom 0 tokens into the pool
         assert _input_coin.transferFrom(
             sender,
             self,

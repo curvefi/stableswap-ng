@@ -342,6 +342,7 @@ def _transfer_in(
 
     else:
 
+        assert dx > 0  # dev : do not transferFrom 0 tokens into the pool
         assert ERC20(coins[coin_idx]).transferFrom(
             sender, self, dx, default_return_value=True
         )
