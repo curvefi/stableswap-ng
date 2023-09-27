@@ -783,6 +783,7 @@ def remove_liquidity_one_coin(
     @param _receiver Address that receives the withdrawn coins
     @return Amount of coin received
     """
+    assert _burn_amount > 0  # dev: do not remove 0 LP tokens
     dy: uint256 = 0
     fee: uint256 = 0
     xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -897,6 +898,7 @@ def remove_liquidity(
     @param _receiver Address that receives the withdrawn coins
     @return List of amounts of coins that were withdrawn
     """
+    assert _burn_amount > 0  # dev: do not remove 0 LP tokens
     total_supply: uint256 = self.total_supply
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
