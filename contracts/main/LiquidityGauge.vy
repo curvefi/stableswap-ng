@@ -240,8 +240,9 @@ def _checkpoint(addr: address):
     new_rate: uint256 = rate
 
     if prev_future_epoch >= _period_time:
+        future_epoch_time_write: uint256 = CRV20(CRV).future_epoch_time_write()
+        self.inflation_params = (future_epoch_time_write << 216) + new_rate
         new_rate = CRV20(CRV).rate()
-        self.inflation_params = (CRV20(CRV).future_epoch_time_write() << 216) + new_rate
 
     if self.is_killed:
         # Stop distributing inflation as soon as killed
@@ -300,6 +301,9 @@ def _checkpoint_rewards(_user: address, _total_supply: uint256, _claim: bool, _r
     """
     @notice Claim pending rewards and checkpoint rewards for a user
     """
+    if _total_supply == 0:
+        return
+
     user_balance: uint256 = 0
     receiver: address = _receiver
     if _user != empty(address):
@@ -320,11 +324,10 @@ def _checkpoint_rewards(_user: address, _total_supply: uint256, _claim: bool, _r
         integral: uint256 = self.reward_data[token].integral
         last_update: uint256 = min(block.timestamp, self.reward_data[token].period_finish)
         duration: uint256 = last_update - self.reward_data[token].last_update
-        if duration != 0:
+        if duration != 0:  # to prevent same-block updates
             self.reward_data[token].last_update = last_update
-            if _total_supply != 0:
-                integral += duration * self.reward_data[token].rate * 10**18 / _total_supply
-                self.reward_data[token].integral = integral
+            integral += duration * self.reward_data[token].rate * 10**18 / _total_supply
+            self.reward_data[token].integral = integral
 
         if _user != empty(address):
             integral_for: uint256 = self.reward_integral_for[token][_user]
@@ -685,6 +688,7 @@ def deposit_reward_token(_reward_token: address, _amount: uint256, _epoch: uint2
     @param _epoch The duration the rewards are distributed across.
     """
     assert msg.sender == self.reward_data[_reward_token].distributor
+    assert _amount > _epoch  # dev: epoch > _amount
 
     self._checkpoint_rewards(empty(address), self.totalSupply, False, empty(address))
 
@@ -710,6 +714,7 @@ def add_reward(_reward_token: address, _distributor: address):
     @param _distributor Address permitted to fund this contract with the reward token
     """
     assert msg.sender in [self.manager, Factory(self.factory).admin()]  # dev: only manager or factory admin
+    assert _distributor != empty(address)  # dev: distributor cannot be zero address
 
     reward_count: uint256 = self.reward_count
     assert reward_count < MAX_REWARDS
@@ -729,7 +734,7 @@ def set_reward_distributor(_reward_token: address, _distributor: address):
     """
     current_distributor: address = self.reward_data[_reward_token].distributor
 
-    assert msg.sender == current_distributor or msg.sender == Factory(self.factory).admin()
+    assert msg.sender in [current_distributor, Factory(self.factory).admin(), self.manager]
     assert current_distributor != empty(address)
     assert _distributor != empty(address)
 

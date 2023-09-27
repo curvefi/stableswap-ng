@@ -39,6 +39,7 @@ interface CurvePool:
     def balances(i: uint256) -> uint256: view
     def admin_balances(i: uint256) -> uint256: view
     def get_virtual_price() -> uint256: view
+    def coins(i: uint256) -> address: view
     def exchange(
         i: int128,
         j: int128,
@@ -718,7 +719,6 @@ def deploy_gauge(_pool: address) -> address:
 def add_base_pool(
     _base_pool: address,
     _base_lp_token: address,
-    _coins: DynArray[address, MAX_COINS],
     _asset_types: DynArray[uint8, MAX_COINS],
     _n_coins: uint256,
 ):
@@ -743,11 +743,13 @@ def add_base_pool(
     self.base_pool_data[_base_pool].asset_types = _asset_types
 
     decimals: uint256 = 0
-    coins: DynArray[address, MAX_COINS] = _coins
+    coins: DynArray[address, MAX_COINS] = empty(DynArray[address, MAX_COINS])
+    coin: address = empty(address)
     for i in range(MAX_COINS):
         if i == _n_coins:
             break
-        coin: address = coins[i]
+        coin = CurvePool(_base_pool).coins(i)
+        assert coin != 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE  # dev: native token is not supported
         self.base_pool_data[_base_pool].coins.append(coin)
         self.base_pool_data[_base_pool].asset_types.append(_asset_types[i])
         self.base_pool_assets[coin] = True

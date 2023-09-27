@@ -287,7 +287,7 @@ def calc_token_amount(
 
             xs = old_balances[i] + new_balance
             _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee, fee_multiplier)
-            new_balances[i] -= base_fee * difference / FEE_DENOMINATOR
+            new_balances[i] -= _dynamic_fee_i * difference / FEE_DENOMINATOR
 
         for idx in range(MAX_COINS):
             if idx == N_COINS:
