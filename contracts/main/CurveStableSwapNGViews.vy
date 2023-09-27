@@ -114,7 +114,7 @@ def get_dx_underlying(
     if i == 0:
         # Calculate LP tokens that are burnt to receive dy amount of base_j tokens.
         lp_amount_burnt: uint256 = self._base_calc_token_amounts(
-            dy, j - 1, meta_v_price, BASE_N_COINS, BASE_POOL, False
+            dy, j - 1, BASE_N_COINS, BASE_POOL, False
         )
         return self._get_dx(0, 1, lp_amount_burnt, pool, False, N_COINS)
 
@@ -182,8 +182,8 @@ def get_dy_underlying(
             # i is from BasePool
             base_n_coins: uint256 = StableSwapNG(pool).BASE_N_COINS()
             x = self._base_calc_token_amounts(
-                dx, base_i, rates[1], base_n_coins, BASE_POOL, True
-            )
+                dx, base_i, base_n_coins, BASE_POOL, True
+            ) * rates[1] / PRECISION
 
             # Accounting for deposit/withdraw fees approximately
             x -= x * StableSwapNG(BASE_POOL).fee() / (2 * FEE_DENOMINATOR)
@@ -455,7 +455,6 @@ def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256, _fee_multiplier: uin
 def _base_calc_token_amounts(
     dx: uint256,
     base_i: int128,
-    meta_vprice: uint256,
     base_n_coins: uint256,
     base_pool: address,
     is_deposit: bool
@@ -465,13 +464,13 @@ def _base_calc_token_amounts(
 
         base_inputs: uint256[2] = empty(uint256[2])
         base_inputs[base_i] = dx
-        return StableSwap2(base_pool).calc_token_amount(base_inputs, is_deposit) * meta_vprice / PRECISION
+        return StableSwap2(base_pool).calc_token_amount(base_inputs, is_deposit)
 
     elif base_n_coins == 3:
 
         base_inputs: uint256[3] = empty(uint256[3])
         base_inputs[base_i] = dx
-        return StableSwap3(base_pool).calc_token_amount(base_inputs, is_deposit) * meta_vprice / PRECISION
+        return StableSwap3(base_pool).calc_token_amount(base_inputs, is_deposit)
 
     else:
 
