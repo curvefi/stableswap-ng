@@ -96,7 +96,6 @@ def add_base_pool(
         factory.add_base_pool(
             base_pool.address,
             base_pool_lp_token.address,
-            [t.address for t in base_pool_tokens],
             [0] * len(base_pool_tokens),
             len(base_pool_tokens),
         )

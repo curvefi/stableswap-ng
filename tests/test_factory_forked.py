@@ -25,6 +25,6 @@ class TestFactoryForked:
         ]
 
         assert empty_factory.base_pool_count() == 0
-        empty_factory.add_base_pool(susd_pool, lp_token, coins, [0] * len(coins), len(coins), sender=owner)
+        empty_factory.add_base_pool(susd_pool, lp_token, [0] * len(coins), len(coins), sender=owner)
         assert empty_factory.base_pool_count() == 1
         assert empty_factory.base_pool_list(0) == susd_pool

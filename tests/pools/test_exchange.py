@@ -88,12 +88,27 @@ class TestExchange:
 
     class TestExchangeReverts:
         @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-        def test_insufficient_balance(self, charlie, swap, sending, receiving, decimals):
+        def test_insufficient_balance(
+            self, charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals
+        ):
+
             amount = 10 ** decimals[sending]
 
+            for token in pool_tokens + underlying_tokens:
+                assert token.balanceOf(charlie) == 0
+
             # Charlie doesn't have any tokens, all balances are 0
-            with boa.reverts():
+            try:
                 swap.exchange(sending, receiving, amount + 1, 0, sender=charlie)
+                assert False
+            except:  # noqa: E722
+                assert True
+
+        @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
+        @pytest.mark.contains_rebasing_tokens
+        def test_zero_amount_swap(self, charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals):
+            with boa.reverts():
+                swap.exchange(sending, receiving, 0, 0, sender=charlie)
 
         @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
         def test_min_dy_too_high(self, bob, swap, sending, receiving, decimals):
