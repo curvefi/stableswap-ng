@@ -183,10 +183,8 @@ def get_dy_underlying(
                 dx, base_i, base_n_coins, BASE_POOL, True
             ) * rates[1] / PRECISION
 
-            # Accounting for deposit/withdraw fees approximately
-            x -= x * StableSwapNG(BASE_POOL).fee() / (2 * FEE_DENOMINATOR)
             # Adding number of pool tokens
-            x += xp[MAX_COIN]
+            x += xp[1]
 
         else:
             # If both are from the base pool
@@ -207,7 +205,7 @@ def get_dy_underlying(
 
     # If output is going via the metapool
     if j == 0:
-        dy /= (rates[0] / 10**18)
+        dy = dy * 10**18 / rates[0]
     else:
         # j is from BasePool
         # The fee is already accounted for
