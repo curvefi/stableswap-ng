@@ -241,8 +241,8 @@ def _checkpoint(addr: address):
 
     if prev_future_epoch >= _period_time:
         future_epoch_time_write: uint256 = CRV20(CRV).future_epoch_time_write()
-        self.inflation_params = (future_epoch_time_write << 216) + new_rate
         new_rate = CRV20(CRV).rate()
+        self.inflation_params = (future_epoch_time_write << 216) + new_rate
 
     if self.is_killed:
         # Stop distributing inflation as soon as killed
@@ -301,8 +301,6 @@ def _checkpoint_rewards(_user: address, _total_supply: uint256, _claim: bool, _r
     """
     @notice Claim pending rewards and checkpoint rewards for a user
     """
-    if _total_supply == 0:
-        return
 
     user_balance: uint256 = 0
     receiver: address = _receiver
@@ -324,7 +322,8 @@ def _checkpoint_rewards(_user: address, _total_supply: uint256, _claim: bool, _r
         integral: uint256 = self.reward_data[token].integral
         last_update: uint256 = min(block.timestamp, self.reward_data[token].period_finish)
         duration: uint256 = last_update - self.reward_data[token].last_update
-        if duration != 0:  # to prevent same-block updates
+
+        if duration != 0 and _total_supply != 0:
             self.reward_data[token].last_update = last_update
             integral += duration * self.reward_data[token].rate * 10**18 / _total_supply
             self.reward_data[token].integral = integral
