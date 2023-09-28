@@ -235,21 +235,20 @@ def _checkpoint(addr: address):
     _integrate_inv_supply: uint256 = self.integrate_inv_supply[_period]
 
     inflation_params: uint256 = self.inflation_params
-    rate: uint256 = inflation_params % 2 ** 216
     prev_future_epoch: uint256 = inflation_params >> 216
-    new_rate: uint256 = rate
     gauge_is_killed: bool = self.is_killed
+
+    rate: uint256 = inflation_params % 2 ** 216
+    new_rate: uint256 = rate
+    if gauge_is_killed:
+        rate = 0
+        new_rate = 0
 
     if prev_future_epoch >= _period_time:
         future_epoch_time_write: uint256 = CRV20(CRV).future_epoch_time_write()
-        new_rate = CRV20(CRV).rate()
         if not gauge_is_killed:
-            self.inflation_params = (future_epoch_time_write << 216) + new_rate
-
-    if gauge_is_killed:
-        # Stop distributing inflation as soon as killed
-        rate = 0
-        new_rate = 0  # prevent distribution when crossing epochs
+            new_rate = CRV20(CRV).rate()
+        self.inflation_params = (future_epoch_time_write << 216) + new_rate
 
     # Update integral of 1/supply
     if block.timestamp > _period_time:
