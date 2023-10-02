@@ -174,7 +174,7 @@ N_COINS: public(constant(uint256)) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 
-POOL_IS_REBASING_IMPLEMENTATION: immutable(bool)
+POOL_IS_REBASING_IMPLEMENTATION: public(immutable(bool))
 
 BASE_POOL: public(immutable(address))
 BASE_N_COINS: public(immutable(uint256))

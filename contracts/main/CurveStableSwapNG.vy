@@ -135,7 +135,7 @@ N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
 
-POOL_IS_REBASING_IMPLEMENTATION: immutable(bool)
+POOL_IS_REBASING_IMPLEMENTATION: public(immutable(bool))
 
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
