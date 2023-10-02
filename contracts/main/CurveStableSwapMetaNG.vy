@@ -1695,12 +1695,6 @@ def get_balances() -> DynArray[uint256, MAX_COINS]:
 
 @view
 @external
-def oracle(_idx: uint256) -> address:
-    return convert(self.oracles[0] % 2**160, address)
-
-
-@view
-@external
 def stored_rates() -> DynArray[uint256, MAX_COINS]:
     return self._stored_rates()
 
