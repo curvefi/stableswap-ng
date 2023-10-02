@@ -1703,8 +1703,8 @@ def oracle(_idx: uint256) -> address:
 
 @view
 @external
-def stored_rates(i: uint256) -> uint256:
-    return self._stored_rates()[i]
+def stored_rates() -> DynArray[uint256, MAX_COINS]:
+    return self._stored_rates()
 
 
 @view

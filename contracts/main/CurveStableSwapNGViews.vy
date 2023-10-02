@@ -11,8 +11,9 @@ interface StableSwapNG:
     def N_COINS() -> uint256: view
     def BASE_POOL() -> address: view
     def BASE_N_COINS() -> uint256: view
-    def stored_rates(i: uint256) -> uint256: view
+    def stored_rates() -> DynArray[uint256, MAX_COINS]: view
     def balances(i: uint256) -> uint256: view
+    def get_balances() -> DynArray[uint256, MAX_COINS]: view
     def fee() -> uint256: view
     def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
     def A() -> uint256: view
@@ -654,18 +655,8 @@ def _get_rates_balances_xp(pool: address, N_COINS: uint256) -> (
     DynArray[uint256, MAX_COINS],
 ):
 
-    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    balances: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    rate: uint256 = 0
-
-    # Get rates and balances:
-    for idx in range(MAX_COINS):
-        if idx == N_COINS:
-            break
-        rate = StableSwapNG(pool).stored_rates(idx)
-        rates.append(StableSwapNG(pool).stored_rates(idx))
-        balances.append(StableSwapNG(pool).balances(idx))
-
+    rates: DynArray[uint256, MAX_COINS] = StableSwapNG(pool).stored_rates()
+    balances: DynArray[uint256, MAX_COINS] = StableSwapNG(pool).get_balances()
     xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for idx in range(MAX_COINS):
         if idx == N_COINS:
