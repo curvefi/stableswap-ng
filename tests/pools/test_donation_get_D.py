@@ -25,8 +25,7 @@ def test_donate_get_D(bob, swap, underlying_tokens, pool_tokens):
 
     # donate 1 wei and attempt adding liquidity:
     pool_tokens[0].transfer(swap, 10, sender=bob)
-
-    if 2 in swap._immutables.asset_types:
+    if swap.POOL_IS_REBASING_IMPLEMENTATION():
         with boa.reverts():
             # division by zero error expected for rebasing implementation
             swap.add_liquidity(amounts, 0, sender=bob)

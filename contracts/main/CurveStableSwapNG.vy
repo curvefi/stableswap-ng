@@ -140,7 +140,6 @@ POOL_IS_REBASING_IMPLEMENTATION: public(immutable(bool))
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
-asset_types: immutable(DynArray[uint8, MAX_COINS])
 
 # Fee specific vars
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
@@ -258,7 +257,6 @@ def __init__(
         self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
 
     rate_multipliers = _rate_multipliers
-    asset_types = _asset_types
     POOL_IS_REBASING_IMPLEMENTATION = 2 in _asset_types
 
     factory = Factory(msg.sender)
@@ -787,6 +785,8 @@ def remove_liquidity(
     # Withdraw admin fees if _claim_admin_fees is set to True. Helps automate.
     if _claim_admin_fees:
         self._withdraw_admin_fees()
+
+    # Upkeep D_oracle
 
     return amounts
 

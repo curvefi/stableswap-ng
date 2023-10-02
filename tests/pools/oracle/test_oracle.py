@@ -85,11 +85,6 @@ class TestOracle:
         def test_oracles(self, alice, swap, pool_size, pool_type, pool_token_types, metapool_token_type):
             assert swap._storage.oracles.get() != [0] * pool_size
 
-            if pool_type == 0:
-                assert swap._immutables.asset_types == pool_token_types
-            else:
-                assert swap._immutables.asset_types == [metapool_token_type, 0, 0, 0, 0]
-
         def test_get_dy(
             self,
             alice,

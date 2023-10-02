@@ -184,7 +184,6 @@ math: immutable(Math)
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
-asset_types: immutable(DynArray[uint8, MAX_COINS])
 
 # Fee specific vars
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
@@ -305,7 +304,6 @@ def __init__(
     BASE_N_COINS = len(_base_coins)
     coins = _coins  # <---------------- coins[1] is always base pool LP token.
     rate_multipliers = _rate_multipliers
-    asset_types = _asset_types  # contains asset types for all pool tokens including base pool tokens
 
     POOL_IS_REBASING_IMPLEMENTATION = 2 in _asset_types
 

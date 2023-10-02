@@ -55,7 +55,7 @@ def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
     # amm prices:
     p_amm = []
     for n in range(swap.N_COINS() - 1):
-        p_amm.append(swap.get_p(n) * stored_rates(n + 1) / 10**36)
+        p_amm.append(swap.get_p(n) * stored_rates[n + 1] / 10**36)
 
     # compare
     for n in range(swap.N_COINS() - 1):
