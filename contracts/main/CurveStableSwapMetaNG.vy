@@ -313,7 +313,7 @@ def __init__(
             # _exchange_underlying:
             ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))
 
-    self.last_prices_packed.append(self.pack_prices(10**18, 10**18))
+    self.last_prices_packed.append(self.pack_2(10**18, 10**18))
 
     # ----------------- Parameters independent of pool type ------------------
 
@@ -750,7 +750,7 @@ def add_liquidity(
         mint_amount = D1  # Take the dust if there was any
 
         # (re)instantiate D oracle if totalSupply is zero.
-        self.last_D_packed = self.pack_prices(D1, D1)
+        self.last_D_packed = self.pack_2(D1, D1)
 
     assert mint_amount >= _min_mint_amount, "Slippage screwed you"
 
@@ -1284,7 +1284,7 @@ def _calc_withdraw_one_coin(
 
 @pure
 @internal
-def pack_prices(p1: uint256, p2: uint256) -> uint256:
+def pack_2(p1: uint256, p2: uint256) -> uint256:
     assert p1 < 2**128
     assert p2 < 2**128
     return p1 | (p2 << 128)
@@ -1332,7 +1332,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
     if spot_price[0] != 0:
 
         # Upate packed prices -----------------
-        last_prices_packed_new[0] = self.pack_prices(
+        last_prices_packed_new[0] = self.pack_2(
             spot_price[0],
             self._calc_moving_average(
                 last_prices_packed_current[0],
@@ -1345,7 +1345,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
     # ---------------------------- Upkeep D oracle ---------------------------
 
     last_D_packed_current: uint256 = self.last_D_packed
-    self.last_D_packed = self.pack_prices(
+    self.last_D_packed = self.pack_2(
         D,
         self._calc_moving_average(last_D_packed_current, self.D_ma_time)
     )
