@@ -1328,7 +1328,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
         )
     )
 
-    # Housekeeping: Update ma_last_time ------------------
+    # Housekeeping: Update ma_last_time for p and D oracles ------------------
     for i in range(2):
         if ma_last_time_unpacked[i] < block.timestamp:
             ma_last_time_unpacked[i] = block.timestamp
@@ -1394,7 +1394,7 @@ def price_oracle(i: uint256) -> uint256:
     return self._calc_moving_average(
         self.last_prices_packed[i],
         self.ma_exp_time,
-        self.ma_last_time
+        self.ma_last_time & (2**128 - 1)
     )
 
 
@@ -1405,7 +1405,7 @@ def D_oracle() -> uint256:
     return self._calc_moving_average(
         self.last_D_packed,
         self.D_ma_time,
-        self.ma_last_time
+        self.ma_last_time >> 128
     )
 
 
