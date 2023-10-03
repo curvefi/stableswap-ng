@@ -1324,7 +1324,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
         self._calc_moving_average(
             last_D_packed_current,
             self.D_ma_time,
-            ma_last_time_unpacked[1],  # index 0 is ma_exp_time for D
+            ma_last_time_unpacked[1],  # index 1 is ma_exp_time for D
         )
     )
 
