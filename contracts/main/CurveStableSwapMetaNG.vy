@@ -218,7 +218,7 @@ last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_pri
 last_D_packed: uint256                            #  packing: last_D, ma_D
 ma_exp_time: public(uint256)
 D_ma_time: public(uint256)
-ma_last_time: public(uint256)
+ma_last_time: public(uint256)                     # packing: ma_last_time_p, ma_last_time_D
 
 # shift(2**32 - 1, 224)
 ORACLE_BIT_MASK: constant(uint256) = (2**32 - 1) * 256**28
@@ -328,7 +328,7 @@ def __init__(
     assert _ma_exp_time != 0
     self.ma_exp_time = _ma_exp_time
     self.D_ma_time = 62324  # <--------- 12 hours default on contract start.
-    self.ma_last_time = block.timestamp
+    self.ma_last_time = self.pack_2(block.timestamp, block.timestamp)
 
     for i in range(N_COINS_128):
 
@@ -896,8 +896,8 @@ def remove_liquidity(
     @param _receiver Address that receives the withdrawn coins
     @return List of amounts of coins that were withdrawn
     """
-    assert _burn_amount > 0  # dev: do not remove 0 LP tokens
     total_supply: uint256 = self.total_supply
+    assert _burn_amount > 0 and _burn_amount <= total_supply  # dev: invalid _burn_amount
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
 
@@ -905,16 +905,44 @@ def remove_liquidity(
 
     for i in range(N_COINS_128):
 
-        value = balances[i] * _burn_amount / total_supply
+        value = unsafe_div(balances[i] * _burn_amount, total_supply)
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
         amounts.append(value)
         self._transfer_out(i, value, _receiver)
 
     self._burnFrom(msg.sender, _burn_amount)  # dev: insufficient funds
 
-    log RemoveLiquidity(msg.sender, amounts, empty(DynArray[uint256, MAX_COINS]), total_supply)
+    # --------------------------- Upkeep D_oracle ----------------------------
 
-    # Withdraw admin fees if _claim_admin_fees is set to True. Helps automate.
+    ma_last_time_unpacked: uint256[2] = self.unpack_2(self.ma_last_time)
+    last_D_packed_current: uint256 = self.last_D_packed
+    old_D: uint256 = last_D_packed_current & (2**128 - 1)
+
+    self.last_D_packed = self.pack_2(
+        old_D - unsafe_div(old_D * _burn_amount, total_supply),  # new_D = proportionally reduce D.
+        self._calc_moving_average(
+            last_D_packed_current,
+            self.D_ma_time,
+            ma_last_time_unpacked[1]
+        )
+    )
+
+    if ma_last_time_unpacked[1] < block.timestamp:
+        ma_last_time_unpacked[1] = block.timestamp
+
+    self.ma_last_time = self.pack_2(ma_last_time_unpacked[0], ma_last_time_unpacked[1])
+
+    # ------------------------------- Log event ------------------------------
+
+    log RemoveLiquidity(
+        msg.sender,
+        amounts,
+        empty(DynArray[uint256, MAX_COINS]),
+        total_supply - _burn_amount
+    )
+
+    # ------- Withdraw admin fees if _claim_admin_fees is set to True --------
+
     if _claim_admin_fees:
         self._withdraw_admin_fees()
 
@@ -1290,6 +1318,12 @@ def pack_2(p1: uint256, p2: uint256) -> uint256:
     return p1 | (p2 << 128)
 
 
+@pure
+@internal
+def unpack_2(packed: uint256) -> uint256[2]:
+    return [packed & (2**128 - 1), packed >> 128]
+
+
 @internal
 @pure
 def _get_p(
@@ -1320,7 +1354,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
     """
     @notice Upkeeps price and D oracles.
     """
-    ma_last_time: uint256 = self.ma_last_time
+    ma_last_time_unpacked: uint256[2] = self.unpack_2(self.ma_last_time)
     last_prices_packed_current: DynArray[uint256, MAX_COINS] = self.last_prices_packed
     last_prices_packed_new: DynArray[uint256, MAX_COINS] = last_prices_packed_current
 
@@ -1336,7 +1370,8 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
             spot_price[0],
             self._calc_moving_average(
                 last_prices_packed_current[0],
-                self.ma_exp_time
+                self.ma_exp_time,
+                ma_last_time_unpacked[0],  # index 0 is ma_exp_time for prices
             )
         )
 
@@ -1347,18 +1382,28 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
     last_D_packed_current: uint256 = self.last_D_packed
     self.last_D_packed = self.pack_2(
         D,
-        self._calc_moving_average(last_D_packed_current, self.D_ma_time)
+        self._calc_moving_average(
+            last_D_packed_current,
+            self.D_ma_time,
+            ma_last_time_unpacked[1],  # index 1 is ma_exp_time for D
+        )
     )
 
-    # Housekeeping: Update ma_last_time ------------------
-    if ma_last_time < block.timestamp:
-        self.ma_last_time = block.timestamp
+    # Housekeeping: Update ma_last_time for p and D oracles ------------------
+    for i in range(2):
+        if ma_last_time_unpacked[i] < block.timestamp:
+            ma_last_time_unpacked[i] = block.timestamp
+
+    self.ma_last_time = self.pack_2(ma_last_time_unpacked[0], ma_last_time_unpacked[1])
 
 
 @internal
 @view
-def _calc_moving_average(packed_value: uint256, averaging_window: uint256) -> uint256:
-    ma_last_time: uint256 = self.ma_last_time
+def _calc_moving_average(
+    packed_value: uint256,
+    averaging_window: uint256,
+    ma_last_time: uint256
+) -> uint256:
 
     last_spot_value: uint256 = packed_value & (2**128 - 1)
     last_ema_value: uint256 = (packed_value >> 128)
@@ -1410,14 +1455,22 @@ def get_p(i: uint256) -> uint256:
 @nonreentrant('lock')
 def price_oracle(i: uint256) -> uint256:
     assert i == 0  # dev: metapools do not have price oracle indices greater than 0.
-    return self._calc_moving_average(self.last_prices_packed[0], self.ma_exp_time)
+    return self._calc_moving_average(
+        self.last_prices_packed[0],
+        self.ma_exp_time,
+        self.ma_last_time & (2**128 - 1),
+    )
 
 
 @external
 @view
 @nonreentrant('lock')
 def D_oracle() -> uint256:
-    return self._calc_moving_average(self.last_D_packed, self.D_ma_time)
+    return self._calc_moving_average(
+        self.last_D_packed,
+        self.D_ma_time,
+        self.ma_last_time >> 128
+    )
 
 
 # ---------------------------- ERC20 Utils -----------------------------------

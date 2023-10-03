@@ -764,7 +764,7 @@ def remove_liquidity(
     @return List of amounts of coins that were withdrawn
     """
     total_supply: uint256 = self.total_supply
-    assert _burn_amount > 0 and _burn_amount < total_supply  # dev: invalid _burn_amount
+    assert _burn_amount > 0 and _burn_amount <= total_supply  # dev: invalid _burn_amount
 
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
