@@ -1800,15 +1800,15 @@ def stop_ramp_A():
 
 
 @external
-def apply_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
+def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
 
     assert msg.sender == factory.admin()
 
-    # apply new fee:
+    # set new fee:
     assert _new_fee <= MAX_FEE
     self.fee = _new_fee
 
-    # apply new offpeg_fee_multiplier:
+    # set new offpeg_fee_multiplier:
     assert _new_offpeg_fee_multiplier * _new_fee <= MAX_FEE * FEE_DENOMINATOR  # dev: offpeg multiplier exceeds maximum
     self.offpeg_fee_multiplier = _new_offpeg_fee_multiplier
 
