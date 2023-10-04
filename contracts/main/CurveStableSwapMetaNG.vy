@@ -1,4 +1,5 @@
-# @version 0.3.9
+# @version 0.3.10rc6
+#pragma optimize codesize
 """
 @title CurveStableSwapMetaNG
 @author Curve.Fi
@@ -567,6 +568,7 @@ def exchange_received(
          this method are dex aggregators, arbitrageurs, or other users who do not
          wish to grant approvals to the contract: they would instead send tokens
          directly to the contract and call `exchange_received`.
+         Note: This is disabled if pool contains rebasing tokens.
     @param i Index value for the coin to send
     @param j Index valie of the coin to recieve
     @param _dx Amount of `i` being exchanged
@@ -625,6 +627,7 @@ def exchange_underlying_received(
 ) -> uint256:
     """
     @notice Perform an exchange between two underlying coins
+    @dev This is disabled if pool contains rebasing tokens.
     @param i Index value for the underlying coin to send
     @param j Index value of the underlying coin to receive
     @param _dx Amount of `i` being exchanged
