@@ -106,7 +106,7 @@ class TestPoolToken:
         def test_permit_contract(self, eth_acc, bob, swap):
             # based on https://eips.ethereum.org/EIPS/eip-1271
             src = """
-                # @version 0.3.9
+                # @version ^0.3.9
                 OWNER: public(immutable(address))
 
                 @external
