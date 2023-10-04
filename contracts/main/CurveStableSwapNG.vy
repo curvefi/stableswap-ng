@@ -50,7 +50,7 @@ interface ERC1271:
 
 interface StableSwapViews:
     def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
-    def get_dy(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dy(i: int128, j: int128, dx: uint256, pool: address) -> uint256: view
     def dynamic_fee(i: int128, j: int128, pool: address) -> uint256: view
     def calc_token_amount(
         _amounts: DynArray[uint256, MAX_COINS],
@@ -317,14 +317,12 @@ def __init__(
 def _transfer_in(
     coin_idx: int128,
     dx: uint256,
-    dy: uint256,
     sender: address,
-    receiver: address,
     expect_optimistic_transfer: bool,
 ) -> uint256:
     """
     @notice Contains all logic to handle ERC20 token transfers.
-    @param _coin address of the coin to transfer in.
+    @param coin_idx Index of the coin to transfer in.
     @param dx amount of `_coin` to transfer into the pool.
     @param dy amount of `_coin` to transfer out of the pool.
     @param sender address to transfer `_coin` from.
@@ -361,8 +359,8 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     """
     @notice Transfer a single token from the pool to receiver.
     @dev This function is called by `remove_liquidity` and
-         `remove_liquidity_one` and `_exchange` methods.
-    @param _coin Address of the token to transfer out
+         `remove_liquidity_one`, `_exchange` and `_withdraw_admin_fees` methods.
+    @param _coin_idx Index of the token to transfer out
     @param _amount Amount of token to transfer out
     @param receiver Address to send the tokens to
     """
@@ -412,8 +410,6 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
             max_outsize=32,
             is_static_call=True,
         )
-
-        assert len(response) != 0
         rates[i] = rates[i] * convert(response, uint256) / PRECISION
 
     return rates
@@ -464,7 +460,7 @@ def exchange(
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
     @param i Index value for the coin to send
-    @param j Index valie of the coin to recieve
+    @param j Index value of the coin to recieve
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
@@ -550,9 +546,7 @@ def add_liquidity(
             new_balances[i] += self._transfer_in(
                 i,
                 _amounts[i],
-                0,
                 msg.sender,
-                empty(address),
                 False,  # expect_optimistic_transfer
             )
 
@@ -606,9 +600,9 @@ def add_liquidity(
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
-        D2: uint256 = self.get_D(xp, amp)
-        mint_amount = total_supply * (D2 - D0) / D0
-        self.upkeep_oracles(xp, amp, D2)
+        D1 = self.get_D(xp, amp)  # <--------------- Reuse D1 for new D value.
+        mint_amount = total_supply * (D1 - D0) / D0
+        self.upkeep_oracles(xp, amp, D1)
 
     else:
 
@@ -730,12 +724,12 @@ def remove_liquidity_imbalance(
         self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
         new_balances[i] -= fees[i]
 
-    D2: uint256 = self.get_D_mem(rates, new_balances, amp)
+    D1 = self.get_D_mem(rates, new_balances, amp)  # dev: reuse D1 for new D.
 
-    self.upkeep_oracles(new_balances, amp, D2)
+    self.upkeep_oracles(new_balances, amp, D1)
 
     total_supply: uint256 = self.total_supply
-    burn_amount: uint256 = ((D0 - D2) * total_supply / D0) + 1
+    burn_amount: uint256 = ((D0 - D1) * total_supply / D0) + 1
     assert burn_amount > 1  # dev: zero tokens burned
     assert burn_amount <= _max_burn_amount, "Slippage screwed you"
 
@@ -764,7 +758,7 @@ def remove_liquidity(
     @return List of amounts of coins that were withdrawn
     """
     total_supply: uint256 = self.total_supply
-    assert _burn_amount > 0 and _burn_amount <= total_supply  # dev: invalid _burn_amount
+    assert _burn_amount > 0  # dev: invalid burn amount
 
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
@@ -775,7 +769,7 @@ def remove_liquidity(
         if i == N_COINS_128:
             break
 
-        value = unsafe_div(balances[i] * _burn_amount, total_supply)
+        value = balances[i] * _burn_amount / total_supply
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
         amounts.append(value)
         self._transfer_out(i, value, _receiver)
@@ -846,7 +840,6 @@ def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256) -> uint256:
 
 @internal
 def __exchange(
-    dx: uint256,
     x: uint256,
     _xp: DynArray[uint256, MAX_COINS],
     rates: DynArray[uint256, MAX_COINS],
@@ -902,16 +895,14 @@ def _exchange(
     dx: uint256 = self._transfer_in(
         i,
         _dx,
-        _min_dy,
         sender,
-        receiver,
         expect_optimistic_transfer
     )
 
     # ------------------------------- Exchange -------------------------------
 
     x: uint256 = xp[i] + dx * rates[i] / PRECISION
-    dy: uint256 = self.__exchange(dx, x, xp, rates, i, j)
+    dy: uint256 = self.__exchange(x, xp, rates, i, j)
     assert dy >= _min_dy, "Exchange resulted in fewer coins than expected"
 
     # --------------------------- Do Transfer out ----------------------------
@@ -978,9 +969,7 @@ def get_y(
 
     amp: uint256 = _amp
     D: uint256 = _D
-    if _D == 0:
-        amp = self._A()
-        D = self.get_D(xp, amp)
+
     S_: uint256 = 0
     _x: uint256 = 0
     y_prev: uint256 = 0
@@ -1218,10 +1207,10 @@ def _calc_withdraw_one_coin(
 
         if j == i:
             dx_expected = xp_j * D1 / D0 - new_y
-            xavg = (xp[j] + new_y) / 2
+            xavg = (xp_j + new_y) / 2
         else:
             dx_expected = xp_j - xp_j * D1 / D0
-            xavg = xp[j]
+            xavg = xp_j
 
         dynamic_fee = self._dynamic_fee(xavg, ys, base_fee)
         xp_reduced[j] = xp_j - dynamic_fee * dx_expected / FEE_DENOMINATOR
@@ -1686,7 +1675,9 @@ def totalSupply() -> uint256:
 def get_virtual_price() -> uint256:
     """
     @notice The current virtual price of the pool LP token
-    @dev Useful for calculating profits
+    @dev Useful for calculating profits.
+         The method may be vulnerable to donation-style attacks if implementation
+         contains rebasing tokens. For integrators, caution is advised.
     @return LP token virtual price normalized to 1e18
     """
     amp: uint256 = self._A()

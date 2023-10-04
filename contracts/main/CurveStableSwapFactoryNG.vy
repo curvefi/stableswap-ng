@@ -30,7 +30,6 @@ interface ERC20:
     def balanceOf(_addr: address) -> uint256: view
     def decimals() -> uint256: view
     def totalSupply() -> uint256: view
-    def approve(_spender: address, _amount: uint256): nonpayable
 
 interface CurvePool:
     def A() -> uint256: view
@@ -40,13 +39,6 @@ interface CurvePool:
     def admin_balances(i: uint256) -> uint256: view
     def get_virtual_price() -> uint256: view
     def coins(i: uint256) -> address: view
-    def exchange(
-        i: int128,
-        j: int128,
-        dx: uint256,
-        min_dy: uint256,
-        _receiver: address,
-    ) -> uint256: nonpayable
 
 interface CurveFactoryMetapool:
     def coins(i :uint256) -> address: view
@@ -74,7 +66,6 @@ event LiquidityGaugeDeployed:
     gauge: address
 
 MAX_COINS: constant(uint256) = 8
-ADDRESS_PROVIDER: constant(address) = 0x0000000022D53366457F9d5E68Ec105046FC4383
 
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
@@ -86,8 +77,8 @@ pool_list: public(address[4294967296])   # master list of pools
 pool_count: public(uint256)              # actual length of pool_list
 pool_data: HashMap[address, PoolArray]
 
-base_pool_list: public(address[4294967296])   # master list of pools
-base_pool_count: public(uint256)         # actual length of pool_list
+base_pool_list: public(address[4294967296])   # list of base pools
+base_pool_count: public(uint256)              # number of base pools
 base_pool_data: public(HashMap[address, BasePoolArray])
 
 # asset -> is used in a metapool?
@@ -442,7 +433,11 @@ def get_pool_asset_types(_pool: address) -> DynArray[uint8, MAX_COINS]:
     """
     @notice Query the asset type of `_pool`
     @param _pool Pool Address
-    @return Integer indicating the pool asset type
+    @return Dynarray of uint8 indicating the pool asset type
+            Asset Types:
+                0. Standard ERC20 token with no additional features
+                1. Oracle - token with rate oracle (e.g. wrapped staked ETH)
+                2. Rebasing - token with rebase (e.g. staked ETH)
     """
     return self.pool_data[_pool].asset_types
 
@@ -476,8 +471,7 @@ def deploy_plain_pool(
                * Non-redeemable, collateralized assets: 100
                * Redeemable assets: 200-400
     @param _fee Trade fee, given as an integer with 1e10 precision. The
-                the maximum is 1% (100000000).
-                50% of the fee is distributed to veCRV holders.
+                maximum is 1% (100000000). 50% of the fee is distributed to veCRV holders.
     @param _ma_exp_time Averaging window of oracle. Set as time_in_seconds / ln(2)
                         Example: for 10 minute EMA, _ma_exp_time is 600 / ln(2) ~= 866
     @param _implementation_idx Index of the implementation to use
@@ -488,9 +482,10 @@ def deploy_plain_pool(
     @param _oracles Array of rate oracle addresses.
     @return Address of the deployed pool
     """
-    assert len(_coins) == len(_method_ids), "All coin arrays should be same length"
-    assert len(_coins) ==  len(_oracles), "All coin arrays should be same length"
-    assert len(_coins) ==  len(_asset_types), "All coin arrays should be same length"
+    assert len(_coins) >= 2  # dev: pool needs to have at least two coins!
+    assert len(_coins) == len(_method_ids)  # dev: All coin arrays should be same length
+    assert len(_coins) ==  len(_oracles)  # dev: All coin arrays should be same length
+    assert len(_coins) ==  len(_asset_types)  # dev: All coin arrays should be same length
     assert _fee <= 100000000, "Invalid fee"
     assert _offpeg_fee_multiplier * _fee <= MAX_FEE * FEE_DENOMINATOR
 
@@ -548,14 +543,7 @@ def deploy_plain_pool(
 
         coin: address = _coins[i]
         self.pool_data[pool].coins.append(coin)
-        raw_call(
-            coin,
-            concat(
-                method_id("approve(address,uint256)"),
-                convert(pool, bytes32),
-                convert(max_value(uint256), bytes32)
-            )
-        )
+
         for j in range(i, i + MAX_COINS):
             if (j + 1) == n_coins:
                 break
@@ -657,8 +645,6 @@ def deploy_metapool(
         _oracles,                                       # _oracles: DynArray[address, MAX_COINS]
         code_offset=3
     )
-
-    ERC20(_coin).approve(pool, max_value(uint256))
 
     # add pool to pool_list
     length: uint256 = self.pool_count

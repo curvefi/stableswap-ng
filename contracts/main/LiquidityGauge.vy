@@ -89,7 +89,6 @@ MAX_REWARDS: constant(uint256) = 8
 TOKENLESS_PRODUCTION: constant(uint256) = 40
 WEEK: constant(uint256) = 604800
 
-# keccak256("isValidSignature(bytes32,bytes)")[:4] << 224
 VERSION: constant(String[8]) = "v6.0.0"  # <- updated from v5.0.0 (adds `create_from_blueprint` pattern)
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
@@ -171,8 +170,6 @@ def __init__(_lp_token: address):
     @notice Contract constructor
     @param _lp_token Liquidity Pool contract address
     """
-    assert self.lp_token == empty(address)
-
     self.lp_token = _lp_token
     self.factory = msg.sender
     self.manager = msg.sender
@@ -259,7 +256,7 @@ def _checkpoint(addr: address):
 
         for i in range(500):
             dt: uint256 = week_time - prev_week_time
-            w: uint256 = Controller(GAUGE_CONTROLLER).gauge_relative_weight(self, prev_week_time / WEEK * WEEK)
+            w: uint256 = Controller(GAUGE_CONTROLLER).gauge_relative_weight(self, prev_week_time)
 
             if _working_supply > 0:
                 if prev_future_epoch >= prev_week_time and prev_future_epoch < week_time:
@@ -413,7 +410,7 @@ def deposit(_value: uint256, _addr: address = msg.sender, _claim_rewards: bool =
     @param _value Number of tokens to deposit
     @param _addr Address to deposit for
     """
-
+    assert _addr != empty(address)  # dev: cannot deposit for zero address
     self._checkpoint(_addr)
 
     if _value != 0:
@@ -431,8 +428,8 @@ def deposit(_value: uint256, _addr: address = msg.sender, _claim_rewards: bool =
 
         ERC20(self.lp_token).transferFrom(msg.sender, self, _value)
 
-    log Deposit(_addr, _value)
-    log Transfer(empty(address), _addr, _value)
+        log Deposit(_addr, _value)
+        log Transfer(empty(address), _addr, _value)
 
 
 @external
@@ -688,19 +685,28 @@ def deposit_reward_token(_reward_token: address, _amount: uint256, _epoch: uint2
     @param _epoch The duration the rewards are distributed across.
     """
     assert msg.sender == self.reward_data[_reward_token].distributor
-    assert _amount > _epoch  # dev: epoch > _amount
 
     self._checkpoint_rewards(empty(address), self.totalSupply, False, empty(address))
 
-    assert ERC20(_reward_token).transferFrom(msg.sender, self, _amount, default_return_value=True)
+    # transferFrom reward token and use transferred amount henceforth:
+    amount_received: uint256 = ERC20(_reward_token).balanceOf(self)
+    assert ERC20(_reward_token).transferFrom(
+        msg.sender,
+        self,
+        _amount,
+        default_return_value=True
+    )
+    amount_received = ERC20(_reward_token).balanceOf(self) - amount_received
 
     period_finish: uint256 = self.reward_data[_reward_token].period_finish
+    assert amount_received > _epoch  # dev: rate will tend to zero!
+
     if block.timestamp >= period_finish:
-        self.reward_data[_reward_token].rate = _amount / _epoch
+        self.reward_data[_reward_token].rate = amount_received / _epoch  # TODO: consider using precision here hmm
     else:
         remaining: uint256 = period_finish - block.timestamp
         leftover: uint256 = remaining * self.reward_data[_reward_token].rate
-        self.reward_data[_reward_token].rate = (_amount + leftover) / _epoch
+        self.reward_data[_reward_token].rate = (amount_received + leftover) / _epoch
 
     self.reward_data[_reward_token].last_update = block.timestamp
     self.reward_data[_reward_token].period_finish = block.timestamp + _epoch

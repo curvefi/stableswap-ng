@@ -350,7 +350,6 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128, pool: address) -> u
         xp_reduced[j] = xp_j - dynamic_fee * dx_expected / FEE_DENOMINATOR
 
     dy: uint256 = xp_reduced[i] - self.get_y_D(amp, i, xp_reduced, D1, N_COINS)
-    dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
     dy = (dy - 1) * PRECISION / rates[i]  # Withdraw less to account for rounding errors
 
     return dy

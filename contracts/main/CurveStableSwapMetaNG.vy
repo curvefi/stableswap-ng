@@ -51,9 +51,9 @@ interface ERC1271:
 
 interface StableSwapViews:
     def get_dx(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
-    def get_dy(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dy(i: int128, j: int128, dx: uint256, pool: address) -> uint256: view
     def get_dx_underlying(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
-    def get_dy_underlying(i: int128, j: int128, dy: uint256, pool: address) -> uint256: view
+    def get_dy_underlying(i: int128, j: int128, dx: uint256, pool: address) -> uint256: view
     def dynamic_fee(i: int128, j: int128, pool: address) -> uint256: view
     def calc_token_amount(
         _amounts: DynArray[uint256, MAX_COINS],
@@ -297,6 +297,7 @@ def __init__(
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
     """
+    assert len(_base_coins) <= 3  # dev: implementation does not support base pool with more than 3 coins
 
     math = Math(_math_implementation)
     BASE_POOL = _base_pool
@@ -375,7 +376,8 @@ def _transfer_in(
 ) -> uint256:
     """
     @notice Contains all logic to handle ERC20 token transfers.
-    @param _coin address of the coin to transfer in.
+    @param coin_metapool_idx metapool index of input coin
+    @param coin_basepool_idx basepool index of input coin
     @param dx amount of `_coin` to transfer into the pool.
     @param sender address to transfer `_coin` from.
     @param expect_optimistic_transfer True if contract expects an optimistic coin transfer
@@ -438,12 +440,12 @@ def _transfer_out(
 ):
     """
     @notice Transfer a single token from the pool to receiver.
-    @param _coin Address of the token to transfer out
+    @param _coin_idx Index of the token to transfer out
     @param _amount Amount of token to transfer out
     @param receiver Address to send the tokens to
     """
 
-    # 'gulp' coin balance of the pool to stored_balances here to account for
+    # Read coin balance of the pool to stored_balances here to account for
     # donations etc.
     coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
 
@@ -470,31 +472,23 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
          this method queries that rate by static-calling an external
          contract.
     """
-    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    if BASE_POOL != empty(address):
-        rates = [rate_multipliers[0], StableSwap(BASE_POOL).get_virtual_price()]
-    else:
-        rates = rate_multipliers
+    rates: DynArray[uint256, MAX_COINS] = [
+        rate_multipliers[0],
+        StableSwap(BASE_POOL).get_virtual_price()
+    ]
 
     oracles: DynArray[uint256, MAX_COINS] = self.oracles
+    if not self.oracles[0] == 0:
 
-    for i in range(N_COINS_128):
-
-        if oracles[i] == 0:
-            continue
-
-        # NOTE: assumed that response is of precision 10**18
         response: Bytes[32] = raw_call(
-            convert(oracles[i] % 2**160, address),
-            _abi_encode(oracles[i] & ORACLE_BIT_MASK),
+            convert(oracles[0] % 2**160, address),
+            _abi_encode(oracles[0] & ORACLE_BIT_MASK),
             max_outsize=32,
             is_static_call=True,
         )
 
-        assert len(response) != 0
-
-        # rates[i] * convert(response, uint256) / PRECISION
-        rates[i] = unsafe_div(rates[i] * convert(response, uint256), PRECISION)
+        # rates[0] * convert(response, uint256) / PRECISION
+        rates[0] = unsafe_div(rates[0] * convert(response, uint256), PRECISION)
 
     return rates
 
@@ -541,7 +535,7 @@ def exchange(
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
     @param i Index value for the coin to send
-    @param j Index valie of the coin to recieve
+    @param j Index value of the coin to recieve
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
@@ -741,9 +735,9 @@ def add_liquidity(
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
-        D2: uint256 = math.get_D(xp, amp, N_COINS)
-        mint_amount = total_supply * (D2 - D0) / D0
-        self.upkeep_oracles(xp, amp, D2)
+        D1 = math.get_D(xp, amp, N_COINS)  # <------ Reuse D1 for new D value.
+        mint_amount = total_supply * (D1 - D0) / D0
+        self.upkeep_oracles(xp, amp, D1)
 
     else:
 
@@ -864,12 +858,12 @@ def remove_liquidity_imbalance(
 
         new_balances[i] -= fees[i]
 
-    D2: uint256 = self.get_D_mem(rates, new_balances, amp)
+    D1 = self.get_D_mem(rates, new_balances, amp)  # dev: reuse D1 for new D.
 
-    self.upkeep_oracles(new_balances, amp, D2)
+    self.upkeep_oracles(new_balances, amp, D1)
 
     total_supply: uint256 = self.total_supply
-    burn_amount: uint256 = ((D0 - D2) * total_supply / D0) + 1
+    burn_amount: uint256 = ((D0 - D1) * total_supply / D0) + 1
     assert burn_amount > 1  # dev: zero tokens burned
     assert burn_amount <= _max_burn_amount, "Slippage screwed you"
 
@@ -897,7 +891,7 @@ def remove_liquidity(
     @return List of amounts of coins that were withdrawn
     """
     total_supply: uint256 = self.total_supply
-    assert _burn_amount > 0 and _burn_amount <= total_supply  # dev: invalid _burn_amount
+    assert _burn_amount > 0  # dev: invalid _burn_amount
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
 
@@ -977,7 +971,6 @@ def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256) -> uint256:
 
 @internal
 def __exchange(
-    dx: uint256,
     x: uint256,
     _xp: DynArray[uint256, MAX_COINS],
     rates: DynArray[uint256, MAX_COINS],
@@ -1042,7 +1035,7 @@ def _exchange(
 
     # xp[i] + dx * rates[i] / PRECISION
     x: uint256 = xp[i] + unsafe_div(dx * rates[i], PRECISION)
-    dy: uint256 = self.__exchange(dx, x, xp, rates, i, j)
+    dy: uint256 = self.__exchange(x, xp, rates, i, j)
     assert dy >= _min_dy, "Exchange resulted in fewer coins than expected"
 
     # --------------------------- Do Transfer out ----------------------------
@@ -1067,8 +1060,6 @@ def _exchange_underlying(
     expect_optimistic_transfer: bool = False
 ) -> uint256:
 
-    assert BASE_POOL != empty(address)  # dev: pool is not a metapool
-
     rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
     xp: DynArray[uint256, MAX_COINS]  = self._xp_mem(rates, old_balances)
@@ -1079,21 +1070,20 @@ def _exchange_underlying(
     meta_i: int128 = 0
     meta_j: int128 = 0
     x: uint256 = 0
-    input_coin: address = empty(address)
     output_coin: address = empty(address)
 
     # ------------------------ Determine coin indices ------------------------
 
-    if i == 0:
-        input_coin = coins[0]
-    else:
-        base_i = i - MAX_METAPOOL_COIN_INDEX  # if i == 1, this reverts
+    # Get input coin indices:
+    if i > 0:
+        base_i = i - MAX_METAPOOL_COIN_INDEX
         meta_i = 1
-        input_coin = BASE_COINS[base_i]
+
+    # Get output coin and indices:
     if j == 0:
         output_coin = coins[0]
     else:
-        base_j = j - MAX_METAPOOL_COIN_INDEX  # if j == 1, this reverts
+        base_j = j - MAX_METAPOOL_COIN_INDEX
         meta_j = 1
         output_coin = BASE_COINS[base_j]
 
@@ -1128,7 +1118,7 @@ def _exchange_underlying(
             x = unsafe_div(dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX], PRECISION)
             x += xp[MAX_METAPOOL_COIN_INDEX]
 
-        dy = self.__exchange(dx_w_fee, x, xp, rates, meta_i, meta_j)
+        dy = self.__exchange(x, xp, rates, meta_i, meta_j)
 
         # Adjust stored balances of meta-level tokens:
         self.stored_balances[meta_j] -= dy
@@ -1289,10 +1279,10 @@ def _calc_withdraw_one_coin(
         xp_j = xp[j]
         if j == i:
             dx_expected = xp_j * D1 / D0 - new_y
-            xavg = (xp[j] + new_y) / 2
+            xavg = (xp_j + new_y) / 2
         else:
             dx_expected = xp_j - xp_j * D1 / D0
-            xavg = xp[j]
+            xavg = xp_j
 
         # xp_j - dynamic_fee * dx_expected / FEE_DENOMINATOR
         dynamic_fee = self._dynamic_fee(xavg, ys, base_fee)
@@ -1690,7 +1680,9 @@ def totalSupply() -> uint256:
 def get_virtual_price() -> uint256:
     """
     @notice The current virtual price of the pool LP token
-    @dev Useful for calculating profits
+    @dev Useful for calculating profits.
+         The method may be vulnerable to donation-style attacks if implementation
+         contains rebasing tokens. For integrators, caution is advised.
     @return LP token virtual price normalized to 1e18
     """
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(self._stored_rates(), self._balances())
