@@ -4037,12 +4037,14 @@ test = ["covdefaults (>=2.3)", "coverage (>=7.2.7)", "coverage-enable-subprocess
 
 [[package]]
 name = "vyper"
-version = "0.3.10rc6"
+version = "0.3.10"
 description = "Vyper: the Pythonic Programming Language for the EVM"
 optional = false
 python-versions = ">=3.10,<4"
-files = []
-develop = false
+files = [
+    {file = "vyper-0.3.10-py3-none-any.whl", hash = "sha256:05636302341bf89602b19f749fcabc8d184a265d8eea4a45c20b3259780353b0"},
+    {file = "vyper-0.3.10.tar.gz", hash = "sha256:8dc1f501caab417fb0ce9c68a6944587f0147ec7cc7d3889cf3a45c19466e489"},
+]
 
 [package.dependencies]
 asttokens = ">=2.0.5,<3"
@@ -4057,12 +4059,6 @@ dev = ["black (==23.3.0)", "eth-stdlib (==0.2.6)", "eth-tester[py-evm] (>=0.9.0b
 docs = ["recommonmark", "sphinx (>=6.0,<7.0)", "sphinx-rtd-theme (>=1.2,<1.3)"]
 lint = ["black (==23.3.0)", "flake8 (==3.9.2)", "flake8-bugbear (==20.1.4)", "flake8-use-fstring (==1.1)", "isort (==5.9.3)", "mypy (==0.982)"]
 test = ["eth-stdlib (==0.2.6)", "eth-tester[py-evm] (>=0.9.0b1,<0.10)", "hypothesis[lark] (>=5.37.1,<6.0)", "lark (==1.1.2)", "py-evm (>=0.7.0a1,<0.8)", "pytest (>=6.2.5,<7.0)", "pytest-cov (>=2.10,<3.0)", "pytest-instafail (>=0.4,<1.0)", "pytest-rerunfailures (>=10.2,<11)", "pytest-split (>=0.7.0,<1.0)", "pytest-xdist (>=2.5,<3.0)", "tox (>=3.15,<4.0)", "web3 (==6.0.0)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/vyperlang/vyper.git"
-reference = "e9c16e40dd11ba21ba817ff0da78eaeab744fd39"
-resolved_reference = "e9c16e40dd11ba21ba817ff0da78eaeab744fd39"
 
 [[package]]
 name = "watchdog"
@@ -4538,4 +4534,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "c3d4972e56d89e5038804f0ade9fd9b578f1d3599100fd87c7401bf34b82fcf6"
+content-hash = "8fe9e234f49d624b6796c4e8f6eb71b98972ecf8f4155cc5a2ce231e2b825a90"

@@ -1,4 +1,4 @@
-# @version 0.3.10rc6
+# @version 0.3.10
 #pragma optimize gas
 """
 @title CurveStableSwapNG

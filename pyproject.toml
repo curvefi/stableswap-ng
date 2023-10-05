@@ -11,7 +11,7 @@ packages = []
 python = "^3.10"
 poetry = "1.5.1"
 titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "40f5bfcc2afe212bb5a6f5026148f3625596ded7"}
-vyper = {git = "https://github.com/vyperlang/vyper.git", rev = "e9c16e40dd11ba21ba817ff0da78eaeab744fd39"}
+vyper = "0.3.10"
 pycryptodome = "^3.18.0"
 pre-commit = "^3.3.3"
 
