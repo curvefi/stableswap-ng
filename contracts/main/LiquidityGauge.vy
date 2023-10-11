@@ -702,7 +702,7 @@ def deposit_reward_token(_reward_token: address, _amount: uint256, _epoch: uint2
     assert amount_received > _epoch  # dev: rate will tend to zero!
 
     if block.timestamp >= period_finish:
-        self.reward_data[_reward_token].rate = amount_received / _epoch  # TODO: consider using precision here hmm
+        self.reward_data[_reward_token].rate = amount_received / _epoch
     else:
         remaining: uint256 = period_finish - block.timestamp
         leftover: uint256 = remaining * self.reward_data[_reward_token].rate

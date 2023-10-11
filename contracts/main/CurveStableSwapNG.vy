@@ -13,6 +13,7 @@
         0. Standard ERC20 token with no additional features
         1. Oracle - token with rate oracle (e.g. wstETH)
         2. Rebasing - token with rebase (e.g. stETH)
+        3. ERC4626 - token with convertToAssets method (e.g. sDAI).
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
@@ -36,6 +37,8 @@
 """
 
 from vyper.interfaces import ERC20
+from vyper.interfaces import ERC20Detailed
+from vyper.interfaces import ERC4626
 
 implements: ERC20
 
@@ -140,6 +143,7 @@ POOL_IS_REBASING_IMPLEMENTATION: public(immutable(bool))
 
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
+asset_types: public(immutable(DynArray[uint8, MAX_COINS]))
 stored_balances: DynArray[uint256, MAX_COINS]
 
 # Fee specific vars
@@ -250,6 +254,7 @@ def __init__(
     """
 
     coins = _coins
+    asset_types = _asset_types
     __n_coins: uint256 = len(_coins)
     N_COINS = __n_coins
     N_COINS_128 = convert(__n_coins, int128)
@@ -366,8 +371,6 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     @param receiver Address to send the tokens to
     """
 
-    # 'gulp' coin balance of the pool to stored_balances here to account for
-    # donations etc.
     coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
 
     # ------------------------- Handle Transfers -----------------------------
@@ -404,14 +407,27 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
         if oracles[i] == 0:
             continue
 
-        # NOTE: assumed that response is of precision 10**18
-        response: Bytes[32] = raw_call(
-            convert(oracles[i] % 2**160, address),
-            _abi_encode(oracles[i] & ORACLE_BIT_MASK),
-            max_outsize=32,
-            is_static_call=True,
-        )
-        rates[i] = rates[i] * convert(response, uint256) / PRECISION
+        if asset_types[i] == 1:
+
+            # NOTE: fetched_rate is assumed to be 10**18 precision
+            fetched_rate: uint256 = convert(
+                raw_call(
+                    convert(oracles[i] % 2**160, address),
+                    _abi_encode(oracles[i] & ORACLE_BIT_MASK),
+                    max_outsize=32,
+                    is_static_call=True,
+                ),
+                uint256
+            )
+
+            rates[i] = unsafe_div(rates[i] * fetched_rate, PRECISION)
+
+        elif asset_types[i] == 3:  # ERC4626
+
+            coin_decimals: uint256 = convert(ERC20Detailed(coins[i]).decimals(), uint256)
+            fetched_rate: uint256 = ERC4626(coins[i]).convertToAssets(10**coin_decimals) * 10**(18 - coin_decimals)
+
+            rates[i] = unsafe_div(rates[i] * fetched_rate, PRECISION)
 
     return rates
 

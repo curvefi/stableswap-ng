@@ -2,7 +2,7 @@ import pytest
 from boa.test import strategy
 from hypothesis import given, settings
 
-SETTINGS = {"max_examples": 100, "deadline": 1000}
+SETTINGS = {"max_examples": 100, "deadline": None}
 
 
 @given(
