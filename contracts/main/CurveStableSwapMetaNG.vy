@@ -219,6 +219,10 @@ rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
 oracles: DynArray[uint256, MAX_COINS]
 
+# For ERC4626 tokens, we need:
+call_amount: immutable(uint256)
+scale_factor: immutable(uint256)
+
 last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_price
 last_D_packed: uint256                            #  packing: last_D, ma_D
 ma_exp_time: public(uint256)
@@ -320,7 +324,14 @@ def __init__(
             # _exchange_underlying:
             ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))
 
-    self.last_prices_packed.append(self.pack_2(10**18, 10**18))
+    # For ERC4626 tokens:
+    if asset_types[0] == 3:
+        # In Vyper 0.3.10, if immutables are not set, because of an if-statement,
+        # it is by default set to 0; this is fine in the case of these two
+        # immutables, since they are only used if asset_types[0] == 3.
+        call_amount = 10**convert(ERC20Detailed(_coins[0]).decimals(), uint256)
+        _underlying_asset: address = ERC4626(_coins[0]).asset()
+        scale_factor = 10**(18 - convert(ERC20Detailed(_underlying_asset).decimals(), uint256))
 
     # ----------------- Parameters independent of pool type ------------------
 
@@ -337,6 +348,9 @@ def __init__(
     self.D_ma_time = 62324  # <--------- 12 hours default on contract start.
     self.ma_last_time = self.pack_2(block.timestamp, block.timestamp)
 
+    #  ------------------- initialize storage for DynArrays ------------------
+
+    self.last_prices_packed.append(self.pack_2(10**18, 10**18))
     for i in range(N_COINS_128):
 
         self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
@@ -500,13 +514,11 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
 
     elif asset_types[0] == 3:  # ERC4626
 
-        coin_decimals: uint256 = convert(ERC20Detailed(coins[0]).decimals(), uint256)
-
         # rates[0] * fetched_rate / PRECISION
         rates[0] = unsafe_div(
-            rates[0] * ERC4626(coins[0]).convertToAssets(10**coin_decimals) * 10**(18 - coin_decimals),
+            rates[0] * ERC4626(coins[0]).convertToAssets(call_amount) * scale_factor,
             PRECISION
-        )
+        )  # 1e18 precision
 
     return rates
 

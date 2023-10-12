@@ -175,6 +175,10 @@ rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
 oracles: DynArray[uint256, MAX_COINS]
 
+# For ERC4626 tokens, we need:
+call_amount: immutable(DynArray[uint256, MAX_COINS])
+scale_factor: immutable(DynArray[uint256, MAX_COINS])
+
 last_prices_packed: DynArray[uint256, MAX_COINS]  #  packing: last_price, ma_price
 last_D_packed: uint256                            #  packing: last_D, ma_D
 ma_exp_time: public(uint256)
@@ -259,11 +263,6 @@ def __init__(
     N_COINS = __n_coins
     N_COINS_128 = convert(__n_coins, int128)
 
-    for i in range(MAX_COINS):
-        if i == __n_coins - 1:
-            break
-        self.last_prices_packed.append(self.pack_2(10**18, 10**18))
-
     rate_multipliers = _rate_multipliers
     POOL_IS_REBASING_IMPLEMENTATION = 2 in _asset_types
 
@@ -280,18 +279,37 @@ def __init__(
     self.D_ma_time = 62324  # <--------- 12 hours default on contract start.
     self.ma_last_time = self.pack_2(block.timestamp, block.timestamp)
 
+    #  ------------------- initialize storage for DynArrays ------------------
+
+    _call_amount: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    _scale_factor: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(MAX_COINS_128):
 
         if i == N_COINS_128:
             break
 
-        self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
+        if i < N_COINS_128 - 1:
+            self.last_prices_packed.append(self.pack_2(10**18, 10**18))
 
-        #  --------------------------- initialize storage ---------------------------
+        self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
         self.stored_balances.append(0)
         self.admin_balances.append(0)
 
-    # --------------------------- ERC20 stuff ----------------------------
+        if _asset_types[i] == 3:
+
+            _call_amount.append(10**convert(ERC20Detailed(_coins[i]).decimals(), uint256))
+            _underlying_asset: address = ERC4626(_coins[i]).asset()
+            _scale_factor.append(10**(18 - convert(ERC20Detailed(_underlying_asset).decimals(), uint256)))
+
+        else:
+
+            _call_amount.append(0)
+            _scale_factor.append(0)
+
+    call_amount = _call_amount
+    scale_factor = _scale_factor
+
+    # ----------------------------- ERC20 stuff ------------------------------
 
     name = _name
     symbol = _symbol
@@ -421,10 +439,13 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
 
         elif asset_types[i] == 3:  # ERC4626
 
-            coin_decimals: uint256 = convert(ERC20Detailed(coins[i]).decimals(), uint256)
-            fetched_rate: uint256 = ERC4626(coins[i]).convertToAssets(10**coin_decimals) * 10**(18 - coin_decimals)
-
-            rates[i] = unsafe_div(rates[i] * fetched_rate, PRECISION)
+            # fetched_rate: uint256 = ERC4626(coins[i]).convertToAssets(call_amount[i]) * scale_factor[i]
+            # here: call_amount has ERC4626 precision, but the returned value is scaled up to 18
+            # using scale_factor which is (18 - n) if underlying asset has n decimals.
+            rates[i] = unsafe_div(
+                rates[i] * ERC4626(coins[i]).convertToAssets(call_amount[i]) * scale_factor[i],
+                PRECISION
+            )  # 1e18 precision
 
     return rates
 
