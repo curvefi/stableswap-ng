@@ -73,6 +73,8 @@ FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 admin: public(address)
 future_admin: public(address)
 
+asset_types: public(HashMap[uint8, String[20]])
+
 pool_list: public(address[4294967296])   # master list of pools
 pool_count: public(uint256)              # actual length of pool_list
 pool_data: HashMap[address, PoolArray]
@@ -106,6 +108,12 @@ def __init__(_fee_receiver: address, _owner: address):
 
     self.fee_receiver = _fee_receiver
     self.admin = _owner
+
+    self.asset_types[0] = "Standard"
+    self.asset_types[1] = "Oracle"
+    self.asset_types[2] = "Rebasing"
+    self.asset_types[3] = "ERC4626"
+
 
 # <--- Factory Getters --->
 
@@ -438,6 +446,7 @@ def get_pool_asset_types(_pool: address) -> DynArray[uint8, MAX_COINS]:
                 0. Standard ERC20 token with no additional features
                 1. Oracle - token with rate oracle (e.g. wrapped staked ETH)
                 2. Rebasing - token with rebase (e.g. staked ETH)
+                3. ERC4626 - e.g. sDAI
     """
     return self.pool_data[_pool].asset_types
 
@@ -840,3 +849,14 @@ def set_fee_receiver(_pool: address, _fee_receiver: address):
     """
     assert msg.sender == self.admin  # dev: admin only
     self.fee_receiver = _fee_receiver
+
+
+@external
+def add_asset_type(_id: uint8, _name: String[10]):
+    """
+    @notice Admin only method that adds a new asset type.
+    @param _id asset type id.
+    @param _name Name of the asset type.
+    """
+    assert msg.sender == self.admin  # dev: admin only
+    self.asset_types[_id] = _name

@@ -404,10 +404,7 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
         if i == N_COINS_128:
             break
 
-        if oracles[i] == 0:
-            continue
-
-        if asset_types[i] == 1:
+        if asset_types[i] == 1 and not oracles[i] == 0:
 
             # NOTE: fetched_rate is assumed to be 10**18 precision
             fetched_rate: uint256 = convert(
