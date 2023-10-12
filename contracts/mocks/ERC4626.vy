@@ -1,6 +1,7 @@
 # @version 0.3.10
 # From: https://github.com/fubuloubu/ERC4626/blob/main/contracts/VyperVault.vy
 from vyper.interfaces import ERC20
+from vyper.interfaces import ERC20Detailed
 
 import ERC4626 as ERC4626
 
@@ -16,6 +17,7 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 NAME: immutable(String[10])
 SYMBOL: immutable(String[5])
 DECIMALS: immutable(uint8)
+_DECIMALS_OFFSET: immutable(uint8)
 
 event Transfer:
     sender: indexed(address)
@@ -56,6 +58,8 @@ def __init__(
     SYMBOL =  _symbol
     DECIMALS = _decimals
     asset = _asset
+
+    _DECIMALS_OFFSET = _decimals - ERC20Detailed(_asset.address).decimals()
 
 
 @view
@@ -113,8 +117,7 @@ def _convertToAssets(shareAmount: uint256) -> uint256:
     if totalSupply == 0:
         return 0
 
-    # NOTE: `shareAmount = 0` is extremely rare case, not optimizing for it
-    return shareAmount * asset.balanceOf(self) / totalSupply
+    return shareAmount * asset.balanceOf(self) / (totalSupply)
 
 
 @view
@@ -129,9 +132,8 @@ def _convertToShares(assetAmount: uint256) -> uint256:
     totalSupply: uint256 = self.totalSupply
     totalAssets: uint256 = asset.balanceOf(self)
     if totalAssets == 0 or totalSupply == 0:
-        return assetAmount  # 1:1 price
+        return assetAmount * 10**convert(_DECIMALS_OFFSET, uint256)  # 1:1 price
 
-    # NOTE: `assetAmount = 0` is extremely rare case, not optimizing for it
     return assetAmount * totalSupply / totalAssets
 
 

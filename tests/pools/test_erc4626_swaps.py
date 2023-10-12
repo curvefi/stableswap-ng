@@ -1,8 +1,18 @@
+import itertools
+
 import boa
 import pytest
 from eth_utils import function_signature_to_4byte_selector
 
 from tests.utils.tokens import mint_for_testing
+
+
+def mint_vault_tokens(deposit_amount, underlying_token, vault_contract, user):
+
+    mint_for_testing(user, deposit_amount, underlying_token, False)
+    underlying_token.approve(vault_contract, 2**256 - 1, sender=user)
+    vault_contract.deposit(deposit_amount, user, sender=user)
+    return vault_contract.balanceOf(user)
 
 
 @pytest.fixture(scope="module")
@@ -23,7 +33,7 @@ def token_a(deployer, asset):
             "contracts/mocks/ERC4626.vy",
             "Vault",
             "VLT",
-            8,  # 8 decimals
+            18,  # 8 decimals
             asset.address,
         )
 
@@ -44,7 +54,7 @@ def token_b(deployer):
 def token_c(deployer):
     with boa.env.prank(deployer):
         return boa.load(
-            "contracts/mocks/ERC20Rebasing.vy",
+            "contracts/mocks/ERC20RebasingConditional.vy",
             "Rebasing",
             "RBSN",
             6,
@@ -122,16 +132,22 @@ def empty_swap(
 @pytest.fixture(scope="module")
 def deposit_amounts(pool_erc20_tokens, token_a, bob):
     _deposit_amounts = []
-    for i, token in enumerate(pool_tokens):
+    for i, token in enumerate(pool_erc20_tokens):
         _deposit_amount = 10**6 * 10 ** token.decimals()
         if token.balanceOf(bob) < _deposit_amount:
             mint_for_testing(bob, _deposit_amount, token, False)
 
         if i == 0:  # erc4626 token
-            token.approve(token_a, 2**256 - 1, sender=bob)
-            token_a.deposit(_deposit_amount, bob, sender=bob)
+            _deposit_amount = mint_vault_tokens(_deposit_amount, token, token_a, bob)
 
         _deposit_amounts.append(_deposit_amount)
+
+        try:
+            assert token.balanceOf(bob) == _deposit_amount
+        except:  # noqa: E722
+            mint_for_testing(bob, _deposit_amount, token, False)
+            assert token.balanceOf(bob) == _deposit_amount
+
     return _deposit_amounts
 
 
@@ -140,21 +156,36 @@ def swap(empty_swap, bob, deposit_amounts, pool_tokens):
 
     for token in pool_tokens:
         token.approve(empty_swap, 2**256 - 1, sender=bob)
-
     empty_swap.add_liquidity(deposit_amounts, 0, bob, sender=bob)
     return empty_swap
 
 
-def test_swap(swap, charlie, pool_tokens):
+@pytest.mark.parametrize("i,j", itertools.permutations(range(3), 2))
+def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
 
-    amount_in = 10**18
-    i = 0
-    j = 1
-    if amount_in > pool_tokens[i].balanceOf(charlie):
-        mint_for_testing(charlie, 10**18, pool_tokens[i], False)
+    amount_erc20_in = 10 ** pool_erc20_tokens[i].decimals()
+
+    if amount_erc20_in > pool_erc20_tokens[i].balanceOf(charlie):
+        if i != 0:
+            bal_before = pool_erc20_tokens[i].balanceOf(charlie)
+            mint_for_testing(charlie, amount_erc20_in, pool_erc20_tokens[i], False)
+            amount_in = pool_erc20_tokens[i].balanceOf(charlie) - bal_before
+        else:
+            amount_in = mint_vault_tokens(amount_erc20_in, pool_erc20_tokens[0], pool_tokens[0], charlie)
 
     pool_tokens[i].approve(swap, 2**256 - 1, sender=charlie)
-    swap.exchange(i, j, amount_in, 0, sender=charlie)
+
+    if "RebasingConditional" in pool_tokens[i].filename:
+        pool_tokens[i].rebase()
+
+    calculated = swap.get_dy(i, j, amount_in)
+    dy = swap.exchange(i, j, amount_in, int(0.99 * calculated), sender=charlie)
+
+    try:
+        assert dy == calculated
+    except:  # noqa: E722
+        assert 2 in [i, j]  # rebasing token balances can have wonky math
+        assert dy == pytest.approx(calculated)
 
 
 def test_rebase(swap, charlie, bob, pool_tokens):

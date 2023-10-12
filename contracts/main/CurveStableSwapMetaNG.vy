@@ -178,8 +178,6 @@ N_COINS: public(constant(uint256)) = 2
 N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 
-POOL_IS_REBASING_IMPLEMENTATION: public(immutable(bool))
-
 BASE_POOL: public(immutable(address))
 BASE_N_COINS: public(immutable(uint256))
 BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
@@ -187,7 +185,7 @@ BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
 math: immutable(Math)
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
-asset_types: public(immutable(DynArray[uint8, MAX_COINS]))
+asset_types: immutable(DynArray[uint8, MAX_COINS])
 stored_balances: DynArray[uint256, MAX_COINS]
 
 # Fee specific vars
@@ -315,8 +313,6 @@ def __init__(
     coins = _coins  # <---------------- coins[1] is always base pool LP token.
     asset_types = _asset_types
     rate_multipliers = _rate_multipliers
-
-    POOL_IS_REBASING_IMPLEMENTATION = 2 in _asset_types
 
     for i in range(MAX_COINS):
         if i < BASE_N_COINS:
@@ -539,7 +535,7 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
 
     for i in range(N_COINS_128):
 
-        if POOL_IS_REBASING_IMPLEMENTATION:
+        if 2 in asset_types:
             balances_i = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
         else:
             balances_i = self.stored_balances[i] - self.admin_balances[i]
@@ -604,7 +600,7 @@ def exchange_received(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
-    assert not POOL_IS_REBASING_IMPLEMENTATION  # dev: exchange_received not supported if pool contains rebasing tokens
+    assert not 2 in asset_types  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange(
         msg.sender,
         i,
@@ -664,7 +660,7 @@ def exchange_underlying_received(
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
-    assert not POOL_IS_REBASING_IMPLEMENTATION  # dev: exchange_received not supported if pool contains rebasing tokens
+    assert not 2 in asset_types  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange_underlying(
         msg.sender,
         i,
