@@ -15,6 +15,13 @@ def mint_vault_tokens(deposit_amount, underlying_token, vault_contract, user):
     return vault_contract.balanceOf(user)
 
 
+def donate_to_vault(donation_amount, underlying_token, vault_contract, user):
+
+    donation_amount = donation_amount * 10 ** underlying_token.decimals()
+    mint_for_testing(user, donation_amount, underlying_token, False)
+    underlying_token.transfer(vault_contract, donation_amount, sender=user)
+
+
 @pytest.fixture(scope="module")
 def asset(deployer):
     with boa.env.prank(deployer):
@@ -181,6 +188,40 @@ def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
     calculated = swap.get_dy(i, j, amount_in)
     dy = swap.exchange(i, j, amount_in, int(0.99 * calculated), sender=charlie)
 
+    try:
+        assert dy == calculated
+    except:  # noqa: E722
+        assert 2 in [i, j]  # rebasing token balances can have wonky math
+        assert dy == pytest.approx(calculated)
+
+
+@pytest.mark.parametrize("i,j", itertools.permutations(range(3), 2))
+def test_donate_swap(swap, i, j, alice, charlie, pool_tokens, pool_erc20_tokens):
+
+    amount_erc20_in = 10 ** pool_erc20_tokens[i].decimals()
+
+    if amount_erc20_in > pool_erc20_tokens[i].balanceOf(charlie):
+        if i != 0:
+            bal_before = pool_erc20_tokens[i].balanceOf(charlie)
+            mint_for_testing(charlie, amount_erc20_in, pool_erc20_tokens[i], False)
+            amount_in = pool_erc20_tokens[i].balanceOf(charlie) - bal_before
+        else:
+            amount_in = mint_vault_tokens(amount_erc20_in, pool_erc20_tokens[0], pool_tokens[0], charlie)
+
+    pool_tokens[i].approve(swap, 2**256 - 1, sender=charlie)
+
+    # rebase:
+    if "RebasingConditional" in pool_tokens[i].filename:
+        pool_tokens[i].rebase()
+
+    # donate to vault:
+    donate_to_vault(10**5, pool_erc20_tokens[0], pool_tokens[0], alice)
+
+    # calculate expected output and swap:
+    calculated = swap.get_dy(i, j, amount_in)
+    dy = swap.exchange(i, j, amount_in, int(0.99 * calculated), sender=charlie)
+
+    # check:
     try:
         assert dy == calculated
     except:  # noqa: E722
