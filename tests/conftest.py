@@ -181,7 +181,7 @@ def skip_by_token_type(request, pool_tokens):
 def skip_rebasing(request, swap):
     only_for_token_types = request.node.get_closest_marker("skip_rebasing_tokens")
     if only_for_token_types:
-        if swap.POOL_IS_REBASING_IMPLEMENTATION():
+        if 2 in swap._immutables.asset_types:
             pytest.skip("skipped because test includes rebasing tokens")
 
 
@@ -209,7 +209,7 @@ def only_oracle(request, pool_tokens):
 def only_rebasing(request, swap):
     marker = request.node.get_closest_marker("contains_rebasing_tokens")
     if marker:
-        asset_types_contains_rebasing = swap.POOL_IS_REBASING_IMPLEMENTATION()
+        asset_types_contains_rebasing = 2 in swap._immutables.asset_types
         if not asset_types_contains_rebasing:
             pytest.skip("skipped because test excludes rebasing tokens")
 

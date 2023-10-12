@@ -207,7 +207,7 @@ def test_exchange_underlying_not_received(bob, swap, sending, receiving):
 @pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
 def test_exchange_underlying_received_rebasing_reverts(swap, transfer_and_swap, sending, receiving):
 
-    if swap.POOL_IS_REBASING_IMPLEMENTATION():
+    if 2 in swap._immutables.asset_types:
         with boa.reverts():
             transfer_and_swap(swap, sending, receiving, True)
 
@@ -216,6 +216,6 @@ def test_exchange_underlying_received_rebasing_reverts(swap, transfer_and_swap, 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_rebasing_reverts(bob, swap, transfer_and_swap, pool_tokens, sending, receiving):
 
-    if swap.POOL_IS_REBASING_IMPLEMENTATION():
+    if 2 in swap._immutables.asset_types:
         with boa.reverts():
             transfer_and_swap(swap, sending, receiving, False)

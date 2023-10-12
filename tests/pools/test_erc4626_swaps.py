@@ -184,6 +184,7 @@ def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
 
     if "RebasingConditional" in pool_tokens[i].filename:
         pool_tokens[i].rebase()
+        assert 2 in swap._immutables.asset_types
 
     calculated = swap.get_dy(i, j, amount_in)
     dy = swap.exchange(i, j, amount_in, int(0.99 * calculated), sender=charlie)
