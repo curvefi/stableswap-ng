@@ -22,6 +22,23 @@ def donate_to_vault(donation_amount, underlying_token, vault_contract, user):
     underlying_token.transfer(vault_contract, donation_amount, sender=user)
 
 
+def mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i):
+
+    amount_erc20_in = 10 ** pool_erc20_tokens[i].decimals()
+
+    if amount_erc20_in > pool_erc20_tokens[i].balanceOf(charlie):
+        if i != 0:
+            bal_before = pool_erc20_tokens[i].balanceOf(charlie)
+            mint_for_testing(charlie, amount_erc20_in, pool_erc20_tokens[i], False)
+            amount_in = pool_erc20_tokens[i].balanceOf(charlie) - bal_before
+        else:
+            amount_in = mint_vault_tokens(amount_erc20_in, pool_erc20_tokens[0], pool_tokens[0], charlie)
+
+    pool_tokens[i].approve(swap, 2**256 - 1, sender=charlie)
+
+    return amount_in
+
+
 @pytest.fixture(scope="module")
 def asset(deployer):
     with boa.env.prank(deployer):
@@ -168,19 +185,9 @@ def swap(empty_swap, bob, deposit_amounts, pool_tokens):
 
 
 @pytest.mark.parametrize("i,j", itertools.permutations(range(3), 2))
-def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
+def test_swap(swap, i, j, charlie, pool_tokens, mint_tokens):
 
-    amount_erc20_in = 10 ** pool_erc20_tokens[i].decimals()
-
-    if amount_erc20_in > pool_erc20_tokens[i].balanceOf(charlie):
-        if i != 0:
-            bal_before = pool_erc20_tokens[i].balanceOf(charlie)
-            mint_for_testing(charlie, amount_erc20_in, pool_erc20_tokens[i], False)
-            amount_in = pool_erc20_tokens[i].balanceOf(charlie) - bal_before
-        else:
-            amount_in = mint_vault_tokens(amount_erc20_in, pool_erc20_tokens[0], pool_tokens[0], charlie)
-
-    pool_tokens[i].approve(swap, 2**256 - 1, sender=charlie)
+    amount_in = mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i)
 
     if "RebasingConditional" in pool_tokens[i].filename:
         pool_tokens[i].rebase()
@@ -199,17 +206,7 @@ def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
 @pytest.mark.parametrize("i,j", itertools.permutations(range(3), 2))
 def test_donate_swap(swap, i, j, alice, charlie, pool_tokens, pool_erc20_tokens):
 
-    amount_erc20_in = 10 ** pool_erc20_tokens[i].decimals()
-
-    if amount_erc20_in > pool_erc20_tokens[i].balanceOf(charlie):
-        if i != 0:
-            bal_before = pool_erc20_tokens[i].balanceOf(charlie)
-            mint_for_testing(charlie, amount_erc20_in, pool_erc20_tokens[i], False)
-            amount_in = pool_erc20_tokens[i].balanceOf(charlie) - bal_before
-        else:
-            amount_in = mint_vault_tokens(amount_erc20_in, pool_erc20_tokens[0], pool_tokens[0], charlie)
-
-    pool_tokens[i].approve(swap, 2**256 - 1, sender=charlie)
+    amount_in = mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i)
 
     # rebase:
     if "RebasingConditional" in pool_tokens[i].filename:
