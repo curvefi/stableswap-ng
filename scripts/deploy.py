@@ -64,20 +64,26 @@ def deploy_infra(network, account):
         factory.set_pool_implementations(0, plain_blueprint_contract, **deploy_utils._get_tx_params())
         factory.set_metapool_implementations(0, meta_blueprint_contract, **deploy_utils._get_tx_params())
 
-        # -------------------------- Add base pools --------------------------
 
-        logger.info("Setting up base pools ...")
-        base_pool_data = deploy_utils.base_pool_list[network]
-        if base_pool_data:  # check if network has base pools:
-            for data in base_pool_data:
-                factory.add_base_pool(
-                    data.pool,
-                    data.lp_token,
-                    data.coins,
-                    data.asset_types,
-                    data.n_coins,
-                    **deploy_utils._get_tx_params(),
-                )
+@cli.command(cls=NetworkBoundCommand)
+@network_option()
+@account_option()
+@click.option("--factory", required=True, type=str)
+def set_up_base_pools(network, account, factory):
+
+    logger.info("Setting up base pools ...")
+    base_pool_data = deploy_utils.base_pool_list[network]
+    if base_pool_data:  # check if network has base pools:
+        for data in base_pool_data:
+            factory.add_base_pool(
+                data.pool,
+                data.lp_token,
+                data.coins,
+                data.asset_types,
+                data.n_coins,
+                **deploy_utils._get_tx_params(),
+            )
+            logger.info(f"Added {data.pool} to factory")
 
 
 @cli.command(cls=NetworkBoundCommand)

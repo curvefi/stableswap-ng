@@ -99,8 +99,8 @@ curve_dao_network_settings = {
         fee_receiver_address="0x06534b0BF7Ff378F162d4F348390BDA53b15fA35",
     ),
     "gnosis:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",  # <--- need to deploy sidechain ownership contract  # noqa: E501
-        fee_receiver_address="",  # <--- need to deploy sidechain pool proxy
+        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # <--- need to deploy sidechain ownership contract  # noqa: E501
+        fee_receiver_address="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # <--- need to deploy sidechain pool proxy
     ),
     "fantom:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # <--- thin proxy  # noqa: E501
