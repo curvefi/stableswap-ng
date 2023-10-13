@@ -185,7 +185,7 @@ def swap(empty_swap, bob, deposit_amounts, pool_tokens):
 
 
 @pytest.mark.parametrize("i,j", itertools.permutations(range(3), 2))
-def test_swap(swap, i, j, charlie, pool_tokens, mint_tokens):
+def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
 
     amount_in = mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i)
 

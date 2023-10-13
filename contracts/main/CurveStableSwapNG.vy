@@ -20,20 +20,22 @@
         3. ERC20 tokens that rebase (either positive or fee on transfer)
         4. ERC20 tokens that have a rate oracle (e.g. wstETH, cbETH, sDAI, etc.)
            Note: Oracle precision _must_ be 10**18.
+        5. ERC4626 tokens with arbitrary precision (<=18) of Vault token and underlying
+           asset.
      Additional features include:
-        1. Adds price oracles based on AMM State Price (and _not_ last traded price)
-           and a TVL oracle based on D.
-        2. `exchange_received`: swaps that expect an ERC20 transfer to have occurred
+        1. Adds price oracles based on AMM State Price (and _not_ last traded price).
+        2. Adds TVL oracle based on D.
+        3. `exchange_received`: swaps that expect an ERC20 transfer to have occurred
            prior to executing the swap.
            Note: a. If pool contains rebasing tokens and one of the `asset_types` is 2 (Rebasing)
                     then calling `exchange_received` will REVERT.
                  b. If pool contains rebasing token and `asset_types` does not contain 2 (Rebasing)
                     then this is an incorrect implementation and rebases can be
                     stolen.
-        3. Adds `get_dx`: Similar to `get_dy` which returns an expected output
+        4. Adds `get_dx`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
-        4. Fees are dynamic: AMM will charge a higher fee if pool depegs.
+        5. Fees are dynamic: AMM will charge a higher fee if pool depegs.
 """
 
 from vyper.interfaces import ERC20
@@ -515,7 +517,7 @@ def exchange_received(
     j: int128,
     _dx: uint256,
     _min_dy: uint256,
-    _receiver: address,
+    _receiver: address = msg.sender,
 ) -> uint256:
     """
     @notice Perform an exchange between two coins without transferring token in
