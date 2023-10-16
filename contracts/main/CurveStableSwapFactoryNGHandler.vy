@@ -1,4 +1,5 @@
-# @version 0.3.10
+# pragma version 0.3.10
+# pragma evm-version shanghai
 """
 @title CurveStableswapFactoryNGHandler
 @author Curve.Fi

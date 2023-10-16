@@ -1,5 +1,6 @@
-# @version 0.3.10
-#pragma optimize codesize
+# pragma version 0.3.10
+# pragma optimize codesize
+# pragma evm-version shanghai
 """
 @title CurveStableSwapMetaNG
 @author Curve.Fi
@@ -10,10 +11,21 @@
      exchanges token 0 <> token b1, b2, .. bn, where b is base pool and bn is the
      nth coin index of the base pool.
      Asset Types:
-        0. Standard ERC20 token with no additional features
+        0. Standard ERC20 token with no additional features.
+                          Note: Users are advised to do careful due-diligence on
+                                ERC20 tokens that they interact with, as this
+                                contract cannot differentiate between harmless and
+                                malicious ERC20 tokens.
         1. Oracle - token with rate oracle (e.g. wstETH)
-        2. Rebasing - token with rebase (e.g. stETH)
+                    Note: Oracles may be controlled externally by an EOA. Users
+                          are advised to proceed with caution.
+        2. Rebasing - token with rebase (e.g. stETH).
+                      Note: Users and Integrators are advised to understand how
+                            the AMM contract works with rebasing balances.
         3. ERC4626 - token with convertToAssets method (e.g. sDAI).
+                     Note: Some ERC4626 implementations may be susceptible to
+                           Donation/Inflation attacks. Users are advised to
+                           proceed with caution.
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
@@ -37,7 +49,8 @@
         4. Adds `get_dx`, `get_dx_underlying`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
-        5. Fees are dynamic: AMM will charge a higher fee if pool depegs.
+        5. Fees are dynamic: AMM will charge a higher fee if pool depegs. This can cause very
+                             slight discrepancies between calculated fees and realised fees.
 """
 
 from vyper.interfaces import ERC20
@@ -336,7 +349,7 @@ def __init__(
 
     factory = Factory(msg.sender)
 
-    A: uint256 = _A * A_PRECISION
+    A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
     self.future_A = A
     self.fee = _fee
@@ -739,17 +752,20 @@ def add_liquidity(
         _dynamic_fee_i: uint256 = 0
 
         # Only account for fees if we are not the first to deposit
-        base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
+        # base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
+        # unsafe math is safu here:
+        base_fee: uint256 = unsafe_div(unsafe_mul(self.fee, N_COINS), 4)
 
         for i in range(N_COINS_128):
 
             ideal_balance = D1 * old_balances[i] / D0
             new_balance = new_balances[i]
 
+            # unsafe math is safu here:
             if ideal_balance > new_balance:
-                difference = ideal_balance - new_balance
+                difference = unsafe_sub(ideal_balance, new_balance)
             else:
-                difference = new_balance - ideal_balance
+                difference = unsafe_sub(new_balance, ideal_balance)
 
             # fee[i] = _dynamic_fee(i, j) * difference / FEE_DENOMINATOR
             xs = unsafe_div(rates[i] * (old_balances[i] + new_balance), PRECISION)

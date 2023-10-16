@@ -154,3 +154,4 @@ scripts/experiments/get_p.py
 .python-version
 todo.txt
 AuditorComments.md
+set_env.py

@@ -1,6 +1,7 @@
-# @version 0.3.10
+# pragma version 0.3.10
+# pragma evm-version shanghai
 """
-@title CurveStableSwap2NG
+@title CurveStableSwapNGViews
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
 @notice Auxiliary contract for Stableswap-NG containing utility methods for

@@ -1,19 +1,29 @@
-# @version 0.3.10
-#pragma optimize codesize
+# pragma version 0.3.10
+# pragma optimize codesize
+# pragma evm-version shanghai
 """
 @title CurveStableSwapNG
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
 @notice Stableswap implementation for up to 8 coins with no rehypothecation,
-        i.e. tokens are not deposited into other contracts. Supports only
-        token pairs that are similarly priced.
-        The Pool contract also records exponential moving averages for coins
-        1, 2 and 3 relative to coin 0.
+        i.e. the AMM does not deposit tokens into other contracts. The Pool contract also
+        records exponential moving averages for coins relative to coin 0.
 @dev Asset Types:
-        0. Standard ERC20 token with no additional features
+        0. Standard ERC20 token with no additional features.
+                          Note: Users are advised to do careful due-diligence on
+                                ERC20 tokens that they interact with, as this
+                                contract cannot differentiate between harmless and
+                                malicious ERC20 tokens.
         1. Oracle - token with rate oracle (e.g. wstETH)
-        2. Rebasing - token with rebase (e.g. stETH)
+                    Note: Oracles may be controlled externally by an EOA. Users
+                          are advised to proceed with caution.
+        2. Rebasing - token with rebase (e.g. stETH).
+                      Note: Users and Integrators are advised to understand how
+                            the AMM contract works with rebasing balances.
         3. ERC4626 - token with convertToAssets method (e.g. sDAI).
+                     Note: Some ERC4626 implementations may be susceptible to
+                           Donation/Inflation attacks. Users are advised to
+                           proceed with caution.
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
@@ -35,7 +45,8 @@
         4. Adds `get_dx`: Similar to `get_dy` which returns an expected output
            of coin[j] for given `dx` amount of coin[i], `get_dx` returns expected
            input of coin[i] for an output amount of coin[j].
-        5. Fees are dynamic: AMM will charge a higher fee if pool depegs.
+        5. Fees are dynamic: AMM will charge a higher fee if pool depegs. This can cause very
+                             slight discrepancies between calculated fees and realised fees.
 """
 
 from vyper.interfaces import ERC20

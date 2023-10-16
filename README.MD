@@ -1,10 +1,19 @@
 # Stableswap NG
 
-Permissionless deployment of Curve metapools.
+Permissionless deployment of Curve Stableswap plain and metapools. Supports up to 8 coins for plain pools and 2 coins for metapools. Supports: rate-oraclised tokens (e.g. wstETH), ERC4626 (sDAI), rebasing (stETH), and plain (WETH:stETH) pools. Does not support native tokens.
 
-# Wen?
+For integrators: check exchange_received. That should improve your pathing significantly. Be aware that if a pool contains rebasing tokens, this method is intentionally disabled.
 
-![STOP THE WEN!](./you_shall_not_wen.jpeg)
+# Deployments
+
+## Sepolia
+
+1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [0xbc7654d2dd901aaaa3be4cb5bc0f10dea9f96443](https://sepolia.etherscan.io/address/0xbc7654d2dd901aaaa3be4cb5bc0f10dea9f96443#code)
+2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [0x07920e98a66e462c2aa4c8fa6200bc68ca161ea0](https://sepolia.etherscan.io/address/0x07920e98a66e462c2aa4c8fa6200bc68ca161ea0#code)
+3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd](https://sepolia.etherscan.io/address/0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd#code)
+4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0xdd7ebb1c49780519dd9755b8b1a23a6f42ce099e](https://sepolia.etherscan.io/address/0xdd7ebb1c49780519dd9755b8b1a23a6f42ce099e#code)
+5. [`LiquidityGauge`](contracts/main/LiquidityGauge.vy): [0x64891ab20392a029c0f231656ff13c5ee64b730c](https://sepolia.etherscan.io/address/0x64891ab20392a029c0f231656ff13c5ee64b730c#code)
+6. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0x8a00365ae28d75b92ec695d5a041b744f140438d](https://sepolia.etherscan.io/address/0x8a00365ae28d75b92ec695d5a041b744f140438d#code)
 
 ## Overview
 

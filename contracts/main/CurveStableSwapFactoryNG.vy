@@ -1,4 +1,5 @@
-# @version 0.3.10
+# pragma version 0.3.10
+# pragma evm-version shanghai
 """
 @title CurveStableswapFactoryNG
 @author Curve.Fi
@@ -721,6 +722,9 @@ def add_base_pool(
     @notice Add a base pool to the registry, which may be used in factory metapools
     @dev 1. Only callable by admin
          2. Rebasing tokens are not allowed in the base pool.
+         3. Do not add base pool which contains native tokens (e.g. ETH).
+         4. As much as possible: use standard ERC20 tokens.
+         Should you choose to deviate from these recommendations, audits are advised.
     @param _base_pool Pool address to add
     @param _asset_types Asset type for pool, as an integer
     """
