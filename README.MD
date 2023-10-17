@@ -13,7 +13,7 @@ For integrators: check exchange_received. That should improve your pathing signi
 3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd](https://sepolia.etherscan.io/address/0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd#code)
 4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0xdd7ebb1c49780519dd9755b8b1a23a6f42ce099e](https://sepolia.etherscan.io/address/0xdd7ebb1c49780519dd9755b8b1a23a6f42ce099e#code)
 5. [`LiquidityGauge`](contracts/main/LiquidityGauge.vy): [0x64891ab20392a029c0f231656ff13c5ee64b730c](https://sepolia.etherscan.io/address/0x64891ab20392a029c0f231656ff13c5ee64b730c#code)
-6. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0x8a00365ae28d75b92ec695d5a041b744f140438d](https://sepolia.etherscan.io/address/0x8a00365ae28d75b92ec695d5a041b744f140438d#code)
+6. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0xfb37b8D939FFa77114005e61CFc2e543d6F49A81](https://sepolia.etherscan.io/address/0xfb37b8D939FFa77114005e61CFc2e543d6F49A81#code)
 
 ## Gnosis
 
@@ -21,7 +21,7 @@ For integrators: check exchange_received. That should improve your pathing signi
 2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [0x5eeE3091f747E60a045a2E715a4c71e600e31F6E](https://gnosisscan.io/address/0x5eeE3091f747E60a045a2E715a4c71e600e31F6E#code)
 3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0xd2002373543Ce3527023C75e7518C274A51ce712](https://gnosisscan.io/address/0xd2002373543Ce3527023C75e7518C274A51ce712#code)
 4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0x686bdb3D24Bc6F3ED89ed3d3B659765c54aC78B4](https://gnosisscan.io/address/0x686bdb3D24Bc6F3ED89ed3d3B659765c54aC78B4#code)
-5. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b](https://gnosisscan.io/address/0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b#code)
+5. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8](https://gnosisscan.io/address/0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8#code)
 
 ## Overview
 

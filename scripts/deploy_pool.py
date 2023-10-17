@@ -6,6 +6,8 @@ from boa.network import NetworkEnv
 from eth_account import Account
 from rich.console import Console as RichConsole
 
+from scripts.deploy_infra import deployments
+
 logger = RichConsole(file=sys.stdout)
 
 
@@ -22,10 +24,10 @@ def deploy_plain_pool(network, url, account, factory, fork=False):
 
 def main():
     deploy_plain_pool(
-        "ethereum:sepolia",
-        "https://eth-sepolia.g.alchemy.com/v2/{alchemy_key}",
+        "gnosis:mainnet",
+        "https://gnosis.drpc.org",
         "FIDDYDEPLOYER",
-        "0x8a00365ae28d75b92ec695d5a041b744f140438d",
+        deployments["gnosis:mainnet"]["factory"],
         False,  # forkmode
     )
 

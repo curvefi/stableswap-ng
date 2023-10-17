@@ -750,7 +750,6 @@ def add_base_pool(
         coin = CurvePool(_base_pool).coins(i)
         assert coin != 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE  # dev: native token is not supported
         self.base_pool_data[_base_pool].coins.append(coin)
-        self.base_pool_data[_base_pool].asset_types.append(_asset_types[i])
         self.base_pool_assets[coin] = True
         decimals += (ERC20(coin).decimals() << i*8)
     self.base_pool_data[_base_pool].decimals = decimals

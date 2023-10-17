@@ -17,14 +17,84 @@ deployments = {
         "plain_amm": "0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd",
         "meta_amm": "0xdd7ebb1c49780519dd9755b8b1a23a6f42ce099e",
         "gauge": "0x64891ab20392a029c0f231656ff13c5ee64b730c",
-        "factory": "0x8a00365ae28d75b92ec695d5a041b744f140438d",
+        "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
     },
     "gnosis:mainnet": {
         "math": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
         "views": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
         "plain_amm": "0xd2002373543Ce3527023C75e7518C274A51ce712",
         "meta_amm": "0x686bdb3D24Bc6F3ED89ed3d3B659765c54aC78B4",
-        "factory": "0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b",
+        "factory": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
+    },
+    "polygon:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "arbitrum:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "optimism:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "base:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "avax:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "aurora:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "celo:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "fantom:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "kava:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "moonbeam:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
     },
 }
 
@@ -103,7 +173,6 @@ def deploy_infra(network, url, account, fork=False):
 
     # Factory:
     factory_contract_obj = set_evm_version("./contracts/main/CurveStableSwapFactoryNG.vy", network)
-    logger.log("Deploying factory ...")
     args = [fee_receiver, deploy_utils.FIDDYDEPLOYER]
     factory = check_and_deploy(factory_contract_obj, "factory", network, False, args)
 
@@ -143,10 +212,10 @@ def deploy_infra(network, url, account, fork=False):
 
 def main():
     deploy_infra(
-        "gnosis:mainnet",
-        "https://gnosis.api.onfinality.io/public",
+        ":mainnet",
+        "",
         "FIDDYDEPLOYER",
-        False,  # forkmode
+        fork=False,
     )
 
 

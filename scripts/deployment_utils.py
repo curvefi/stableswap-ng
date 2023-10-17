@@ -191,7 +191,19 @@ _base_pool_list = {
     ],
     "arbitrum:mainnet": [],
     "optimism:mainnet": [],
-    "gnosis:mainnet": [],
+    "gnosis:mainnet": [
+        BasePoolSettings(
+            pool="0x7f90122bf0700f9e7e1f688fe926940e8839f353",
+            lp_token="0x1337BedC9D22ecbe766dF105c9623922A27963EC",
+            coins=[
+                "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",
+                "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83",
+                "0x4ECaBa5870353805a9F068101A40E0f32ed605C6",
+            ],
+            asset_types=[0, 0, 0],
+            n_coins=3,
+        ),
+    ],
     "polygon:mainnet": [],
     "base:mainnet": [],
 }
