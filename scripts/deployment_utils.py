@@ -231,7 +231,7 @@ class PoolSettings:
 pool_settings = {
     "gnosis:mainnet": {
         "plain": [
-            "WXDAI<>USDC<>USDT",  # name
+            "WXDAI/USDC/USDT",  # name
             "3pool-ng",  # symbol
             [
                 "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",  # wxdai
@@ -244,7 +244,7 @@ pool_settings = {
             865,  # ma_exp_time
             0,  # implementation index
             [0, 0, 0],  # asset_types
-            [0, 0, 0],  # method_ids
+            [b"", b"", b""],  # method_ids
             [ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
         ],
         "oracles": [
@@ -275,7 +275,7 @@ pool_settings = {
             865,  # ma_exp_time
             0,  # implementation index
             [2, 0],  # asset_types
-            [0, 0],  # method_ids
+            [b"", b""],  # method_ids
             [ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
         ],
         "meta-plain": [],
