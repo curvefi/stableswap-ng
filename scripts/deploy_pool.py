@@ -5,14 +5,13 @@ import boa
 from boa.network import NetworkEnv
 from deploy_infra import deployments
 from deployment_utils import pool_settings
-from eth_abi import encode
 from eth_account import Account
 from rich.console import Console as RichConsole
 
 logger = RichConsole(file=sys.stdout)
 
 
-def deploy_plain_pool(network, url, account, fork=False):
+def deploy_pool(network, url, account, fork, pool_type):
 
     if fork:
         boa.env.fork(url)
@@ -23,34 +22,18 @@ def deploy_plain_pool(network, url, account, fork=False):
     factory = boa.load_partial("./contracts/main/CurveStableSwapFactoryNG.vy")
     factory = factory.at(deployments["gnosis:mainnet"]["factory"])
 
-    args = pool_settings[network]["plain"]
-    call_sig = [
-        "string",
-        "string",
-        "address[]",
-        "uint256",
-        "uint256",
-        "uint256",
-        "uint256",
-        "uint256",
-        "uint8[]",
-        "bytes4[]",
-        "address[]",
-    ]
-    encoded_args = encode(call_sig, args)
-    print(f"Encoded args: {encoded_args.hex()}")
     logger.log("Deploying pool ...")
-    amm_address = factory.deploy_plain_pool(*args)
+    args = pool_settings[network][pool_type]
+    if pool_type == "plain":
+        amm_address = factory.deploy_plain_pool(*args)
+    elif pool_type == "meta":
+        amm_address = factory.deploy_metapool(*args)
+
     logger.log(f"Deployed Plain pool {amm_address}.")
 
 
 def main():
-    deploy_plain_pool(
-        "gnosis:mainnet",
-        "https://gnosis.drpc.org",
-        "FIDDYDEPLOYER",
-        False,  # forkmode
-    )
+    deploy_pool("gnosis:mainnet", "https://gnosis.drpc.org", "FIDDYDEPLOYER", False, "meta")  # forkmode
 
 
 if __name__ == "__main__":
