@@ -39,7 +39,6 @@ def deploy_plain_pool(network, url, account, fork=False):
     ]
     encoded_args = encode(call_sig, args)
     print(f"Encoded args: {encoded_args.hex()}")
-    breakpoint()
     logger.log("Deploying pool ...")
     amm_address = factory.deploy_plain_pool(*args)
     logger.log(f"Deployed Plain pool {amm_address}.")
