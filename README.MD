@@ -15,6 +15,14 @@ For integrators: check exchange_received. That should improve your pathing signi
 5. [`LiquidityGauge`](contracts/main/LiquidityGauge.vy): [0x64891ab20392a029c0f231656ff13c5ee64b730c](https://sepolia.etherscan.io/address/0x64891ab20392a029c0f231656ff13c5ee64b730c#code)
 6. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0x8a00365ae28d75b92ec695d5a041b744f140438d](https://sepolia.etherscan.io/address/0x8a00365ae28d75b92ec695d5a041b744f140438d#code)
 
+## Gnosis
+
+1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [0x87FE17697D0f14A222e8bEf386a0860eCffDD617](https://gnosisscan.io/address/0x87FE17697D0f14A222e8bEf386a0860eCffDD617#code)
+2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [0x5eeE3091f747E60a045a2E715a4c71e600e31F6E](https://gnosisscan.io/address/0x5eeE3091f747E60a045a2E715a4c71e600e31F6E#code)
+3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0xd2002373543Ce3527023C75e7518C274A51ce712](https://gnosisscan.io/address/0xd2002373543Ce3527023C75e7518C274A51ce712#code)
+4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0x686bdb3D24Bc6F3ED89ed3d3B659765c54aC78B4](https://gnosisscan.io/address/0x686bdb3D24Bc6F3ED89ed3d3B659765c54aC78B4#code)
+5. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b](https://gnosisscan.io/address/0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b#code)
+
 ## Overview
 
 The metapool factory has several core components:

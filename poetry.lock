@@ -4115,15 +4115,13 @@ version = "0.1.8"
 description = "A Vyper interpreter"
 optional = false
 python-versions = "*"
-files = [
-    {file = "titanoboa-0.1.8-py3-none-any.whl", hash = "sha256:6551663ba52793d8a2113ab1a169de32ed2c102166a5655e2988af7e9cb8997e"},
-    {file = "titanoboa-0.1.8.tar.gz", hash = "sha256:5fc3a6638ade9885d1d271367d4e05d91bdce246e7064882196ccd213ab927cd"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 eth-abi = "*"
 eth-account = "*"
-eth-stdlib = "*"
+eth-stdlib = ">=0.2.7,<0.3.0"
 eth-typing = "*"
 hypothesis = "*"
 py-evm = ">=0.7.0a4"
@@ -4134,6 +4132,12 @@ vyper = ">=0.3.10"
 
 [package.extras]
 forking-recommended = ["ujson"]
+
+[package.source]
+type = "git"
+url = "https://github.com/vyperlang/titanoboa.git"
+reference = "3201bf318d10c238071365be833ef8e3c7eaaef2"
+resolved_reference = "3201bf318d10c238071365be833ef8e3c7eaaef2"
 
 [[package]]
 name = "tomli"
@@ -4801,4 +4805,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "cc845fc44050fac852d04626b39b9dc33546a6d4b173f2e607dff2608105c4a0"
+content-hash = "4bd0c70b9ebc5d3a0d92e626ea31898516bb129fd5f2ca0abaee77e4fd77565f"
