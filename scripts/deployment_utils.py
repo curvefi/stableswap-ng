@@ -85,44 +85,24 @@ curve_dao_network_settings = {
         fee_receiver_address="0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17",
     ),
     "arbitrum:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0xb055ebbacc8eefc166c169e9ce2886d0406ab49b",
+        dao_ownership_contract="0xb055ebbacc8eefc166c169e9ce2886d0406ab49b",  # proxy
         fee_receiver_address="0xd4f94d0aaa640bbb72b5eec2d85f6d114d81a88e",
     ),
     "optimism:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",
+        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
         fee_receiver_address="0xbF7E49483881C76487b0989CD7d9A8239B20CA41",
     ),
     "polygon:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",
+        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
         fee_receiver_address="0x774D1Dba98cfBD1F2Bc3A1F59c494125e07C48F9",
     ),
-    "avalanche:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0xbabe61887f1de2713c6f97e567623453d3c79f67",
-        fee_receiver_address="0x06534b0BF7Ff378F162d4F348390BDA53b15fA35",
+    "base:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0xe8269B33E47761f552E1a3070119560d5fa8bBD6",  # proxy
+        fee_receiver_address="0xe8269B33E47761f552E1a3070119560d5fa8bBD6",  # proxy
     ),
     "gnosis:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # <--- need to deploy sidechain ownership contract  # noqa: E501
-        fee_receiver_address="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # <--- need to deploy sidechain pool proxy
-    ),
-    "fantom:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # <--- thin proxy  # noqa: E501
-        fee_receiver_address="0x2B039565B2b7a1A9192D4847fbd33B25b836B950",
-    ),
-    "celo:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0x56bc95Ded2BEF162131905dfd600F2b9F1B380a4",  # <-- needs to accept transfer ownership for 0x5277A0226d10392295E8D383E9724D6E416d6e6C  # noqa: E501
-        fee_receiver_address="",
-    ),
-    "kava:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
-    ),
-    "moonbeam": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
-    ),
-    "aurora": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
+        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
+        fee_receiver_address="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
     ),
 }
 

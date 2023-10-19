@@ -15,7 +15,7 @@ deployments = {
         "math": "0xbc7654d2dd901aaaa3be4cb5bc0f10dea9f96443",
         "views": "0x07920e98a66e462c2aa4c8fa6200bc68ca161ea0",
         "plain_amm": "0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd",
-        "meta_amm": "0xdd7ebb1c49780519dd9755b8b1a23a6f42ce099e",
+        "meta_amm": "",
         "gauge": "0x64891ab20392a029c0f231656ff13c5ee64b730c",
         "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
     },
@@ -23,20 +23,13 @@ deployments = {
         "math": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
         "views": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
         "plain_amm": "0xd2002373543Ce3527023C75e7518C274A51ce712",
-        "meta_amm": "0x686bdb3D24Bc6F3ED89ed3d3B659765c54aC78B4",
+        "meta_amm": "",
         "factory": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
     },
-    "polygon:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
-    },
     "arbitrum:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
+        "math": "0x3d6cB2F6DcF47CDd9C13E4e3beAe9af041d8796a",
+        "views": "0xC1b393EfEF38140662b91441C6710Aa704973228",
+        "plain_amm": "0x76303e4fDcA0AbF28aB3ee42Ce086E6503431F1D",
         "meta_amm": "",
         "factory": "",
     },
@@ -54,42 +47,7 @@ deployments = {
         "meta_amm": "",
         "factory": "",
     },
-    "avax:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
-    },
-    "aurora:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
-    },
-    "celo:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
-    },
-    "fantom:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
-    },
-    "kava:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
-    },
-    "moonbeam:mainnet": {
+    "polygon:mainnet": {
         "math": "",
         "views": "",
         "plain_amm": "",
@@ -108,12 +66,15 @@ def set_evm_version(contract_file, network) -> boa.vyper.contract.VyperDeployer:
 
     if is_shanghai_chain and "# pragma evm-version paris" in source:
         logger.log("Replacing EVM version to Shanghai ...")
-        source = source.replace("# pragma evm-version paris\n", "# pragma evm-version shanghai\n")
+        new_source = source.replace("# pragma evm-version paris\n", "# pragma evm-version shanghai\n")
     elif not is_shanghai_chain and "# pragma evm-version shanghai" in source:
         logger.log("Replacing EVM version to Paris ...")
-        source = source.replace("# pragma evm-version shanghai\n", "# pragma evm-version paris\n")
+        new_source = source.replace("# pragma evm-version shanghai\n", "# pragma evm-version paris\n")
+    else:  # all looks good ...
+        new_source = source
 
-    return boa.loads_partial(source_code=source)
+    contract_obj = boa.loads_partial(source_code=new_source)
+    return contract_obj
 
 
 def check_and_deploy(contract_obj, contract_designation, network, blueprint: bool = False, args=[]):
@@ -170,6 +131,7 @@ def deploy_infra(network, url, account, fork=False):
     logger.log("Deploying blueprints ...")
     plain_blueprint = check_and_deploy(plain_contract_obj, "plain_amm", network, blueprint=True)
     meta_blueprint = check_and_deploy(meta_contract_obj, "meta_amm", network, blueprint=True)
+    breakpoint()
 
     # Factory:
     factory_contract_obj = set_evm_version("./contracts/main/CurveStableSwapFactoryNG.vy", network)
@@ -212,10 +174,10 @@ def deploy_infra(network, url, account, fork=False):
 
 def main():
     deploy_infra(
-        ":mainnet",
-        "",
+        "arbitrum:mainnet",
+        "https://arb-mainnet.g.alchemy.com/v2/jx__wvt4TxgRHDiRwi9MaUk0Tmq1htPT",
         "FIDDYDEPLOYER",
-        fork=False,
+        fork=True,
     )
 
 

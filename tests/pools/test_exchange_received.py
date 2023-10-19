@@ -1,5 +1,3 @@
-import itertools
-
 import boa
 import pytest
 
@@ -130,39 +128,6 @@ def test_exchange_not_received(bob, swap, pool_tokens, sending, receiving):
         swap.exchange_received(sending, receiving, 1, 0, bob)
 
 
-@pytest.mark.only_for_pool_type(1)  # only for metapools
-@pytest.mark.skip_rebasing_tokens
-@pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
-def test_exchange_underlying_received_nonrebasing(
-    bob,
-    swap,
-    transfer_and_swap,
-    underlying_tokens,
-    sending,
-    receiving,
-):
-    swap_data = transfer_and_swap(swap, sending, receiving, True)
-
-    assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
-    assert swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0] == swap_data["amount_out"]
-
-    # sending token swap balances should go up for sending_token_pool
-    # (could be base pool could be metapool):
-    sending_token_pool = swap_data["sending_token_pool"]
-    receiving_token_pool = swap_data["receiving_token_pool"]
-    assert (
-        swap_data[sending_token_pool]["sending_token"][1] - swap_data[sending_token_pool]["sending_token"][0]
-        == swap_data["amount_in"]
-    )
-
-    # receiving token swap balances should go down for receiving_token_pool
-    # (could be base pool could be metapool):
-    assert (
-        swap_data[receiving_token_pool]["receiving_token"][0] - swap_data[receiving_token_pool]["receiving_token"][1]
-        == swap_data["amount_out"]
-    )
-
-
 @pytest.mark.skip_rebasing_tokens
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_no_dos(bob, charlie, swap, pool_tokens, sending, receiving, transfer_and_swap):
@@ -172,44 +137,6 @@ def test_exchange_received_no_dos(bob, charlie, swap, pool_tokens, sending, rece
 
     mint_for_testing(charlie, 10**18, pool_tokens[sending], False)
     transfer_and_swap(swap, sending, receiving, False)
-
-
-@pytest.mark.only_for_pool_type(1)  # only for metapools
-@pytest.mark.skip_rebasing_tokens
-@pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_exchange_underlying_received_no_dos(
-    bob, charlie, swap, underlying_tokens, sending, receiving, transfer_and_swap
-):
-
-    if sending == 0:
-        input_coin = underlying_tokens[0]
-    else:
-        base_i = sending - 1
-        input_coin = underlying_tokens[2 + base_i]
-
-    mint_for_testing(bob, 1, input_coin, False)
-    input_coin.transfer(swap, 1, sender=bob)
-
-    mint_for_testing(charlie, 10**18, input_coin, False)
-    transfer_and_swap(swap, sending, receiving, True)
-
-
-@pytest.mark.only_for_pool_type(1)  # only for metapools
-@pytest.mark.skip_rebasing_tokens
-@pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
-def test_exchange_underlying_not_received(bob, swap, sending, receiving):
-    with boa.env.prank(bob), boa.reverts():
-        swap.exchange_underlying_received(sending, receiving, 1, 0, bob)
-
-
-@pytest.mark.only_for_pool_type(1)  # only for metapools
-@pytest.mark.contains_rebasing_tokens
-@pytest.mark.parametrize("sending,receiving", list(itertools.combinations([0, 1, 2, 3], 2)))
-def test_exchange_underlying_received_rebasing_reverts(swap, transfer_and_swap, sending, receiving):
-
-    if 2 in swap._immutables.asset_types:
-        with boa.reverts():
-            transfer_and_swap(swap, sending, receiving, True)
 
 
 @pytest.mark.contains_rebasing_tokens
