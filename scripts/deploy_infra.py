@@ -15,7 +15,7 @@ deployments = {
         "math": "0xbc7654d2dd901aaaa3be4cb5bc0f10dea9f96443",
         "views": "0x07920e98a66e462c2aa4c8fa6200bc68ca161ea0",
         "plain_amm": "0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd",
-        "meta_amm": "",
+        "meta_amm": "0xa12A87c73718a34CD8601b5022B2C6C359142585",
         "gauge": "0x64891ab20392a029c0f231656ff13c5ee64b730c",
         "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
     },
@@ -23,22 +23,22 @@ deployments = {
         "math": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
         "views": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
         "plain_amm": "0xd2002373543Ce3527023C75e7518C274A51ce712",
-        "meta_amm": "",
+        "meta_amm": "0xd3B17f862956464ae4403cCF829CE69199856e1e",
         "factory": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
     },
     "arbitrum:mainnet": {
         "math": "0x3d6cB2F6DcF47CDd9C13E4e3beAe9af041d8796a",
         "views": "0xC1b393EfEF38140662b91441C6710Aa704973228",
         "plain_amm": "0x76303e4fDcA0AbF28aB3ee42Ce086E6503431F1D",
-        "meta_amm": "",
-        "factory": "",
+        "meta_amm": "0xd125E7a0cEddF89c6473412d85835450897be6Dc",
+        "factory": "0x9AF14D26075f142eb3F292D5065EB3faa646167b",
     },
     "optimism:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
+        "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "views": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "plain_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "meta_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
     },
     "base:mainnet": {
         "math": "",
@@ -85,6 +85,9 @@ def check_and_deploy(contract_obj, contract_designation, network, blueprint: boo
         logger.log(f"Deploying {contract_designation} contract ...")
         if not blueprint:
             contract = contract_obj.deploy(*args)
+            if args:
+                constructor_args = encode(["address", "address"], args)
+                logger.log(f"Constructor arguments for {contract_designation}: {constructor_args.hex()}")
         else:
             contract = contract_obj.deploy_as_blueprint()
         logger.log(f"Deployed! At: {contract.address}.")
@@ -97,9 +100,13 @@ def check_and_deploy(contract_obj, contract_designation, network, blueprint: boo
 
 def deploy_infra(network, url, account, fork=False):
 
+    logger.log(f"Deploying on {network} ...")
+
     if fork:
         boa.env.fork(url)
+        logger.log("Forkmode ...")
     else:
+        logger.log("Prodmode ...")
         boa.set_env(NetworkEnv(url))
         boa.env.add_account(Account.from_key(os.environ[account]))
     for _network, data in deploy_utils.curve_dao_network_settings.items():
@@ -114,8 +121,6 @@ def deploy_infra(network, url, account, fork=False):
 
     # --------------------- Deploy math, views, blueprints ---------------------
 
-    logger.log("Setting EVM versions ...")
-
     # get source and set evm_version
     math_contract_obj = set_evm_version("./contracts/main/CurveStableSwapNGMath.vy", network)
     views_contract_obj = set_evm_version("./contracts/main/CurveStableSwapNGViews.vy", network)
@@ -123,27 +128,19 @@ def deploy_infra(network, url, account, fork=False):
     meta_contract_obj = set_evm_version("./contracts/main/CurveStableSwapMetaNG.vy", network)
 
     # deploy non-blueprint contracts:
-    logger.log("Deploying non-blueprint AMM components ...")
     math_contract = check_and_deploy(math_contract_obj, "math", network)
     views_contract = check_and_deploy(views_contract_obj, "views", network)
 
     # deploy blueprints:
-    logger.log("Deploying blueprints ...")
     plain_blueprint = check_and_deploy(plain_contract_obj, "plain_amm", network, blueprint=True)
     meta_blueprint = check_and_deploy(meta_contract_obj, "meta_amm", network, blueprint=True)
-    breakpoint()
 
     # Factory:
     factory_contract_obj = set_evm_version("./contracts/main/CurveStableSwapFactoryNG.vy", network)
     args = [fee_receiver, deploy_utils.FIDDYDEPLOYER]
     factory = check_and_deploy(factory_contract_obj, "factory", network, False, args)
 
-    constructor_args = encode(["address", "address"], args)
-    logger.log(f"Constructor arguments for factory: {constructor_args.hex()}")
-
     # Set up AMM implementations:
-    logger.log("Integrating AMM components into factory ...")
-
     if not factory.views_implementation() == views_contract.address:
         factory.set_views_implementation(views_contract.address)
         logger.log(f"Set views implementation to: {views_contract.address}")
@@ -173,12 +170,102 @@ def deploy_infra(network, url, account, fork=False):
 
 
 def main():
+
+    # # gnosis
+    # deploy_infra(
+    #     "gnosis:mainnet",
+    #     os.environ["RPC_GNOSIS"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # ethereum sepolia
+    # deploy_infra(
+    #     "ethereum:sepolia",
+    #     os.environ["RPC_ETHEREUM_SEPOLIA"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # arbitrum
+    # deploy_infra(
+    #     "arbitrum:mainnet",
+    #     os.environ["RPC_ARBITRUM"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # optimism
+    # deploy_infra(
+    #     "optimism:mainnet",
+    #     os.environ["RPC_OPTIMISM"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # polygon
     deploy_infra(
-        "arbitrum:mainnet",
-        "https://arb-mainnet.g.alchemy.com/v2/jx__wvt4TxgRHDiRwi9MaUk0Tmq1htPT",
+        "polygon:mainnet",
+        os.environ["RPC_POLYGON"],
         "FIDDYDEPLOYER",
-        fork=True,
+        fork=False,
     )
+
+    # # base
+    # deploy_infra(
+    #     "base:mainnet",
+    #     os.environ["RPC_BASE"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # avax
+    # deploy_infra(
+    #     "avax:mainnet",
+    #     os.environ["RPC_AVAX"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # fantom
+    # deploy_infra(
+    #     "fantom:mainnet",
+    #     os.environ["RPC_FANTOM"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # kava
+    # deploy_infra(
+    #     "kava:mainnet",
+    #     os.environ["RPC_KAVA"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # celo
+    # deploy_infra(
+    #     "celo:mainnet",
+    #     os.environ["RPC_CELO"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # aurora
+    # deploy_infra(
+    #     "aurora:mainnet",
+    #     os.environ["RPC_AURORA"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # eth
+    # deploy_infra(
+    #     "ethereum:mainnet",
+    #     os.environ["RPC_ETHEREUM"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
 
 
 if __name__ == "__main__":

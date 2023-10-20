@@ -15,6 +15,15 @@ For integrators: check exchange_received. That should improve your pathing signi
 5. [`LiquidityGauge`](contracts/main/LiquidityGauge.vy): [0x64891ab20392a029c0f231656ff13c5ee64b730c](https://sepolia.etherscan.io/address/0x64891ab20392a029c0f231656ff13c5ee64b730c#code)
 6. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0xfb37b8D939FFa77114005e61CFc2e543d6F49A81](https://sepolia.etherscan.io/address/0xfb37b8D939FFa77114005e61CFc2e543d6F49A81#code)
 
+## Ethereum
+
+1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [](https://sepolia.etherscan.io/address/#code)
+2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [](https://sepolia.etherscan.io/address/#code)
+3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [](https://sepolia.etherscan.io/address/#code)
+4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [](https://sepolia.etherscan.io/address/#code)
+5. [`LiquidityGauge`](contracts/main/LiquidityGauge.vy): [](https://sepolia.etherscan.io/address/#code)
+6. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [](https://sepolia.etherscan.io/address/#code)
+
 ## Gnosis
 
 1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [0x87FE17697D0f14A222e8bEf386a0860eCffDD617](https://gnosisscan.io/address/0x87FE17697D0f14A222e8bEf386a0860eCffDD617#code)
@@ -22,6 +31,22 @@ For integrators: check exchange_received. That should improve your pathing signi
 3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0xd2002373543Ce3527023C75e7518C274A51ce712](https://gnosisscan.io/address/0xd2002373543Ce3527023C75e7518C274A51ce712#code)
 4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [](https://gnosisscan.io/address/#code)
 5. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8](https://gnosisscan.io/address/0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8#code)
+
+## Arbitrum
+
+1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [0x3d6cB2F6DcF47CDd9C13E4e3beAe9af041d8796a](https://arbiscan.io/address/0x3d6cB2F6DcF47CDd9C13E4e3beAe9af041d8796a#code)
+2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [0xC1b393EfEF38140662b91441C6710Aa704973228](https://arbiscan.io/address/0xC1b393EfEF38140662b91441C6710Aa704973228#code)
+3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0x76303e4fDcA0AbF28aB3ee42Ce086E6503431F1D](https://arbiscan.io/address/0x76303e4fDcA0AbF28aB3ee42Ce086E6503431F1D#code)
+4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0xd125E7a0cEddF89c6473412d85835450897be6Dc](https://arbiscan.io/address/0xd125E7a0cEddF89c6473412d85835450897be6Dc#code)
+5. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0x9AF14D26075f142eb3F292D5065EB3faa646167b](https://arbiscan.io/address/0x9AF14D26075f142eb3F292D5065EB3faa646167b#code)
+
+## Optimism
+
+1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6](https://optimistic.etherscan.io/address/0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6#code)
+2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [0x506F594ceb4E33F5161139bAe3Ee911014df9f7f](https://optimistic.etherscan.io/address/0x506F594ceb4E33F5161139bAe3Ee911014df9f7f#code)
+3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0x87FE17697D0f14A222e8bEf386a0860eCffDD617](https://optimistic.etherscan.io/address/0x87FE17697D0f14A222e8bEf386a0860eCffDD617#code)
+4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0x1764ee18e8B3ccA4787249Ceb249356192594585](https://optimistic.etherscan.io/address/0x1764ee18e8B3ccA4787249Ceb249356192594585#code)
+5. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0x5eeE3091f747E60a045a2E715a4c71e600e31F6E](https://optimistic.etherscan.io/address/0x5eeE3091f747E60a045a2E715a4c71e600e31F6E#code)
 
 ## Overview
 
