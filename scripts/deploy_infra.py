@@ -48,11 +48,11 @@ deployments = {
         "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
     },
     "base:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
+        "math": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "views": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "plain_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "meta_amm": "0x5eee3091f747e60a045a2e715a4c71e600e31f6e",
+        "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
     },
 }
 
@@ -204,20 +204,20 @@ def main():
     # )
 
     # # polygon
-    deploy_infra(
-        "polygon:mainnet",
-        os.environ["RPC_POLYGON"],
-        "FIDDYDEPLOYER",
-        fork=False,
-    )
-
-    # # base
     # deploy_infra(
-    #     "base:mainnet",
-    #     os.environ["RPC_BASE"],
+    #     "polygon:mainnet",
+    #     os.environ["RPC_POLYGON"],
     #     "FIDDYDEPLOYER",
     #     fork=False,
     # )
+
+    # # base
+    deploy_infra(
+        "base:mainnet",
+        os.environ["RPC_BASE"],
+        "FIDDYDEPLOYER",
+        fork=False,
+    )
 
     # # avax
     # deploy_infra(

@@ -56,6 +56,14 @@ For integrators: check exchange_received. That should improve your pathing signi
 4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0x87FE17697D0f14A222e8bEf386a0860eCffDD617](https://polygonscan.com/address/0x87FE17697D0f14A222e8bEf386a0860eCffDD617#code)
 5. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0x1764ee18e8B3ccA4787249Ceb249356192594585](https://polygonscan.com/address/0x1764ee18e8B3ccA4787249Ceb249356192594585#code)
 
+## Base
+
+1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [0x506F594ceb4E33F5161139bAe3Ee911014df9f7f](https://basescan.org/address/0x506F594ceb4E33F5161139bAe3Ee911014df9f7f#code)
+2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [0x87FE17697D0f14A222e8bEf386a0860eCffDD617](https://basescan.org/address/0x87FE17697D0f14A222e8bEf386a0860eCffDD617#code)
+3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0x1764ee18e8B3ccA4787249Ceb249356192594585](https://basescan.org/address/0x1764ee18e8B3ccA4787249Ceb249356192594585#code)
+4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0x5eee3091f747e60a045a2e715a4c71e600e31f6e](https://basescan.org/address/0x5eee3091f747e60a045a2e715a4c71e600e31f6e#code)
+5. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0xd2002373543Ce3527023C75e7518C274A51ce712](https://basescan.org/address/0xd2002373543Ce3527023C75e7518C274A51ce712#code)
+
 ## Overview
 
 The metapool factory has several core components:
