@@ -53,6 +53,7 @@ GAUGE_CONTROLLER = "0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB"
 ADDRESS_PROVIDER = "0x0000000022d53366457f9d5e68ec105046fc4383"
 FIDDYRESEARCH = "0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17"
 FIDDYDEPLOYER = "0x2d12D0907A388811e3AA855A550F959501d303EE"
+BABE = "0xbabe61887f1de2713c6f97e567623453d3C79f67"
 
 
 # -------------- CURVE DATA --------------
@@ -103,6 +104,46 @@ curve_dao_network_settings = {
     "gnosis:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
         fee_receiver_address="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
+    ),
+    "avax:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
+        fee_receiver_address="0x06534b0BF7Ff378F162d4F348390BDA53b15fA35",
+    ),
+    "ftm:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
+        fee_receiver_address="0x2B039565B2b7a1A9192D4847fbd33B25b836B950",
+    ),
+    "kava:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0x1f0e8445Ebe0D0F60A96A7cd5BB095533cb15B58",
+        fee_receiver_address="0x1f0e8445Ebe0D0F60A96A7cd5BB095533cb15B58",
+    ),
+    "celo:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0x56bc95Ded2BEF162131905dfd600F2b9F1B380a4",
+        fee_receiver_address="0x56bc95Ded2BEF162131905dfd600F2b9F1B380a4",
+    ),
+    "aurora:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="",
+    ),
+    "bsc:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
+        fee_receiver_address="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
+    ),
+    "linea:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="",
+    ),
+    "scroll:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="",
+    ),
+    "zksync:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="",
+    ),
+    "pzkevm:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="",
     ),
 }
 
