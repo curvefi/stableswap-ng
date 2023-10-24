@@ -69,22 +69,18 @@ class CurveNetworkSettings:
 
 
 curve_dao_network_settings = {
+    # Ethereum
+    "ethereum:sepolia": CurveNetworkSettings(
+        dao_ownership_contract="0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17",
+        fee_receiver_address="0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17",
+    ),
     "ethereum:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0x40907540d8a6C65c637785e8f8B742ae6b0b9968",
         fee_receiver_address="0xeCb456EA5365865EbAb8a2661B0c503410e9B347",
         metaregistry_address="0xF98B45FA17DE75FB1aD0e7aFD971b0ca00e379fC",
         base_pool_registry_address="0xDE3eAD9B2145bBA2EB74007e58ED07308716B725",
     ),
-    "ethereum:mainnet-fork": CurveNetworkSettings(
-        dao_ownership_contract="0x40907540d8a6C65c637785e8f8B742ae6b0b9968",
-        fee_receiver_address="0xeCb456EA5365865EbAb8a2661B0c503410e9B347",
-        metaregistry_address="0xF98B45FA17DE75FB1aD0e7aFD971b0ca00e379fC",
-        base_pool_registry_address="0xDE3eAD9B2145bBA2EB74007e58ED07308716B725",
-    ),
-    "ethereum:sepolia": CurveNetworkSettings(
-        dao_ownership_contract="0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17",
-        fee_receiver_address="0xE6DA683076b7eD6ce7eC972f21Eb8F91e9137a17",
-    ),
+    # Layer 2
     "arbitrum:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xb055ebbacc8eefc166c169e9ce2886d0406ab49b",  # proxy
         fee_receiver_address="0xd4f94d0aaa640bbb72b5eec2d85f6d114d81a88e",
@@ -93,13 +89,30 @@ curve_dao_network_settings = {
         dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
         fee_receiver_address="0xbF7E49483881C76487b0989CD7d9A8239B20CA41",
     ),
-    "polygon:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
-        fee_receiver_address="0x774D1Dba98cfBD1F2Bc3A1F59c494125e07C48F9",
-    ),
     "base:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xe8269B33E47761f552E1a3070119560d5fa8bBD6",  # proxy
         fee_receiver_address="0xe8269B33E47761f552E1a3070119560d5fa8bBD6",  # proxy
+    ),
+    "linea:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
+        fee_receiver_address="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
+    ),
+    "scroll:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="",
+    ),
+    "zksync:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="0x4920088D9a5e5De9c098FCA4960d0DA5f4caa4c1",
+    ),
+    "pzkevm:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="",
+    ),
+    # Layer 1
+    "polygon:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
+        fee_receiver_address="0x774D1Dba98cfBD1F2Bc3A1F59c494125e07C48F9",
     ),
     "gnosis:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
@@ -129,21 +142,9 @@ curve_dao_network_settings = {
         dao_ownership_contract="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
         fee_receiver_address="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
     ),
-    "linea:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
-        fee_receiver_address="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
-    ),
-    "scroll:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
-    ),
-    "zksync:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
-    ),
-    "pzkevm:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
+    "tron:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
+        fee_receiver_address="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
     ),
 }
 

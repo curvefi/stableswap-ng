@@ -11,6 +11,7 @@ from rich.console import Console as RichConsole
 logger = RichConsole(file=sys.stdout)
 
 deployments = {
+    # Ethereum
     "ethereum:sepolia": {
         "math": "0xbc7654d2dd901aaaa3be4cb5bc0f10dea9f96443",
         "views": "0x07920e98a66e462c2aa4c8fa6200bc68ca161ea0",
@@ -19,13 +20,15 @@ deployments = {
         "gauge": "0x64891ab20392a029c0f231656ff13c5ee64b730c",
         "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
     },
-    "gnosis:mainnet": {
-        "math": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
-        "views": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
-        "plain_amm": "0xd2002373543Ce3527023C75e7518C274A51ce712",
-        "meta_amm": "0xd3B17f862956464ae4403cCF829CE69199856e1e",
-        "factory": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
+    "ethereum:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "gauge": "",
+        "factory": "",
     },
+    # Layer 2
     "arbitrum:mainnet": {
         "math": "0x3d6cB2F6DcF47CDd9C13E4e3beAe9af041d8796a",
         "views": "0xC1b393EfEF38140662b91441C6710Aa704973228",
@@ -40,61 +43,12 @@ deployments = {
         "meta_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
         "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
     },
-    "polygon:mainnet": {
-        "math": "0xf3A431008396df8A8b2DF492C913706BDB0874ef",
-        "views": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
-        "plain_amm": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
-        "meta_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
-        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
-    },
     "base:mainnet": {
         "math": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
         "views": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
         "plain_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
         "meta_amm": "0x5eee3091f747e60a045a2e715a4c71e600e31f6e",
         "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
-    },
-    "avax:mainnet": {
-        "math": "0xf3A431008396df8A8b2DF492C913706BDB0874ef",
-        "views": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
-        "plain_amm": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
-        "meta_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
-        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
-    },
-    "ftm:mainnet": {
-        "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
-        "views": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
-        "plain_amm": "0xd2002373543Ce3527023C75e7518C274A51ce712",
-        "meta_amm": "0x686bdb3D24Bc6F3ED89ed3d3B659765c54aC78B4",
-        "factory": "0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b",
-    },
-    "kava:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
-    },
-    "celo:mainnet": {
-        "math": "0xf3A431008396df8A8b2DF492C913706BDB0874ef",
-        "views": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
-        "plain_amm": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
-        "meta_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
-        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
-    },
-    "aurora:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
-    },
-    "bsc:mainnet": {
-        "math": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
-        "views": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
-        "plain_amm": "0x604388Bb1159AFd21eB5191cE22b4DeCdEE2Ae22",
-        "meta_amm": "0x06452f9c013fc37169B57Eab8F50A7A48c9198A3",
-        "factory": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
     },
     "linea:mainnet": {
         "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
@@ -118,6 +72,70 @@ deployments = {
         "factory": "",
     },
     "pzkevm:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    # Layer 1
+    "gnosis:mainnet": {
+        "math": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "views": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "plain_amm": "0xd2002373543Ce3527023C75e7518C274A51ce712",
+        "meta_amm": "0xd3B17f862956464ae4403cCF829CE69199856e1e",
+        "factory": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
+    },
+    "polygon:mainnet": {
+        "math": "0xf3A431008396df8A8b2DF492C913706BDB0874ef",
+        "views": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "plain_amm": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "meta_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+    },
+    "avax:mainnet": {
+        "math": "0xf3A431008396df8A8b2DF492C913706BDB0874ef",
+        "views": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "plain_amm": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "meta_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+    },
+    "ftm:mainnet": {
+        "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "views": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "plain_amm": "0xd2002373543Ce3527023C75e7518C274A51ce712",
+        "meta_amm": "0x686bdb3D24Bc6F3ED89ed3d3B659765c54aC78B4",
+        "factory": "0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b",
+    },
+    "bsc:mainnet": {
+        "math": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "views": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "plain_amm": "0x604388Bb1159AFd21eB5191cE22b4DeCdEE2Ae22",
+        "meta_amm": "0x06452f9c013fc37169B57Eab8F50A7A48c9198A3",
+        "factory": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
+    },
+    "celo:mainnet": {
+        "math": "0xf3A431008396df8A8b2DF492C913706BDB0874ef",
+        "views": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "plain_amm": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "meta_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+    },
+    "kava:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "aurora:mainnet": {
+        "math": "",
+        "views": "",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+    },
+    "tron:mainnet": {
         "math": "",
         "views": "",
         "plain_amm": "",
@@ -241,117 +259,13 @@ def deploy_infra(network, url, account, fork=False):
 
 def main():
 
-    # # gnosis
-    # deploy_infra(
-    #     "gnosis:mainnet",
-    #     os.environ["RPC_GNOSIS"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # ethereum sepolia
-    # deploy_infra(
-    #     "ethereum:sepolia",
-    #     os.environ["RPC_ETHEREUM_SEPOLIA"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # arbitrum
-    # deploy_infra(
-    #     "arbitrum:mainnet",
-    #     os.environ["RPC_ARBITRUM"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # optimism
-    # deploy_infra(
-    #     "optimism:mainnet",
-    #     os.environ["RPC_OPTIMISM"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # polygon
-    # deploy_infra(
-    #     "polygon:mainnet",
-    #     os.environ["RPC_POLYGON"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # base
-    # deploy_infra(
-    #     "base:mainnet",
-    #     os.environ["RPC_BASE"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # avax
-    # deploy_infra(
-    #     "avax:mainnet",
-    #     os.environ["RPC_AVAX"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # fantom
-    # deploy_infra(
-    #     "ftm:mainnet",
-    #     os.environ["RPC_FANTOM"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # kava
-    # deploy_infra(
-    #     "kava:mainnet",
-    #     os.environ["RPC_KAVA"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # celo
-    # deploy_infra(
-    #     "celo:mainnet",
-    #     os.environ["RPC_CELO"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # aurora
-    # deploy_infra(
-    #     "aurora:mainnet",
-    #     os.environ["RPC_AURORA"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # bsc
-    # deploy_infra(
-    #     "bsc:mainnet",
-    #     os.environ["RPC_BSC"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
-
-    # # linea
+    # eth
     deploy_infra(
-        "linea:mainnet",
-        os.environ["RPC_LINEA"],
+        "ethereum:mainnet",
+        os.environ["RPC_ETHEREUM"],
         "FIDDYDEPLOYER",
         fork=False,
     )
-
-    # # eth
-    # deploy_infra(
-    #     "ethereum:mainnet",
-    #     os.environ["RPC_ETHEREUM"],
-    #     "FIDDYDEPLOYER",
-    #     fork=False,
-    # )
 
 
 if __name__ == "__main__":
