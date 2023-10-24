@@ -97,11 +97,11 @@ deployments = {
         "factory": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
     },
     "linea:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
+        "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "views": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "plain_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "meta_amm": "0x1764ee18e8b3cca4787249ceb249356192594585",
+        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
     },
     "scroll:mainnet": {
         "math": "",
@@ -330,9 +330,17 @@ def main():
     # )
 
     # # bsc
+    # deploy_infra(
+    #     "bsc:mainnet",
+    #     os.environ["RPC_BSC"],
+    #     "FIDDYDEPLOYER",
+    #     fork=False,
+    # )
+
+    # # linea
     deploy_infra(
-        "bsc:mainnet",
-        os.environ["RPC_BSC"],
+        "linea:mainnet",
+        os.environ["RPC_LINEA"],
         "FIDDYDEPLOYER",
         fork=False,
     )
