@@ -10,7 +10,7 @@ packages = []
 [tool.poetry.dependencies]
 python = "^3.10"
 poetry = "1.5.1"
-titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "7171aee25c4d25fc1626a361a8c972e9316fd383"}
+titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "7fcca390a0c4d94fe78e19221df618d264a609f1"}
 vyper = "0.3.10"
 pycryptodome = "^3.18.0"
 pre-commit = "^3.3.3"

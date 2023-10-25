@@ -4136,8 +4136,8 @@ forking-recommended = ["ujson"]
 [package.source]
 type = "git"
 url = "https://github.com/vyperlang/titanoboa.git"
-reference = "7171aee25c4d25fc1626a361a8c972e9316fd383"
-resolved_reference = "7171aee25c4d25fc1626a361a8c972e9316fd383"
+reference = "7fcca390a0c4d94fe78e19221df618d264a609f1"
+resolved_reference = "7fcca390a0c4d94fe78e19221df618d264a609f1"
 
 [[package]]
 name = "tomli"
@@ -4805,4 +4805,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "40670953f2e928ef535bfedc35d1c0ea4fafd22fff5e96d6123780ba2b92b3cb"
+content-hash = "8c4d5d89084264c79558162dda8bf51fd649a3a3a78c7bb54f28996fda12fa45"

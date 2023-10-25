@@ -122,11 +122,11 @@ deployments = {
         "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
     },
     "kava:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
+        "math": "0xf3A431008396df8A8b2DF492C913706BDB0874ef",
+        "views": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "plain_amm": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "meta_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
     },
     "aurora:mainnet": {
         "math": "",
@@ -259,10 +259,9 @@ def deploy_infra(network, url, account, fork=False):
 
 def main():
 
-    # eth
     deploy_infra(
-        "ethereum:mainnet",
-        os.environ["RPC_ETHEREUM"],
+        "kava:mainnet",
+        os.environ["RPC_KAVA"],
         "FIDDYDEPLOYER",
         fork=False,
     )
