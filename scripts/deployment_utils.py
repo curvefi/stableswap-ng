@@ -98,16 +98,16 @@ curve_dao_network_settings = {
         fee_receiver_address="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
     ),
     "scroll:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
+        dao_ownership_contract="0xf3A431008396df8A8b2DF492C913706BDB0874ef",  # proxy
+        fee_receiver_address="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
     ),
     "zksync:mainnet": CurveNetworkSettings(
         dao_ownership_contract="",
         fee_receiver_address="0x4920088D9a5e5De9c098FCA4960d0DA5f4caa4c1",
     ),
     "pzkevm:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
+        dao_ownership_contract="0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        fee_receiver_address="0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
     ),
     # Layer 1
     "polygon:mainnet": CurveNetworkSettings(
@@ -143,8 +143,8 @@ curve_dao_network_settings = {
         fee_receiver_address="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
     ),
     "tron:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
-        fee_receiver_address="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
+        dao_ownership_contract="",
+        fee_receiver_address="",
     ),
 }
 

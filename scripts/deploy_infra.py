@@ -17,16 +17,16 @@ deployments = {
         "views": "0x07920e98a66e462c2aa4c8fa6200bc68ca161ea0",
         "plain_amm": "0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd",
         "meta_amm": "0xa12A87c73718a34CD8601b5022B2C6C359142585",
-        "gauge": "0x64891ab20392a029c0f231656ff13c5ee64b730c",
         "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
+        "gauge": "0x64891ab20392a029c0f231656ff13c5ee64b730c",
     },
     "ethereum:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "gauge": "",
-        "factory": "",
+        "math": "0x20D1c021525C85D9617Ccc64D8f547d5f730118A",
+        "views": "0x87DD13Dd25a1DBde0E1EdcF5B8Fa6cfff7eABCaD",
+        "plain_amm": "0x3E3B5F27bbf5CC967E074b70E9f4046e31663181",
+        "meta_amm": "0x19bd1AB34d6ABB584b9C1D5519093bfAA7f6c7d2",
+        "factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf",
+        "gauge": "0xF5617D4f7514bE35fce829a1C19AE7f6c9106979",
     },
     # Layer 2
     "arbitrum:mainnet": {
@@ -58,11 +58,11 @@ deployments = {
         "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
     },
     "scroll:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
+        "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "views": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "plain_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "meta_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
     },
     "zksync:mainnet": {
         "math": "",
@@ -72,11 +72,11 @@ deployments = {
         "factory": "",
     },
     "pzkevm:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
+        "math": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "views": "0x87fe17697d0f14a222e8bef386a0860ecffdd617",
+        "plain_amm": "0x1764ee18e8b3cca4787249ceb249356192594585",
+        "meta_amm": "0x5eee3091f747e60a045a2e715a4c71e600e31f6e",
+        "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
     },
     # Layer 1
     "gnosis:mainnet": {
@@ -260,8 +260,8 @@ def deploy_infra(network, url, account, fork=False):
 def main():
 
     deploy_infra(
-        "aurora:mainnet",
-        os.environ["RPC_AURORA"],
+        "ethereum:mainnet",
+        os.environ["RPC_ETHEREUM"],
         "FIDDYDEPLOYER",
         fork=False,
     )
