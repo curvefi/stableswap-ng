@@ -135,8 +135,8 @@ curve_dao_network_settings = {
         fee_receiver_address="0x56bc95Ded2BEF162131905dfd600F2b9F1B380a4",
     ),
     "aurora:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
+        dao_ownership_contract="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
+        fee_receiver_address="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
     ),
     "bsc:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",

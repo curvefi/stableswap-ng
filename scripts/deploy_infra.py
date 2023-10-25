@@ -129,11 +129,11 @@ deployments = {
         "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
     },
     "aurora:mainnet": {
-        "math": "",
-        "views": "",
-        "plain_amm": "",
-        "meta_amm": "",
-        "factory": "",
+        "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "views": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "plain_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "meta_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
     },
     "tron:mainnet": {
         "math": "",
@@ -260,8 +260,8 @@ def deploy_infra(network, url, account, fork=False):
 def main():
 
     deploy_infra(
-        "kava:mainnet",
-        os.environ["RPC_KAVA"],
+        "aurora:mainnet",
+        os.environ["RPC_AURORA"],
         "FIDDYDEPLOYER",
         fork=False,
     )

@@ -35,8 +35,8 @@ def deploy_proxy_admin(network, url, account, fork=False):
 
 def main():
     deploy_proxy_admin(
-        "pzkevm:mainnet",
-        os.environ["RPC_PZKEVM"],
+        "aurora:mainnet",
+        os.environ["RPC_AURORA"],
         "FIDDYDEPLOYER",
         fork=False,
     )
