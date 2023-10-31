@@ -17,12 +17,12 @@ For integrators: check exchange_received. That should improve your pathing signi
 
 ## Ethereum
 
-1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [](https://sepolia.etherscan.io/address/#code)
-2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [](https://sepolia.etherscan.io/address/#code)
-3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [](https://sepolia.etherscan.io/address/#code)
-4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [](https://sepolia.etherscan.io/address/#code)
-5. [`LiquidityGauge`](contracts/main/LiquidityGauge.vy): [](https://sepolia.etherscan.io/address/#code)
-6. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [](https://sepolia.etherscan.io/address/#code)
+1. [`CurveStableSwapNGMath`](contracts/main/CurveStableSwapNGMath.vy): [0x20D1c021525C85D9617Ccc64D8f547d5f730118A](https://etherscan.io/address/0x20D1c021525C85D9617Ccc64D8f547d5f730118A#code)
+2. [`CurveStableSwapNGViews`](contracts/main/CurveStableSwapNGViews.vy): [0x87DD13Dd25a1DBde0E1EdcF5B8Fa6cfff7eABCaD](https://etherscan.io/address/0x87DD13Dd25a1DBde0E1EdcF5B8Fa6cfff7eABCaD#code)
+3. [`StableSwapNG`](contracts/main/CurveStableSwapNG.vy): [0x3E3B5F27bbf5CC967E074b70E9f4046e31663181](https://etherscan.io/address/0x3E3B5F27bbf5CC967E074b70E9f4046e31663181#code)
+4. [`StableSwapMetaNG`](contracts/main/CurveStableSwapMetaNG.vy): [0x19bd1AB34d6ABB584b9C1D5519093bfAA7f6c7d2](https://etherscan.io/address/0x19bd1AB34d6ABB584b9C1D5519093bfAA7f6c7d2#code)
+5. [`LiquidityGauge`](contracts/main/LiquidityGauge.vy): [0xF5617D4f7514bE35fce829a1C19AE7f6c9106979](https://etherscan.io/address/0xF5617D4f7514bE35fce829a1C19AE7f6c9106979#code)
+6. [`CurveStableSwapFactoryNG`](contracts/main/CurveStableSwapFactoryNG.vy): [0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf](https://etherscan.io/address/0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf#code)
 
 ## Gnosis
 
