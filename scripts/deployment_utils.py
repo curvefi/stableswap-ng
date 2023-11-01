@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import List
 
 import click
 from ape import networks, project
@@ -8,7 +7,6 @@ from ape.api.address import Address
 # from eth_utils import function_signature_to_4byte_selector
 
 DOLLAR_VALUE_OF_TOKENS_TO_DEPOSIT = 5
-ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 def _get_tx_params():
@@ -146,6 +144,10 @@ curve_dao_network_settings = {
         dao_ownership_contract="",
         fee_receiver_address="",
     ),
+    "mantle:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="",
+        fee_receiver_address="",
+    ),
 }
 
 
@@ -154,58 +156,4 @@ CURVE_DAO_OWNERSHIP = {
     "voting": "0xe478de485ad2fe566d49342cbd03e49ed7db3356",
     "token": "0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2",
     "quorum": 30,
-}
-
-# -------------------------- POOL SETUP --------------------------
-
-
-@dataclass
-class PoolSettings:
-    name: str
-    symbol: str
-    coins: List[Address]
-    A: int
-    fee: int
-    offpeg_fee_multiplier: int
-    ma_exp_time: int
-    implementation_idx: int
-    asset_types: List[int]
-    method_ids: List[int]
-    oracles: List[Address]
-
-
-pool_settings = {
-    "gnosis:mainnet": {
-        "plain": [
-            "WXDAI/USDC/USDT",  # name
-            "3pool-ng",  # symbol
-            [
-                "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",  # wxdai
-                "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83",  # usdc
-                "0x4ECaBa5870353805a9F068101A40E0f32ed605C6",  # usdt
-            ],
-            1000,  # A
-            1000000,  # fee
-            20000000000,  # offpeg_fee_multiplier
-            865,  # ma_exp_time
-            0,  # implementation index
-            [0, 0, 0],  # asset_types
-            [b"", b"", b""],  # method_ids
-            [ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
-        ],
-        "meta": [
-            "0x7f90122bf0700f9e7e1f688fe926940e8839f353",  # base_pool
-            "EURE/3CRV",  # name
-            "eure3crvng",  # symbol
-            "0xcb444e90d8198415266c6a2724b7900fb12fc56e",  # eure
-            500,  # A
-            1000000,  # fee
-            20000000000,  # offpeg_fee_multiplier
-            865,  # ma_exp_time
-            0,  # implementation index
-            0,  # asset_types
-            b"",  # method_ids
-            ZERO_ADDRESS,  # oracles
-        ],
-    }
 }

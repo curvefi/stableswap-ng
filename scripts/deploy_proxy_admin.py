@@ -19,6 +19,7 @@ def deploy_proxy_admin(network, url, account, fork=False):
     if fork:
         boa.env.fork(url)
         logger.log("Forkmode ...")
+        boa.env.eoa = deploy_utils.FIDDYDEPLOYER
     else:
         logger.log("Prodmode ...")
         boa.set_env(NetworkEnv(url))
@@ -35,10 +36,10 @@ def deploy_proxy_admin(network, url, account, fork=False):
 
 def main():
     deploy_proxy_admin(
-        "pzkevm:mainnet",
-        os.environ["RPC_PZKEVM"],
+        "mantle:mainnet",
+        os.environ["RPC_MANTLE"],
         "FIDDYDEPLOYER",
-        fork=False,
+        fork=True,
     )
 
 
