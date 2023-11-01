@@ -1,18 +1,9 @@
-name: test_gauge
+name: test_token
 
-on:
-  pull_request:
-    paths:
-      - "tests/gauge/*.py"
-      - "contracts/LiquidityGauge.vy"
-  push:
-    paths:
-      - "tests/gauge/*.py"
-      - "contracts/LiquidityGauge.vy"
+on: [pull_request, push]
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
 
 jobs:
   tests:
@@ -36,9 +27,9 @@ jobs:
         run: |
           pip install poetry==1.5.1
           poetry config virtualenvs.in-project true
-          poetry install --no-interaction
+          poetry install --no-interaction --without dev
 
       - name: Run Tests
         run: |
           source .venv/bin/activate
-          pytest tests/gauge/ --pool-size=2 --pool-type=basic --token-types=plain --decimals=18,18 -n auto
+          pytest tests/test_token.py --token-types=plain -n auto

@@ -2,7 +2,6 @@ import math
 
 import boa
 import pytest
-from boa.environment import AddressType
 from eth_account.account import Account, LocalAccount
 
 from tests.utils.tokens import mint_for_testing
@@ -11,17 +10,17 @@ from .constants import INITIAL_AMOUNT
 
 
 @pytest.fixture(scope="module")
-def deployer() -> AddressType:
+def deployer():
     return boa.env.generate_address()
 
 
 @pytest.fixture(scope="module")
-def owner() -> AddressType:
+def owner():
     return boa.env.generate_address()
 
 
 @pytest.fixture(scope="module")
-def fee_receiver() -> AddressType:
+def fee_receiver():
     return boa.env.generate_address()
 
 

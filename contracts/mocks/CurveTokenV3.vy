@@ -1,4 +1,4 @@
-# @version 0.3.9
+# @version ^0.3.9
 """
 @title Curve LP Token
 @author Curve.Fi
@@ -85,7 +85,7 @@ def transferFrom(_from : address, _to : address, _value : uint256) -> bool:
     self.balanceOf[_to] += _value
 
     _allowance: uint256 = self.allowance[_from][msg.sender]
-    if _allowance != MAX_UINT256:
+    if _allowance != max_value(uint256):
         self.allowance[_from][msg.sender] = _allowance - _value
 
     log Transfer(_from, _to, _value)

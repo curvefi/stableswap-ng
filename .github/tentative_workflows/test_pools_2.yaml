@@ -1,14 +1,6 @@
-name: test_factory
+name: test_pools_2
 
-on:
-  pull_request:
-    paths:
-      - "tests/test_factory.py"
-      - "contracts/CurveStableSwapFactoryNG.vy"
-  push:
-    paths:
-      - "tests/test_factory.py"
-      - "contracts/CurveStableSwapFactoryNG.vy"
+on: [pull_request, push]
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,14 +28,14 @@ jobs:
         run: |
           pip install poetry==1.5.1
           poetry config virtualenvs.in-project true
-          poetry install --no-interaction
+          poetry install --no-interaction --without dev
 
-      - name: Run Tests Basic
+      - name: Run All Token Tests 18,18
         run: |
           source .venv/bin/activate
-          pytest tests/test_factory.py --token-types=plain -n auto
+          pytest tests/pools/ --pool-size=2 -n auto
 
-      - name: Run Tests Forked
+      - name: Run Plain Tests 18,6
         run: |
           source .venv/bin/activate
-          pytest tests/test_factory_forked.py --token-types=plain -n auto
+          pytest tests/pools/ --pool-size=2 --pool-type=basic --token-types=plain --decimals=18,6 -n auto

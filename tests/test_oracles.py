@@ -15,7 +15,7 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 
 def get_D(swap, math):
 
-    _rates = [swap.stored_rates(i) for i in range(swap.N_COINS())]
+    _rates = swap.stored_rates()
     _balances = swap.internal._balances()
     xp = swap.internal._xp_mem(_rates, _balances)
     amp = swap.internal._A()
@@ -46,15 +46,16 @@ def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
 
     # numeric prices:
     p_numeric = []
+    stored_rates = swap.stored_rates()
     for n in range(1, swap.N_COINS()):
 
         expected_jth_out = views_implementation.get_dy(0, n, 10**18, swap)
-        p_numeric.append(swap.stored_rates(0) / expected_jth_out)
+        p_numeric.append(stored_rates[0] / expected_jth_out)
 
     # amm prices:
     p_amm = []
     for n in range(swap.N_COINS() - 1):
-        p_amm.append(swap.get_p(n) * swap.stored_rates(n + 1) / 10**36)
+        p_amm.append(swap.get_p(n) * stored_rates[n + 1] / 10**36)
 
     # compare
     for n in range(swap.N_COINS() - 1):

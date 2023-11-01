@@ -1,10 +1,12 @@
 # Stableswap NG
 
-Permissionless deployment of Curve metapools.
+Permissionless deployment of Curve Stableswap plain and metapools. Supports up to 8 coins for plain pools and 2 coins for metapools. Supports: rate-oraclised tokens (e.g. wstETH), ERC4626 (sDAI), rebasing (stETH), and plain (WETH:stETH) pools. Does not support native tokens.
 
-# Wen?
+For integrators: check exchange_received. That should improve your pathing significantly. Be aware that if a pool contains rebasing tokens, this method is intentionally disabled.
 
-![STOP THE WEN!](./you_shall_not_wen.jpeg)
+# Deployments
+
+For a full list of deployments, please check: [The deployment script](scripts/deploy_infra.py)
 
 ## Overview
 

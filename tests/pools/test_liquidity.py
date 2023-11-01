@@ -389,9 +389,13 @@ class TestLiquidityMethods:
             initial_amount = swap.balanceOf(alice)
             amount = initial_amount // divisor
 
-            swap.remove_liquidity_one_coin(amount, idx, 0, sender=alice)
+            if divisor == 1:
+                with boa.reverts():
+                    swap.remove_liquidity_one_coin(amount, idx, 0, sender=alice)
+            else:
+                swap.remove_liquidity_one_coin(amount, idx, 0, sender=alice)
 
-            assert swap.balanceOf(alice) + amount == initial_amount
+                assert swap.balanceOf(alice) + amount == initial_amount
 
         @pytest.mark.parametrize("idx", range(2))
         def test_expected_vs_actual(self, alice, swap, pool_type, pool_tokens, underlying_tokens, idx):

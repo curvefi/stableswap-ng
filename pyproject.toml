@@ -10,17 +10,17 @@ packages = []
 [tool.poetry.dependencies]
 python = "^3.10"
 poetry = "1.5.1"
-titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "e29a70640b67c3e87c248a582454ae6fe8eeec00"}
-vyper = "^0.3.9"
+titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "1924f4888e2ef261efb2367fce2cf467de16f529"}
+vyper = "0.3.10"
 pycryptodome = "^3.18.0"
 pre-commit = "^3.3.3"
-eth-ape = "^0.6.18"
 
 [tool.poetry.group.dev.dependencies]
 black = "22.3.0"
 flake8 = "4.0.1"
 isort = "5.12.0"
 mamushi = "^0.0.2a1"
+eth-ape = "^0.6.18"
 
 
 [tool.poetry.group.testing.dependencies]

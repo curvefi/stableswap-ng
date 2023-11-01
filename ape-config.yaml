@@ -15,9 +15,7 @@ plugins:
 default_ecosystem: ethereum
 
 # vyper:
-#   default_version: paris # enable for non PUSH0 evm networks
-#   ethereum:
-#     evm_version: shanghai
+#   evm_version: shanghai
 
 hardhat:
   port: auto

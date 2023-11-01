@@ -50,7 +50,7 @@ def test_remove(alice, swap, pool_size, deposit_amounts):
 def test_exchange(bob, swap, sending, receiving, decimals):
     virtual_price = swap.get_virtual_price()
 
-    amount = 10 ** decimals[sending]
+    amount = 10_000 * 10 ** decimals[sending]
     swap.exchange(
         sending,
         receiving,

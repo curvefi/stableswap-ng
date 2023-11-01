@@ -21,7 +21,8 @@ def amm_interface():
 @pytest.fixture(scope="module")
 def amm_implementation(deployer, amm_interface):
     with boa.env.prank(deployer):
-        return amm_interface.deploy_as_blueprint()
+        impl = amm_interface.deploy_as_blueprint()
+    return impl
 
 
 @pytest.fixture(scope="module")
@@ -32,7 +33,8 @@ def amm_interface_meta():
 @pytest.fixture(scope="module")
 def amm_implementation_meta(deployer, amm_interface_meta):
     with boa.env.prank(deployer):
-        return amm_interface_meta.deploy_as_blueprint()
+        impl = amm_interface_meta.deploy_as_blueprint()
+    return impl
 
 
 @pytest.fixture(scope="module")
@@ -96,7 +98,6 @@ def add_base_pool(
         factory.add_base_pool(
             base_pool.address,
             base_pool_lp_token.address,
-            [t.address for t in base_pool_tokens],
             [0] * len(base_pool_tokens),
             len(base_pool_tokens),
         )
