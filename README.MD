@@ -15,7 +15,7 @@ The metapool factory has several core components:
 - [`Factory`](contracts/main/CurveStableSwapFactoryNG.vy) is the main contract used to deploy new metapools. It also acts a registry for finding the deployed pools and querying information about them.
 - New pools are deployed via blueprints. The [implementation contract](contracts/main/CurveStableSwapNG.vy) targetted by the proxy is determined according to the base pool.
 
-See the [documentation](https://curve.readthedocs.io) for more detailed information.
+See the [documentation](https://docs.curve.fi) for more detailed information.
 
 ## Testing
 
