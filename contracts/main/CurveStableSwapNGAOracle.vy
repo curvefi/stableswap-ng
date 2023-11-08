@@ -1170,8 +1170,8 @@ def _A() -> uint256:
         uint256
     )
 
-    assert fetched_A < A_PRECISION * MAX_A  # dev: fetched A is too high
-    assert fetched_A > A_PRECISION  # dev: fetched A is too low
+    assert fetched_A <= A_PRECISION * MAX_A  # dev: fetched A is too high
+    assert fetched_A >= A_PRECISION  # dev: fetched A is too low
 
     return fetched_A
 
@@ -1829,7 +1829,7 @@ def set_A_oracle(_oracle: address, _method_id: bytes4):
     """
     @notice Set the address and method id of the external contract that
             governs Amplification Factor
-    @dev Only settable by the Pool Manager. Pool manager can change A oracle whenever.
+    @dev Only settable by the Pool Manager once.
     """
     assert POOL_MANAGER == tx.origin  # dev: only pool manager
     assert self.A_oracle == 0  # dev: A_oracle already set
