@@ -145,7 +145,7 @@ MAX_COINS_128: constant(int128) = 8
 
 # ---------------------------- Pool Variables --------------------------------
 
-pool_manager: public(immutable(address))
+POOL_MANAGER: public(immutable(address))
 
 N_COINS: public(immutable(uint256))
 N_COINS_128: immutable(int128)
@@ -239,12 +239,8 @@ def __init__(
     @notice Initialize the pool contract
     @param _name Name of the new plain pool.
     @param _symbol Symbol for the new plain pool.
-    @param _A Amplification co-efficient - a lower value here means
-              less tolerance for imbalance within the pool's assets.
-              Suggested values include:
-               * Uncollateralized algorithmic stablecoins: 5-10
-               * Non-redeemable, collateralized assets: 100
-               * Redeemable assets: 200-400
+    @param _A Amplification co-efficient. For this implementation, the constructor
+              argument is inconsequential since A is inferred from an external call.
     @param _fee Trade fee, given as an integer with 1e10 precision. The
                 the maximum is 1% (100000000).
                 50% of the fee is distributed to veCRV holders.
@@ -261,7 +257,7 @@ def __init__(
     @param _oracles Array of rate oracle addresses.
     """
 
-    pool_manager = tx.origin
+    POOL_MANAGER = tx.origin
 
     coins = _coins
     asset_types = _asset_types
@@ -273,9 +269,6 @@ def __init__(
 
     factory = Factory(msg.sender)
 
-    A: uint256 = _A * A_PRECISION
-    self.initial_A = A
-    self.future_A = A
     self.fee = _fee
     self.offpeg_fee_multiplier = _offpeg_fee_multiplier
 
@@ -1177,7 +1170,8 @@ def _A() -> uint256:
         uint256
     )
 
-    assert fetched_A < MAX_A  # dev: fetched A is too high
+    assert fetched_A < A_PRECISION * MAX_A  # dev: fetched A is too high
+    assert
 
     return fetched_A
 
@@ -1837,7 +1831,8 @@ def set_A_oracle(_oracle: address, _method_id: bytes4):
             governs Amplification Factor
     @dev Only settable by the Pool Manager. Pool manager can change A oracle whenever.
     """
-    assert msg.sender == pool_manager  # dev: only pool manager
+    assert POOL_MANAGER == tx.origin  # dev: only pool manager
+    assert self.A_oracle == 0  # dev: A_oracle already set
 
     self.A_oracle = convert(_method_id, uint256) * 2**224 | convert(_oracle, uint256)
 
