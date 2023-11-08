@@ -1171,7 +1171,7 @@ def _A() -> uint256:
     )
 
     assert fetched_A < A_PRECISION * MAX_A  # dev: fetched A is too high
-    assert
+    assert fetched_A > A_PRECISION  # dev: fetched A is too low
 
     return fetched_A
 
