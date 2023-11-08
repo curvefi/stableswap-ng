@@ -1170,11 +1170,8 @@ def _A() -> uint256:
         uint256
     )
 
-    assert fetched_A <= A_PRECISION * MAX_A  # dev: fetched A is too high
-    assert fetched_A >= A_PRECISION  # dev: fetched A is too low
-
-    return fetched_A
-
+    # Cap fetched_A between: [A_PRECISION, A_PRECISION * MAX_A]:
+    return min(max(A_PRECISION, fetched_A), A_PRECISION * MAX_A)
 
 
 @pure
