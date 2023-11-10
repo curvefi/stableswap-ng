@@ -18,7 +18,7 @@ deployments = {
         "plain_amm": "0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd",
         "meta_amm": "0xa12A87c73718a34CD8601b5022B2C6C359142585",
         "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
-        "gauge": "0x64891ab20392a029c0f231656ff13c5ee64b730c",
+        "gauge": "",
     },
     "ethereum:mainnet": {
         "math": "0x20D1c021525C85D9617Ccc64D8f547d5f730118A",
@@ -26,7 +26,7 @@ deployments = {
         "plain_amm": "0x3E3B5F27bbf5CC967E074b70E9f4046e31663181",
         "meta_amm": "0x19bd1AB34d6ABB584b9C1D5519093bfAA7f6c7d2",
         "factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf",
-        "gauge": "0xF5617D4f7514bE35fce829a1C19AE7f6c9106979",
+        "gauge": "0xf2eff2Cd0d9C82b7b2f17FbBed703fA7931dB1da",
     },
     # Layer 2
     "arbitrum:mainnet": {
@@ -193,6 +193,7 @@ def deploy_infra(network, url, account, fork=False):
     if fork:
         boa.env.fork(url)
         logger.log("Forkmode ...")
+        boa.env.eoa = deploy_utils.FIDDYDEPLOYER
     else:
         logger.log("Prodmode ...")
         boa.set_env(NetworkEnv(url))
@@ -260,7 +261,7 @@ def deploy_infra(network, url, account, fork=False):
 def main():
 
     deploy_infra(
-        "ethereum:mainnet",
+        "ethereum:sepolia",
         os.environ["RPC_ETHEREUM"],
         "FIDDYDEPLOYER",
         fork=False,
