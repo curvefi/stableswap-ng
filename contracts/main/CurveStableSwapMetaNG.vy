@@ -334,7 +334,11 @@ def __init__(
         if i < BASE_N_COINS:
             # Approval needed for add_liquidity operation on base pool in
             # _exchange_underlying:
-            ERC20(_base_coins[i]).approve(BASE_POOL, max_value(uint256))
+            ERC20(_base_coins[i]).approve(
+                BASE_POOL,
+                max_value(uint256),
+                default_return_value = True
+            )
 
     # For ERC4626 tokens:
     if asset_types[0] == 3:

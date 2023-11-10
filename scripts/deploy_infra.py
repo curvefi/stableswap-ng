@@ -24,7 +24,7 @@ deployments = {
         "math": "0x20D1c021525C85D9617Ccc64D8f547d5f730118A",
         "views": "0x87DD13Dd25a1DBde0E1EdcF5B8Fa6cfff7eABCaD",
         "plain_amm": "0x3E3B5F27bbf5CC967E074b70E9f4046e31663181",
-        "meta_amm": "0x19bd1AB34d6ABB584b9C1D5519093bfAA7f6c7d2",
+        "meta_amm": "0x64AFA95e0C3D8410240a4262df9Fd82B12b64eDd",
         "factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf",
         "gauge": "0xF5617D4f7514bE35fce829a1C19AE7f6c9106979",
     },
@@ -193,6 +193,7 @@ def deploy_infra(network, url, account, fork=False):
     if fork:
         boa.env.fork(url)
         logger.log("Forkmode ...")
+        boa.env.eoa = deploy_utils.FIDDYDEPLOYER  # set eoa address here
     else:
         logger.log("Prodmode ...")
         boa.set_env(NetworkEnv(url))
@@ -261,7 +262,7 @@ def main():
 
     deploy_infra(
         "ethereum:mainnet",
-        os.environ["RPC_ETHEREUM"],
+        "http://localhost:9090",
         "FIDDYDEPLOYER",
         fork=False,
     )
