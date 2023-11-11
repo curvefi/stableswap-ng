@@ -26,7 +26,7 @@ deployments = {
         "plain_amm": "0x3E3B5F27bbf5CC967E074b70E9f4046e31663181",
         "meta_amm": "0x64AFA95e0C3D8410240a4262df9Fd82B12b64eDd",
         "factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf",
-        "gauge": "0xF5617D4f7514bE35fce829a1C19AE7f6c9106979",
+        "gauge": "0xf2eff2Cd0d9C82b7b2f17FbBed703fA7931dB1da",
     },
     # Layer 2
     "arbitrum:mainnet": {
