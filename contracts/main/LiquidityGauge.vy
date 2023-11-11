@@ -173,7 +173,7 @@ def __init__(_lp_token: address):
     """
     self.lp_token = _lp_token
     self.factory = msg.sender
-    self.manager = msg.sender
+    self.manager = tx.origin
 
     symbol: String[32] = ERC20Extended(_lp_token).symbol()
     name: String[64] = concat("Curve.fi ", symbol, " Gauge Deposit")

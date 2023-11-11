@@ -136,7 +136,7 @@ def deploy_pool(network, url, account, pool_type, fork):
     elif pool_type == "meta":
         amm_address = factory.deploy_metapool(*args)
 
-    logger.log(f"Deployed Plain pool {amm_address}.")
+    logger.log(f"Deployed pool {amm_address}.")
 
     return amm_address
 
@@ -187,7 +187,7 @@ def deploy_pool_and_gauge(network, url, account, pool_type, fork):
     elif pool_type == "meta":
         amm_address = factory.deploy_metapool(*args)
 
-    logger.log(f"Deployed Plain pool {amm_address}.")
+    logger.log(f"Deployed pool {amm_address}.")
 
     gauge_address = factory.deploy_gauge(amm_address)
 
@@ -197,7 +197,7 @@ def deploy_pool_and_gauge(network, url, account, pool_type, fork):
 def main():
 
     fork = False
-    deploy_pool_and_gauge("ethereum:mainnet", "http://localhost:9090", "FIDDYDEPLOYER", "meta", fork)
+    deploy_pool_and_gauge("ethereum:mainnet", os.environ["RPC_ETHEREUM"], "FIDDYDEPLOYER", "meta", fork)
 
 
 if __name__ == "__main__":
