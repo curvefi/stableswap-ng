@@ -109,6 +109,22 @@ pool_settings = {
             b"",  # method_ids
             ZERO_ADDRESS,  # oracles
         ],
+        "plain": [
+            "FRAXsDAI",  # name
+            "FRAXSDAI",  # symbol
+            [
+                "0x853d955aCEf822Db058eb8505911ED77F175b99e",  # frax
+                "0x83F20F44975D03b1b09e64809B757c47f942BEeA",  # sdai
+            ],
+            1500,  # A
+            1000000,  # fee
+            10000000000,  # offpeg_fee_multiplier
+            865,  # ma_exp_time
+            0,  # implementation index
+            [0, 3],  # asset_types
+            [b"", b""],  # method_ids
+            [ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
+        ],
     }
 }
 
@@ -196,8 +212,8 @@ def deploy_pool_and_gauge(network, url, account, pool_type, fork):
 
 def main():
 
-    fork = False
-    deploy_pool_and_gauge("ethereum:mainnet", os.environ["RPC_ETHEREUM"], "FIDDYDEPLOYER", "meta", fork)
+    fork = True
+    deploy_pool_and_gauge("ethereum:mainnet", os.environ["RPC_ETHEREUM"], "FIDDYDEPLOYER", "plain", fork)
 
 
 if __name__ == "__main__":

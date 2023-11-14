@@ -178,6 +178,7 @@ admin_balances: public(DynArray[uint256, MAX_COINS])
 rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
 oracles: DynArray[uint256, MAX_COINS]
+A_oracle: public(uint256)
 
 # For ERC4626 tokens, we need:
 call_amount: immutable(DynArray[uint256, MAX_COINS])
@@ -1331,7 +1332,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
 
             # Upate packed prices -----------------
             last_prices_packed_new[i] = self.pack_2(
-                spot_price[i],
+                min(spot_price[i], 2 * 10**18),  # <----- Cap spot value by 2.
                 self._calc_moving_average(
                     last_prices_packed_current[i],
                     self.ma_exp_time,

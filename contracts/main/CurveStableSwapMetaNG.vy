@@ -1374,7 +1374,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
 
         # Upate packed prices -----------------
         last_prices_packed_new[0] = self.pack_2(
-            spot_price[0],
+            min(spot_price[0], 2 * 10**18),  # <----- Cap spot value by 2.
             self._calc_moving_average(
                 last_prices_packed_current[0],
                 self.ma_exp_time,
