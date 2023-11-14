@@ -111,6 +111,43 @@ def test_price_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, 
 
 
 @given(
+    amount=strategy("uint256", min_value=10**9, max_value=10**15),
+)
+@settings(**SETTINGS)
+@pytest.mark.only_for_pool_type(0)
+def test_manipulate_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount):
+
+    for token in pool_tokens:
+        if "IS_UP" in token._immutables.__dict__.keys() and not token._immutables.IS_UP:
+            return
+
+    p_oracle_before = swap.price_oracle(0)
+    print("before", p_oracle_before)
+
+    # calc amount in:
+    amount_in = amount * 10 ** (decimals[0])
+
+    # mint tokens for bob if he needs:
+    if amount_in > pool_tokens[0].balanceOf(bob):
+        mint_for_testing(bob, amount_in, pool_tokens[0], False)
+
+    # do large swap
+    try:
+        swap.exchange(0, 1, amount_in, 0, sender=bob)
+    except boa.BoaError:
+        return  # we're okay with failure to manipulate here
+
+    # time travel
+    boa.env.time_travel(blocks=500)
+
+    # check if price oracle is way too high
+    p_oracle_after = swap.price_oracle(0)
+    print("after", p_oracle_after)
+
+    assert p_oracle_after < 2 * 10**18
+
+
+@given(
     amount=strategy("uint256", min_value=1, max_value=10**5),
     dt0=strategy("uint256", min_value=0, max_value=10**6),
     dt=strategy("uint256", min_value=0, max_value=10**6),
