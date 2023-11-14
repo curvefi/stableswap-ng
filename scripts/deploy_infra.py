@@ -18,7 +18,7 @@ deployments = {
         "plain_amm": "0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd",
         "meta_amm": "0xa12A87c73718a34CD8601b5022B2C6C359142585",
         "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
-        "gauge": "0x64891ab20392a029c0f231656ff13c5ee64b730c",
+        "gauge": "",
     },
     "ethereum:mainnet": {
         "math": "0x20D1c021525C85D9617Ccc64D8f547d5f730118A",
@@ -262,7 +262,7 @@ def main():
 
     deploy_infra(
         "ethereum:mainnet",
-        "http://localhost:9090",
+        os.environ["RPC_ETHEREUM"],
         "FIDDYDEPLOYER",
         fork=False,
     )
