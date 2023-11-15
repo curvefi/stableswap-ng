@@ -15,8 +15,8 @@ deployments = {
     "ethereum:sepolia": {
         "math": "0xbc7654d2dd901aaaa3be4cb5bc0f10dea9f96443",
         "views": "0x07920e98a66e462c2aa4c8fa6200bc68ca161ea0",
-        "plain_amm": "0x296d2b5c23833a70d07c8fcbb97d846c1ff90ddd",
-        "meta_amm": "0xa12A87c73718a34CD8601b5022B2C6C359142585",
+        "plain_amm": "",
+        "meta_amm": "",
         "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
         "gauge": "",
     },
@@ -24,7 +24,7 @@ deployments = {
         "math": "0x20D1c021525C85D9617Ccc64D8f547d5f730118A",
         "views": "0x87DD13Dd25a1DBde0E1EdcF5B8Fa6cfff7eABCaD",
         "plain_amm": "0x933f4769DCC27fC7345D9d5975AE48EC4D0F829C",
-        "meta_amm": "0x64AFA95e0C3D8410240a4262df9Fd82B12b64eDd",
+        "meta_amm": "0x1f7C86AffE5bCF7a1D74a8c8E2ef9E03BF31c1BD",
         "factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf",
         "gauge": "0xf2eff2Cd0d9C82b7b2f17FbBed703fA7931dB1da",
     },
@@ -262,7 +262,7 @@ def main():
 
     deploy_infra(
         "ethereum:mainnet",
-        os.environ["RPC_ETHEREUM"],
+        "http://localhost:9090/",
         "FIDDYDEPLOYER",
         fork=False,
     )
