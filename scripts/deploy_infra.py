@@ -24,7 +24,7 @@ deployments = {
         "math": "0x20D1c021525C85D9617Ccc64D8f547d5f730118A",
         "views": "0x87DD13Dd25a1DBde0E1EdcF5B8Fa6cfff7eABCaD",
         "plain_amm": "0x933f4769DCC27fC7345D9d5975AE48EC4D0F829C",
-        "meta_amm": "0x1f7C86AffE5bCF7a1D74a8c8E2ef9E03BF31c1BD",
+        "meta_amm": "0xDD7EBB1C49780519dD9755B8B1A23a6f42CE099E",
         "factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf",
         "gauge": "0xf2eff2Cd0d9C82b7b2f17FbBed703fA7931dB1da",
     },
