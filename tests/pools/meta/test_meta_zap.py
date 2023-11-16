@@ -91,20 +91,21 @@ def zap(base_pool, base_pool_tokens, base_pool_lp_token):
 
 
 @pytest.fixture(scope="module")
-def swap(zap, base_pool, empty_swap, charlie, tokens_all):
+def initial_amts():
+    return [100 * 10**18] * 4
+
+
+@pytest.fixture(scope="module")
+def swap(zap, base_pool, empty_swap, charlie, tokens_all, initial_amts):
 
     for i in range(3):
         assert base_pool.balances(i) == 0
 
-    deposit_amount = 100 * 10**18
-
     for token in tokens_all:
-        mint_for_testing(charlie, deposit_amount, token, False)
+        mint_for_testing(charlie, initial_amts[0], token, False)
         token.approve(zap.address, 2**256 - 1, sender=charlie)
 
-    deposit_amounts = [deposit_amount] * 4
-
-    out_amount = zap.add_liquidity(empty_swap.address, deposit_amounts, 0, sender=charlie)
+    out_amount = zap.add_liquidity(empty_swap.address, initial_amts, 0, sender=charlie)
     assert out_amount > 0
     assert 0 not in empty_swap.get_balances()
     assert empty_swap.totalSupply() > 0
@@ -128,24 +129,26 @@ def test_calc_amts_add(zap, swap, charlie, tokens_all):
     assert calc_amt_zap == out_amount
 
 
-def test_calc_amts_remove_imbalance(zap, swap, charlie, tokens_all):
+def test_calc_amts_remove_imbalance(
+    zap, swap, meta_token, base_pool_tokens, base_pool_lp_token, base_pool, charlie, tokens_all, initial_amts
+):
 
-    to_receive_amounts = [10 * 10**18] * 4
-
-    charlie_bal_before = []
-    for token in tokens_all:
-        charlie_bal_before.append(token.balanceOf(charlie))
-
+    amounts = [i // 4 for i in initial_amts]
+    initial_balance = swap.balanceOf(charlie)
     swap.approve(zap, 2**256 - 1, sender=charlie)
-    calc_burnt_amt_zap = zap.calc_token_amount(swap.address, to_receive_amounts, False)
-    actual_burnt_amt = zap.remove_liquidity_imbalance(
-        swap.address, [int(0.9 * amt) for amt in to_receive_amounts], calc_burnt_amt_zap, sender=charlie
-    )
+    max_burn = swap.balanceOf(charlie)
+    zap.remove_liquidity_imbalance(swap, amounts, max_burn, sender=charlie)
 
-    assert actual_burnt_amt <= calc_burnt_amt_zap
-
+    # check if charlie received what was wanted:
     for i, token in enumerate(tokens_all):
-        assert token.balanceOf(charlie) > charlie_bal_before[i]
+        assert token.balanceOf(charlie) == amounts[i]
+
+    # bob is the only LP, total supply is affected in the same way as his balance
+    assert swap.balanceOf(charlie) < initial_balance
+    assert swap.balanceOf(charlie) >= initial_balance - max_burn
+
+    assert swap.balanceOf(zap) == 0
+    assert swap.balanceOf(charlie) == swap.totalSupply()
 
 
 def test_calc_amts_remove(zap, swap, charlie, tokens_all, meta_token, base_pool, base_pool_tokens):

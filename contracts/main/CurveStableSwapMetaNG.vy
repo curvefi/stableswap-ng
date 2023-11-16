@@ -752,6 +752,7 @@ def add_liquidity(
     @param _receiver Address that owns the minted LP tokens
     @return Amount of LP tokens received by depositing
     """
+    amounts: DynArray[uint256, MAX_COINS] = [_amounts[0], _amounts[1]]
     amp: uint256 = self._A()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
     rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
@@ -766,12 +767,12 @@ def add_liquidity(
 
     for i in range(N_COINS_128):
 
-        if _amounts[i] > 0:
+        if amounts[i] > 0:
 
             new_balances[i] += self._transfer_in(
                 i,
                 -1,  # <--- we're not handling underlying coins here
-                _amounts[i],
+                amounts[i],
                 msg.sender,
                 False,  # expect_optimistic_transfer
             )
@@ -859,7 +860,7 @@ def add_liquidity(
 
     log AddLiquidity(
         msg.sender,
-        [_amounts[0], _amounts[1]],
+        amounts,
         fees,
         D1,
         total_supply
@@ -924,6 +925,7 @@ def remove_liquidity_imbalance(
     @param _receiver Address that receives the withdrawn coins
     @return Actual amount of the LP token burned in the withdrawal
     """
+    amounts: DynArray[uint256, MAX_COINS] = [_amounts[0], _amounts[1]]
     amp: uint256 = self._A()
     rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
@@ -932,9 +934,9 @@ def remove_liquidity_imbalance(
 
     for i in range(N_COINS_128):
 
-        if _amounts[i] != 0:
-            new_balances[i] -= _amounts[i]
-            self._transfer_out(i, _amounts[i], _receiver)
+        if amounts[i] != 0:
+            new_balances[i] -= amounts[i]
+            self._transfer_out(i, amounts[i], _receiver)
 
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
     # base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
@@ -984,7 +986,7 @@ def remove_liquidity_imbalance(
 
     log RemoveLiquidityImbalance(
         msg.sender,
-        [_amounts[0], _amounts[1]],
+        amounts,
         fees,
         D1,
         total_supply
