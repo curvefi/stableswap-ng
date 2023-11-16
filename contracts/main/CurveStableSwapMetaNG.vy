@@ -1,6 +1,6 @@
 # pragma version 0.3.10
 # pragma optimize codesize
-# pragma evm-version paris
+# pragma evm-version shanghai
 """
 @title CurveStableSwapMetaNG
 @author Curve.Fi
@@ -741,7 +741,7 @@ def exchange_underlying(
 @external
 @nonreentrant('lock')
 def add_liquidity(
-    _amounts: DynArray[uint256, MAX_COINS],
+    _amounts: uint256[N_COINS],
     _min_mint_amount: uint256,
     _receiver: address = msg.sender
 ) -> uint256:
@@ -857,7 +857,13 @@ def add_liquidity(
     self.total_supply = total_supply
     log Transfer(empty(address), _receiver, mint_amount)
 
-    log AddLiquidity(msg.sender, _amounts, fees, D1, total_supply)
+    log AddLiquidity(
+        msg.sender,
+        [_amounts[0], _amounts[1]],
+        fees,
+        D1,
+        total_supply
+    )
 
     return mint_amount
 
@@ -907,7 +913,7 @@ def remove_liquidity_one_coin(
 @external
 @nonreentrant('lock')
 def remove_liquidity_imbalance(
-    _amounts: DynArray[uint256, MAX_COINS],
+    _amounts: uint256[N_COINS],
     _max_burn_amount: uint256,
     _receiver: address = msg.sender
 ) -> uint256:
@@ -976,7 +982,13 @@ def remove_liquidity_imbalance(
 
     self._burnFrom(msg.sender, burn_amount)
 
-    log RemoveLiquidityImbalance(msg.sender, _amounts, fees, D1, total_supply)
+    log RemoveLiquidityImbalance(
+        msg.sender,
+        [_amounts[0], _amounts[1]],
+        fees,
+        D1,
+        total_supply
+    )
 
     return burn_amount
 
@@ -985,10 +997,10 @@ def remove_liquidity_imbalance(
 @nonreentrant('lock')
 def remove_liquidity(
     _burn_amount: uint256,
-    _min_amounts: DynArray[uint256, MAX_COINS],
+    _min_amounts: uint256[N_COINS],
     _receiver: address = msg.sender,
     _claim_admin_fees: bool = True,
-) -> DynArray[uint256, MAX_COINS]:
+) -> uint256[N_COINS]:
     """
     @notice Withdraw coins from the pool
     @dev Withdrawal amounts are based on current deposit ratios
@@ -1047,7 +1059,7 @@ def remove_liquidity(
     if _claim_admin_fees:
         self._withdraw_admin_fees()
 
-    return amounts
+    return [amounts[0], amounts[1]]
 
 
 @external
@@ -1729,7 +1741,7 @@ def get_virtual_price() -> uint256:
 @view
 @external
 def calc_token_amount(
-    _amounts: DynArray[uint256, MAX_COINS],
+    _amounts: uint256[N_COINS],
     _is_deposit: bool
 ) -> uint256:
     """
@@ -1738,7 +1750,11 @@ def calc_token_amount(
     @param _is_deposit set True for deposits, False for withdrawals
     @return Expected amount of LP tokens received
     """
-    return StableSwapViews(factory.views_implementation()).calc_token_amount(_amounts, _is_deposit, self)
+    return StableSwapViews(factory.views_implementation()).calc_token_amount(
+        [_amounts[0], _amounts[1]],
+        _is_deposit,
+        self
+    )
 
 
 @view
