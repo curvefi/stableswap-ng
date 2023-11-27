@@ -399,17 +399,20 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     @param receiver Address to send the tokens to
     """
 
-    coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
+    if not 2 in asset_types:
 
-    # ------------------------- Handle Transfers -----------------------------
+        assert ERC20(coins[_coin_idx]).transfer(
+            receiver, _amount, default_return_value=True
+        )
+        self.stored_balances[_coin_idx] -= _amount
 
-    assert ERC20(coins[_coin_idx]).transfer(
-        receiver, _amount, default_return_value=True
-    )
+    else:
 
-    # ----------------------- Update Stored Balances -------------------------
-
-    self.stored_balances[_coin_idx] = coin_balance - _amount
+        coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
+        assert ERC20(coins[_coin_idx]).transfer(
+            receiver, _amount, default_return_value=True
+        )
+        self.stored_balances[_coin_idx] = coin_balance - _amount
 
 
 # -------------------------- AMM Special Methods -----------------------------

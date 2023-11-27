@@ -480,18 +480,20 @@ def _transfer_out(
     @param _amount Amount of token to transfer out
     @param receiver Address to send the tokens to
     """
+    if asset_types[0] != 2:
 
-    coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
+        assert ERC20(coins[_coin_idx]).transfer(
+            receiver, _amount, default_return_value=True
+        )
+        self.stored_balances[_coin_idx] -= _amount
 
-    # ------------------------- Handle Transfers -----------------------------
+    else:
 
-    assert ERC20(coins[_coin_idx]).transfer(
-        receiver, _amount, default_return_value=True
-    )
-
-    # ----------------------- Update Stored Balances -------------------------
-
-    self.stored_balances[_coin_idx] = coin_balance - _amount
+        coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
+        assert ERC20(coins[_coin_idx]).transfer(
+            receiver, _amount, default_return_value=True
+        )
+        self.stored_balances[_coin_idx] = coin_balance - _amount
 
 
 # -------------------------- AMM Special Methods -----------------------------
@@ -1086,9 +1088,12 @@ def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256) -> uint256:
         return _fee
 
     xps2: uint256 = (xpi + xpj) ** 2
-    return (
-        (_offpeg_fee_multiplier * _fee) /
-        (unsafe_sub(_offpeg_fee_multiplier, FEE_DENOMINATOR) * 4 * xpi * xpj / xps2 + FEE_DENOMINATOR)
+    return unsafe_div(
+        unsafe_mul(_offpeg_fee_multiplier, _fee),
+        unsafe_add(
+            unsafe_sub(_offpeg_fee_multiplier, FEE_DENOMINATOR) * 4 * xpi * xpj / xps2,
+            FEE_DENOMINATOR
+        )
     )
 
 
@@ -1321,7 +1326,7 @@ def _calc_withdraw_one_coin(
 
     dy: uint256 = xp_reduced[i] - math.get_y_D(amp, i, xp_reduced, D1, N_COINS)
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
-    dy = (dy - 1) * PRECISION / rates[i]  # Withdraw less to account for rounding errors
+    dy = unsafe_div((dy - 1) * PRECISION, rates[i])  # Withdraw less to account for rounding errors
 
     # calculate state price
     xp[i] = new_y
@@ -1431,10 +1436,10 @@ def _calc_moving_average(
     if ma_last_time < block.timestamp:  # calculate new_ema_value and return that.
         alpha: uint256 = math.exp(
             -convert(
-                (block.timestamp - ma_last_time) * 10**18 / averaging_window, int256
+                unsafe_div(unsafe_mul(unsafe_sub(block.timestamp, ma_last_time), 10**18), averaging_window), int256
             )
         )
-        return (last_spot_value * (10**18 - alpha) + last_ema_value * alpha) / 10**18
+        return unsafe_div(last_spot_value * (10**18 - alpha) + last_ema_value * alpha, 10**18)
 
     return last_ema_value
 
@@ -1870,7 +1875,7 @@ def set_ma_exp_time(_ma_exp_time: uint256, _D_ma_time: uint256):
     @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
     """
     assert msg.sender == factory.admin()  # dev: only owner
-    assert 0 not in [_ma_exp_time, _D_ma_time]
+    assert unsafe_mul(_ma_exp_time, _D_ma_time) > 0  # dev: 0 in input values
 
     self.ma_exp_time = _ma_exp_time
     self.D_ma_time = _D_ma_time

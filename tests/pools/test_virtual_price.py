@@ -1,5 +1,7 @@
 import pytest
 
+from tests.utils.tokens import mint_for_testing
+
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
@@ -60,3 +62,30 @@ def test_exchange(bob, swap, sending, receiving, decimals):
     )
 
     assert swap.get_virtual_price() > virtual_price
+
+
+def test_pump_virtual_price(bob, swap, pool_tokens, initial_amounts, pool_size):
+
+    # make a deposit
+    for i, amount in enumerate(initial_amounts):
+        amounts = [0] * pool_size
+        amounts[i] = amount
+        swap.add_liquidity(amounts, 0, sender=bob)
+
+    virtual_price_pre_donation = swap.get_virtual_price()
+
+    # airdrop some tokens to increase the price.
+    pool_balances_post_donation = []
+    for i, token in enumerate(pool_tokens):
+        to_deposit = token.balanceOf(swap)
+        mint_for_testing(swap.address, to_deposit, token, False)  # directly mint to pool
+        pool_balances_post_donation.append(token.balanceOf(swap))
+
+    virtual_price_post_donation = swap.get_virtual_price()
+    assert virtual_price_pre_donation == virtual_price_post_donation
+
+    # remove liquidity in one coin.
+    swap.remove_liquidity_one_coin(swap.balanceOf(bob), 0, 0, sender=bob)
+    virtual_price_post_withdrawal = swap.get_virtual_price()
+
+    assert virtual_price_post_withdrawal < 1.05 * virtual_price_post_donation
