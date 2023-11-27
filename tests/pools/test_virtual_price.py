@@ -64,7 +64,7 @@ def test_exchange(bob, swap, sending, receiving, decimals):
     assert swap.get_virtual_price() > virtual_price
 
 
-def test_pump_virtual_price(bob, swap, pool_tokens, initial_amounts, pool_size):
+def test_donate_virtual_price(bob, swap, pool_tokens, initial_amounts, pool_size):
 
     # make a deposit
     for i, amount in enumerate(initial_amounts):

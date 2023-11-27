@@ -20,7 +20,6 @@ black = "22.3.0"
 flake8 = "4.0.1"
 isort = "5.12.0"
 mamushi = "^0.0.2a1"
-eth-ape = "^0.6.18"
 
 
 [tool.poetry.group.testing.dependencies]

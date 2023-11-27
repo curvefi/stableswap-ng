@@ -774,8 +774,7 @@ def remove_liquidity_imbalance(
         new_balances[i] -= fees[i]
 
     D1 = self.get_D_mem(rates, new_balances, amp)  # dev: reuse D1 for new D.
-
-    self.upkeep_oracles(new_balances, amp, D1)
+    self.upkeep_oracles(self._xp_mem(rates, new_balances), amp, D1)
 
     total_supply: uint256 = self.total_supply
     burn_amount: uint256 = ((D0 - D1) * total_supply / D0) + 1
