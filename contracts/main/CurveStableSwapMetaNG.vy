@@ -201,7 +201,7 @@ BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
 math: immutable(Math)
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
-asset_types: immutable(uint8[N_COINS])
+asset_type: immutable(uint8)
 stored_balances: uint256[N_COINS]
 
 # Fee specific vars
@@ -229,9 +229,9 @@ admin_balances: public(DynArray[uint256, MAX_COINS])
 
 # ----------------------- Oracle Specific vars -------------------------------
 
-rate_multipliers: immutable(uint256[N_COINS])
+rate_multiplier: immutable(uint256)
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
-oracles: uint256[N_COINS]
+rate_oracle: immutable(uint256)  # this is the rate oracle for the token at 0th index
 
 # For ERC4626 tokens, we need:
 call_amount: immutable(uint256)
@@ -327,8 +327,9 @@ def __init__(
     BASE_COINS = _base_coins
     BASE_N_COINS = len(_base_coins)
     coins = _coins  # <---------------- coins[1] is always base pool LP token.
-    asset_types = [_asset_types[0], _asset_types[1]]
-    rate_multipliers = [_rate_multipliers[0], _rate_multipliers[1]]
+
+    asset_type = _asset_types[0]
+    rate_multiplier = _rate_multipliers[0]
 
     for i in range(MAX_COINS):
         if i < BASE_N_COINS:
@@ -341,7 +342,7 @@ def __init__(
             )
 
     # For ERC4626 tokens:
-    if asset_types[0] == 3:
+    if asset_type == 3:
         # In Vyper 0.3.10, if immutables are not set, because of an if-statement,
         # it is by default set to 0; this is fine in the case of these two
         # immutables, since they are only used if asset_types[0] == 3.
@@ -363,15 +364,11 @@ def __init__(
     self.D_ma_time = 62324  # <--------- 12 hours default on contract start.
     self.ma_last_time = self.pack_2(block.timestamp, block.timestamp)
 
-    #  ------------------- initialize storage for DynArrays ------------------
-
     self.last_prices_packed = self.pack_2(10**18, 10**18)
-    for i in range(N_COINS_128):
-
-        self.oracles[i] = convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256)
-
     self.admin_balances = [0, 0]
     self.stored_balances = [0, 0]
+
+    rate_oracle = convert(_method_ids[0], uint256) * 2**224 | convert(_oracles[0], uint256)
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -480,7 +477,7 @@ def _transfer_out(
     @param _amount Amount of token to transfer out
     @param receiver Address to send the tokens to
     """
-    if asset_types[0] != 2:
+    if asset_type != 2:
 
         assert ERC20(coins[_coin_idx]).transfer(
             receiver, _amount, default_return_value=True
@@ -508,16 +505,15 @@ def _stored_rates() -> uint256[N_COINS]:
          this method queries that rate by static-calling an external
          contract.
     """
-    rates: uint256[N_COINS] = [rate_multipliers[0], StableSwap(BASE_POOL).get_virtual_price()]
-    oracles: uint256[N_COINS] = self.oracles
+    rates: uint256[N_COINS] = [rate_multiplier, StableSwap(BASE_POOL).get_virtual_price()]
 
-    if asset_types[0] == 1 and not self.oracles[0] == 0:
+    if asset_type == 1 and not rate_oracle == 0:
 
         # NOTE: fetched_rate is assumed to be 10**18 precision
         fetched_rate: uint256 = convert(
             raw_call(
-                convert(oracles[0] % 2**160, address),
-                _abi_encode(oracles[0] & ORACLE_BIT_MASK),
+                convert(rate_oracle % 2**160, address),
+                _abi_encode(rate_oracle & ORACLE_BIT_MASK),
                 max_outsize=32,
                 is_static_call=True,
             ),
@@ -527,7 +523,7 @@ def _stored_rates() -> uint256[N_COINS]:
         # rates[0] * fetched_rate / PRECISION
         rates[0] = unsafe_div(rates[0] * fetched_rate, PRECISION)
 
-    elif asset_types[0] == 3:  # ERC4626
+    elif asset_type == 3:  # ERC4626
 
         # rates[0] * fetched_rate / PRECISION
         rates[0] = unsafe_div(
@@ -553,7 +549,7 @@ def _balances() -> uint256[N_COINS]:
     admin_balances: DynArray[uint256, MAX_COINS] = self.admin_balances
     for i in range(N_COINS_128):
 
-        if 2 in asset_types:
+        if asset_type != 2:
             result[i] = ERC20(coins[i]).balanceOf(self) - admin_balances[i]
         else:
             result[i] = self.stored_balances[i] - admin_balances[i]
@@ -616,7 +612,7 @@ def exchange_received(
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
     """
-    assert not 2 in asset_types  # dev: exchange_received not supported if pool contains rebasing tokens
+    assert asset_type != 2  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange(
         msg.sender,
         i,

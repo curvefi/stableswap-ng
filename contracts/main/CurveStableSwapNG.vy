@@ -184,7 +184,7 @@ admin_balances: public(DynArray[uint256, MAX_COINS])
 
 rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
-oracles: DynArray[uint256, MAX_COINS]
+rate_oracles: immutable(DynArray[uint256, MAX_COINS])
 
 # For ERC4626 tokens, we need:
 call_amount: immutable(DynArray[uint256, MAX_COINS])
@@ -293,6 +293,7 @@ def __init__(
 
     _call_amount: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _scale_factor: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    _rate_oracles: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(MAX_COINS_128):
 
         if i == N_COINS_128:
@@ -301,7 +302,7 @@ def __init__(
         if i < N_COINS_128 - 1:
             self.last_prices_packed.append(self.pack_2(10**18, 10**18))
 
-        self.oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
+        _rate_oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
         self.stored_balances.append(0)
         self.admin_balances.append(0)
 
@@ -318,6 +319,7 @@ def __init__(
 
     call_amount = _call_amount
     scale_factor = _scale_factor
+    rate_oracles = _rate_oracles
 
     # ----------------------------- ERC20 stuff ------------------------------
 
@@ -428,20 +430,19 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
          contract.
     """
     rates: DynArray[uint256, MAX_COINS] = rate_multipliers
-    oracles: DynArray[uint256, MAX_COINS] = self.oracles
 
     for i in range(MAX_COINS_128):
 
         if i == N_COINS_128:
             break
 
-        if asset_types[i] == 1 and not oracles[i] == 0:
+        if asset_types[i] == 1 and not rate_oracles[i] == 0:
 
             # NOTE: fetched_rate is assumed to be 10**18 precision
             fetched_rate: uint256 = convert(
                 raw_call(
-                    convert(oracles[i] % 2**160, address),
-                    _abi_encode(oracles[i] & ORACLE_BIT_MASK),
+                    convert(rate_oracles[i] % 2**160, address),
+                    _abi_encode(rate_oracles[i] & ORACLE_BIT_MASK),
                     max_outsize=32,
                     is_static_call=True,
                 ),

@@ -170,13 +170,3 @@ def test_exchange(swap, charlie, meta_token):
     mint_for_testing(charlie, amount, meta_token, False)
     meta_token.approve(swap.address, 2**256 - 1, sender=charlie)
     swap.exchange(0, 1, amount, 0, sender=charlie)
-
-
-def test_exchange_underlying(swap, charlie, meta_token, base_pool_tokens):
-
-    base_pool_index = 0
-    amount = 1000 * 10**18
-    mint_for_testing(charlie, amount, meta_token, False)
-    mint_for_testing(charlie, amount, base_pool_tokens[base_pool_index], False)
-
-    swap.exchange_underlying(1, 0)
