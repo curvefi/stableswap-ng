@@ -142,6 +142,10 @@ event ApplyNewFee:
     fee: uint256
     offpeg_fee_multiplier: uint256
 
+event SetNewMATime:
+    ma_exp_time: uint256
+    D_ma_time: uint256
+
 
 MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
 MAX_COINS_128: constant(int128) = 8
@@ -1886,3 +1890,5 @@ def set_ma_exp_time(_ma_exp_time: uint256, _D_ma_time: uint256):
 
     self.ma_exp_time = _ma_exp_time
     self.D_ma_time = _D_ma_time
+
+    log SetNewMATime(_ma_exp_time, _D_ma_time)
