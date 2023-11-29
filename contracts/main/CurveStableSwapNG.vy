@@ -278,7 +278,7 @@ def __init__(
 
     factory = Factory(msg.sender)
 
-    A: uint256 = _A * A_PRECISION
+    A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
     self.future_A = A
     self.fee = _fee
@@ -621,12 +621,15 @@ def add_liquidity(
         difference: uint256 = 0
         new_balance: uint256 = 0
 
-        ys: uint256 = (D0 + D1) / N_COINS
+        ys: uint256 = unsafe_div((D0 + D1), N_COINS)
         xs: uint256 = 0
         _dynamic_fee_i: uint256 = 0
 
         # Only account for fees if we are not the first to deposit
-        base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
+        base_fee: uint256 = unsafe_div(
+            unsafe_mul(self.fee, N_COINS),
+            unsafe_mul(4, unsafe_sub(N_COINS, 1))
+        )
 
         for i in range(MAX_COINS_128):
 
@@ -638,20 +641,20 @@ def add_liquidity(
             new_balance = new_balances[i]
 
             if ideal_balance > new_balance:
-                difference = ideal_balance - new_balance
+                difference = unsafe_sub(ideal_balance, new_balance)
             else:
-                difference = new_balance - ideal_balance
+                difference = unsafe_sub(new_balance, ideal_balance)
 
             # fee[i] = _dynamic_fee(i, j) * difference / FEE_DENOMINATOR
             xs = unsafe_div(rates[i] * (old_balances[i] + new_balance), PRECISION)
             _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee)
-            fees.append(_dynamic_fee_i * difference / FEE_DENOMINATOR)
-            self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
+            fees.append(unsafe_div(_dynamic_fee_i * difference, FEE_DENOMINATOR))
+            self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
         D1 = self.get_D(xp, amp)  # <--------------- Reuse D1 for new D value.
-        mint_amount = total_supply * (D1 - D0) / D0
+        mint_amount = unsafe_div(total_supply * (D1 - D0), D0)
         self.upkeep_oracles(xp, amp, D1)
 
     else:
@@ -700,7 +703,7 @@ def remove_liquidity_one_coin(
     dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i)
     assert dy >= _min_received, "Not enough coins removed"
 
-    self.admin_balances[i] += fee * admin_fee / FEE_DENOMINATOR
+    self.admin_balances[i] += unsafe_div(fee * admin_fee, FEE_DENOMINATOR)
 
     self._burnFrom(msg.sender, _burn_amount)
 
@@ -743,8 +746,11 @@ def remove_liquidity_imbalance(
             self._transfer_out(i, _amounts[i], _receiver)
 
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
-    base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-    ys: uint256 = (D0 + D1) / N_COINS
+    base_fee: uint256 = unsafe_div(
+        unsafe_mul(self.fee, N_COINS),
+        unsafe_mul(4, unsafe_sub(N_COINS, 1))
+    )
+    ys: uint256 = unsafe_div((D0 + D1), N_COINS)
 
     fees: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     dynamic_fee: uint256 = 0
@@ -763,22 +769,22 @@ def remove_liquidity_imbalance(
         new_balance = new_balances[i]
 
         if ideal_balance > new_balance:
-            difference = ideal_balance - new_balance
+            difference = unsafe_sub(ideal_balance, new_balance)
         else:
-            difference = new_balance - ideal_balance
+            difference = unsafe_sub(new_balance, ideal_balance)
 
         xs = unsafe_div(rates[i] * (old_balances[i] + new_balance), PRECISION)
         dynamic_fee = self._dynamic_fee(xs, ys, base_fee)
-        fees.append(dynamic_fee * difference / FEE_DENOMINATOR)
+        fees.append(unsafe_div(dynamic_fee * difference, FEE_DENOMINATOR))
 
-        self.admin_balances[i] += fees[i] * admin_fee / FEE_DENOMINATOR
+        self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
         new_balances[i] -= fees[i]
 
     D1 = self.get_D_mem(rates, new_balances, amp)  # dev: reuse D1 for new D.
     self.upkeep_oracles(self._xp_mem(rates, new_balances), amp, D1)
 
     total_supply: uint256 = self.total_supply
-    burn_amount: uint256 = ((D0 - D1) * total_supply / D0) + 1
+    burn_amount: uint256 = unsafe_div((D0 - D1) * total_supply, D0) + 1
     assert burn_amount > 1  # dev: zero tokens burned
     assert burn_amount <= _max_burn_amount, "Slippage screwed you"
 
@@ -818,7 +824,7 @@ def remove_liquidity(
         if i == N_COINS_128:
             break
 
-        value = balances[i] * _burn_amount / total_supply
+        value = unsafe_div(balances[i] * _burn_amount, total_supply)
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
         amounts.append(value)
         self._transfer_out(i, value, _receiver)
@@ -850,7 +856,7 @@ def remove_liquidity(
         msg.sender,
         amounts,
         empty(DynArray[uint256, MAX_COINS]),
-        total_supply - _burn_amount
+        unsafe_sub(total_supply, _burn_amount)
     )
 
     # ------- Withdraw admin fees if _claim_admin_fees is set to True --------
@@ -880,9 +886,12 @@ def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256) -> uint256:
         return _fee
 
     xps2: uint256 = (xpi + xpj) ** 2
-    return (
-        (_offpeg_fee_multiplier * _fee) /
-        ((_offpeg_fee_multiplier - FEE_DENOMINATOR) * 4 * xpi * xpj / xps2 + FEE_DENOMINATOR)
+    return unsafe_div(
+        unsafe_mul(_offpeg_fee_multiplier, _fee),
+        unsafe_add(
+            unsafe_sub(_offpeg_fee_multiplier, FEE_DENOMINATOR) * 4 * xpi * xpj / xps2,
+            FEE_DENOMINATOR
+        )
     )
 
 
@@ -900,14 +909,20 @@ def __exchange(
     y: uint256 = self.get_y(i, j, x, _xp, amp, D)
 
     dy: uint256 = _xp[j] - y - 1  # -1 just in case there were some rounding errors
-    dy_fee: uint256 = dy * self._dynamic_fee((_xp[i] + x) / 2, (_xp[j] + y) / 2, self.fee) / FEE_DENOMINATOR
+    dy_fee: uint256 = unsafe_div(
+        dy * self._dynamic_fee(
+            unsafe_div(_xp[i] + x, 2), unsafe_div(_xp[j] + y, 2), self.fee
+        ),
+        FEE_DENOMINATOR
+    )
 
     # Convert all to real units
     dy = (dy - dy_fee) * PRECISION / rates[j]
 
-    self.admin_balances[j] += (
-        dy_fee * admin_fee / FEE_DENOMINATOR
-    ) * PRECISION / rates[j]
+    self.admin_balances[j] += unsafe_div(
+        unsafe_div(dy_fee * admin_fee, FEE_DENOMINATOR) * PRECISION,
+        rates[j]
+    )
 
     # Calculate and store state prices:
     xp: DynArray[uint256, MAX_COINS] = _xp
@@ -949,7 +964,7 @@ def _exchange(
 
     # ------------------------------- Exchange -------------------------------
 
-    x: uint256 = xp[i] + dx * rates[i] / PRECISION
+    x: uint256 = unsafe_div(xp[i] + dx * rates[i], PRECISION)
     dy: uint256 = self.__exchange(x, xp, rates, i, j)
     assert dy >= _min_dy, "Exchange resulted in fewer coins than expected"
 
@@ -1178,9 +1193,9 @@ def _A() -> uint256:
         t0: uint256 = self.initial_A_time
         # Expressions in uint256 cannot have negative numbers, thus "if"
         if A1 > A0:
-            return A0 + (A1 - A0) * (block.timestamp - t0) / (t1 - t0)
+            return A0 + unsafe_sub(A1, A0) * (block.timestamp - t0) / (t1 - t0)
         else:
-            return A0 - (A0 - A1) * (block.timestamp - t0) / (t1 - t0)
+            return A0 - unsafe_sub(A0, A1) * (block.timestamp - t0) / (t1 - t0)
 
     else:  # when t1 == 0 or block.timestamp >= t1
         return A1
@@ -1197,7 +1212,7 @@ def _xp_mem(
     for i in range(MAX_COINS_128):
         if i == N_COINS_128:
             break
-        result.append(_rates[i] * _balances[i] / PRECISION)
+        result.append(unsafe_div(_rates[i] * _balances[i], PRECISION))
     return result
 
 
@@ -1236,9 +1251,12 @@ def _calc_withdraw_one_coin(
     D1: uint256 = D0 - _burn_amount * D0 / total_supply
     new_y: uint256 = self.get_y_D(amp, i, xp, D1)
 
-    base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-    ys: uint256 = (D0 + D1) / (2 * N_COINS)
+    base_fee: uint256 = unsafe_div(
+        unsafe_mul(self.fee, N_COINS),
+        unsafe_mul(4, unsafe_sub(N_COINS, 1))
+    )
     xp_reduced: DynArray[uint256, MAX_COINS] = xp
+    ys: uint256 = unsafe_div((D0 + D1), unsafe_mul(2, N_COINS))
 
     dx_expected: uint256 = 0
     xp_j: uint256 = 0
@@ -1255,17 +1273,17 @@ def _calc_withdraw_one_coin(
 
         if j == i:
             dx_expected = xp_j * D1 / D0 - new_y
-            xavg = (xp_j + new_y) / 2
+            xavg = unsafe_div((xp_j + new_y), 2)
         else:
             dx_expected = xp_j - xp_j * D1 / D0
             xavg = xp_j
 
         dynamic_fee = self._dynamic_fee(xavg, ys, base_fee)
-        xp_reduced[j] = xp_j - dynamic_fee * dx_expected / FEE_DENOMINATOR
+        xp_reduced[j] = unsafe_div(xp_j - dynamic_fee * dx_expected, FEE_DENOMINATOR)
 
     dy: uint256 = xp_reduced[i] - self.get_y_D(amp, i, xp_reduced, D1)
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
-    dy = (dy - 1) * PRECISION / rates[i]  # Withdraw less to account for rounding errors
+    dy = unsafe_div((dy - 1) * PRECISION, rates[i])  # Withdraw less to account for rounding errors
 
     # update xp with new_y for p calculations.
     xp[i] = new_y
@@ -1309,14 +1327,14 @@ def _get_p(
         Dr = Dr * D / xp[i]
 
     p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    xp0_A: uint256 = ANN * xp[0] / A_PRECISION
+    xp0_A: uint256 = unsafe_div(ANN * xp[0], A_PRECISION)
 
     for i in range(1, MAX_COINS):
 
         if i == N_COINS:
             break
 
-        p.append(10**18 * (xp0_A + Dr * xp[0] / xp[i]) / (xp0_A + Dr))
+        p.append(10**18 * unsafe_div(xp0_A + Dr * xp[0], xp[i]) / (xp0_A + Dr))
 
     return p
 
@@ -1387,10 +1405,10 @@ def _calc_moving_average(
     if ma_last_time < block.timestamp:  # calculate new_ema_value and return that.
         alpha: uint256 = self.exp(
             -convert(
-                (block.timestamp - ma_last_time) * 10**18 / averaging_window, int256
+                unsafe_div(unsafe_mul(unsafe_sub(block.timestamp, ma_last_time), 10**18), averaging_window), int256
             )
         )
-        return (last_spot_value * (10**18 - alpha) + last_ema_value * alpha) / 10**18
+        return unsafe_div(last_spot_value * (10**18 - alpha) + last_ema_value * alpha, 10**18)
 
     return last_ema_value
 
@@ -1647,7 +1665,7 @@ def permit(
         assert ecrecover(digest, convert(_v, uint256), convert(_r, uint256), convert(_s, uint256)) == _owner
 
     self.allowance[_owner][_spender] = _value
-    self.nonces[_owner] = nonce + 1
+    self.nonces[_owner] = unsafe_add(nonce, 1)
 
     log Approval(_owner, _spender, _value)
     return True
@@ -1756,7 +1774,7 @@ def calc_token_amount(
 @view
 @external
 def A() -> uint256:
-    return self._A() / A_PRECISION
+    return unsafe_div(self._A(), A_PRECISION)
 
 
 @view
@@ -1864,7 +1882,7 @@ def set_ma_exp_time(_ma_exp_time: uint256, _D_ma_time: uint256):
     @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
     """
     assert msg.sender == factory.admin()  # dev: only owner
-    assert 0 not in [_ma_exp_time, _D_ma_time]
+    assert unsafe_mul(_ma_exp_time, _D_ma_time) > 0  # dev: 0 in input values
 
     self.ma_exp_time = _ma_exp_time
     self.D_ma_time = _D_ma_time

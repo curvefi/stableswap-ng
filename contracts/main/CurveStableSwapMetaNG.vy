@@ -926,7 +926,7 @@ def remove_liquidity_imbalance(
 
     D1: uint256 = self.get_D_mem(rates, new_balances, amp)
     # base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-    base_fee: uint256 = unsafe_div(self.fee * N_COINS, 4)
+    base_fee: uint256 = unsafe_div(unsafe_mul(self.fee, N_COINS), 4)
     # ys: uint256 = (D0 + D1) / N_COINS
     ys: uint256 = unsafe_div(D0 + D1, N_COINS)
 
@@ -1277,11 +1277,11 @@ def _calc_withdraw_one_coin(
     D1: uint256 = D0 - _burn_amount * D0 / total_supply
     new_y: uint256 = math.get_y_D(amp, i, [xp[0], xp[1]], D1, N_COINS)
 
+    base_fee: uint256 = unsafe_div(unsafe_mul(self.fee, N_COINS), 4)
     xp_reduced: uint256[N_COINS] = xp
     # ys: uint256 = (D0 + D1) / (2 * N_COINS)
-    ys: uint256 = unsafe_div((D0 + D1), unsafe_mul(2, N_COINS))
+    ys: uint256 = unsafe_div((D0 + D1), 4)
     # base_fee: uint256 = self.fee * N_COINS / (4 * (N_COINS - 1))
-    base_fee: uint256 = unsafe_div(unsafe_mul(self.fee, N_COINS), 4)
 
     dx_expected: uint256 = 0
     xp_j: uint256 = 0
