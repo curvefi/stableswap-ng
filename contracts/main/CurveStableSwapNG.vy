@@ -613,7 +613,7 @@ def add_liquidity(
         difference: uint256 = 0
         new_balance: uint256 = 0
 
-        ys: uint256 = unsafe_div((D0 + D1), N_COINS)
+        ys: uint256 = unsafe_div(D0 + D1, N_COINS)
         xs: uint256 = 0
         _dynamic_fee_i: uint256 = 0
 
@@ -1306,7 +1306,7 @@ def _get_p(
         if i == N_COINS:
             break
 
-        p.append(10**18 * unsafe_div(xp0_A + Dr * xp[0], xp[i]) / (xp0_A + Dr))
+        p.append(10**18 * (xp0_A + unsafe_div(Dr * xp[0], xp[i])) / (xp0_A + Dr))
 
     return p
 
