@@ -1254,7 +1254,7 @@ def _calc_withdraw_one_coin(
             xavg = xp_j
 
         dynamic_fee = self._dynamic_fee(xavg, ys, base_fee)
-        xp_reduced[j] = unsafe_div(xp_j - dynamic_fee * dx_expected, FEE_DENOMINATOR)
+        xp_reduced[j] = xp_j - unsafe_div(dynamic_fee * dx_expected, FEE_DENOMINATOR)
 
     dy: uint256 = xp_reduced[i] - self.get_y_D(amp, i, xp_reduced, D1)
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
