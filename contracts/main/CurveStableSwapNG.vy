@@ -841,8 +841,7 @@ def remove_liquidity(
 
     if ma_last_time_unpacked[1] < block.timestamp:
         ma_last_time_unpacked[1] = block.timestamp
-
-    self.ma_last_time = self.pack_2(ma_last_time_unpacked[0], ma_last_time_unpacked[1])
+        self.ma_last_time = self.pack_2(ma_last_time_unpacked[0], ma_last_time_unpacked[1])
 
     # ------------------------------- Log event ------------------------------
 
