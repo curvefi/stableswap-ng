@@ -298,10 +298,7 @@ def __init__(
     _call_amount: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _scale_factor: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _rate_oracles: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if i < N_COINS_128 - 1:
             self.last_prices_packed.append(self.pack_2(10**18, 10**18))
@@ -435,10 +432,7 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
     """
     rates: DynArray[uint256, MAX_COINS] = rate_multipliers
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if asset_types[i] == 1 and not rate_oracles[i] == 0:
 
@@ -482,10 +476,7 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances_i: uint256 = 0
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if 2 in asset_types:
             balances_i = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
@@ -590,10 +581,7 @@ def add_liquidity(
 
     # -------------------------- Do Transfers In -----------------------------
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if _amounts[i] > 0:
 
@@ -635,10 +623,7 @@ def add_liquidity(
             unsafe_mul(4, unsafe_sub(N_COINS, 1))
         )
 
-        for i in range(MAX_COINS_128):
-
-            if i == N_COINS_128:
-                break
+        for i in range(N_COINS_128, bound=MAX_COINS_128):
 
             ideal_balance = D1 * old_balances[i] / D0
             difference = 0
@@ -740,10 +725,7 @@ def remove_liquidity_imbalance(
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
     new_balances: DynArray[uint256, MAX_COINS] = old_balances
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if _amounts[i] != 0:
             new_balances[i] -= _amounts[i]
@@ -763,10 +745,7 @@ def remove_liquidity_imbalance(
     difference: uint256 = 0
     new_balance: uint256 = 0
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         ideal_balance = D1 * old_balances[i] / D0
         difference = 0
@@ -823,10 +802,7 @@ def remove_liquidity(
     balances: DynArray[uint256, MAX_COINS] = self._balances()
 
     value: uint256 = 0
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         value = unsafe_div(balances[i] * _burn_amount, total_supply)
         assert value >= _min_amounts[i], "Withdrawal resulted in fewer coins than expected"
@@ -989,10 +965,7 @@ def _withdraw_admin_fees():
     assert fee_receiver != empty(address)  # dev: fee receiver not set
 
     admin_balances: DynArray[uint256, MAX_COINS] = self.admin_balances
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if admin_balances[i] > 0:
 
@@ -1213,9 +1186,7 @@ def _xp_mem(
 ) -> DynArray[uint256, MAX_COINS]:
 
     result: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
-    for i in range(MAX_COINS_128):
-        if i == N_COINS_128:
-            break
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
         result.append(unsafe_div(_rates[i] * _balances[i], PRECISION))
     return result
 
@@ -1323,11 +1294,7 @@ def _get_p(
     ANN: uint256 = unsafe_mul(amp, N_COINS)
     Dr: uint256 = unsafe_div(D, pow_mod256(N_COINS, N_COINS))
 
-    for i in range(MAX_COINS_128):
-
-        if i == N_COINS_128:
-            break
-
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
         Dr = Dr * D / xp[i]
 
     p: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
