@@ -944,7 +944,7 @@ def _exchange(
 
     # ------------------------------- Exchange -------------------------------
 
-    x: uint256 = unsafe_div(xp[i] + dx * rates[i], PRECISION)
+    x: uint256 = xp[i] + unsafe_div(dx * rates[i], PRECISION)
     dy: uint256 = self.__exchange(x, xp, rates, i, j)
     assert dy >= _min_dy, "Exchange resulted in fewer coins than expected"
 
@@ -1080,8 +1080,9 @@ def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
 
         # (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
         D = (
-            (unsafe_div(Ann * S, A_PRECISION) + D_P * N_COINS) *
-            D / (
+            (unsafe_div(Ann * S, A_PRECISION) + D_P * N_COINS) * D
+            /
+            (
                 unsafe_div((Ann - A_PRECISION) * D, A_PRECISION) +
                 unsafe_add(N_COINS, 1) * D_P
             )
