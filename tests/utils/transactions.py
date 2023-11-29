@@ -8,7 +8,7 @@ def call_returning_result_and_logs(
     contract: VyperContract, function_name: str, *args, value=0, gas=None, sender=None, **kwargs
 ) -> tuple[Any, list[Event]]:
     func: VyperFunction = getattr(contract, function_name)
-    calldata_bytes = func._prepare_calldata(*args, **kwargs)
+    calldata_bytes = func.prepare_calldata(*args, **kwargs)
     override_bytecode = getattr(func, "override_bytecode", None)
 
     with func.contract._anchor_source_map(func._source_map):

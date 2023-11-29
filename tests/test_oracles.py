@@ -28,10 +28,6 @@ def get_D(swap, math):
 @settings(**SETTINGS)
 def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
 
-    for token in pool_tokens:
-        if "IS_UP" in token._immutables.__dict__.keys() and not token._immutables.IS_UP:
-            return  # TODO: rebasing tokens that rebase downwards are causing trouble here.
-
     i, j = random.sample(range(swap.N_COINS()), 2)
 
     # calc amount in:
@@ -69,10 +65,6 @@ def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
 )
 @settings(**SETTINGS)
 def test_price_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt):
-
-    for token in pool_tokens:
-        if "IS_UP" in token._immutables.__dict__.keys() and not token._immutables.IS_UP:
-            return  # TODO: rebasing tokens that rebase downwards are causing trouble here.
 
     i, j = random.sample(range(swap.N_COINS()), 2)
 
@@ -117,10 +109,6 @@ def test_price_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, 
 @pytest.mark.only_for_pool_type(0)
 def test_manipulate_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount):
 
-    for token in pool_tokens:
-        if "IS_UP" in token._immutables.__dict__.keys() and not token._immutables.IS_UP:
-            return
-
     p_oracle_before = swap.price_oracle(0)
     print("before", p_oracle_before)
 
@@ -154,10 +142,6 @@ def test_manipulate_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amo
 )
 @settings(**SETTINGS)
 def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt, math_implementation):
-
-    for token in pool_tokens:
-        if "IS_UP" in token._immutables.__dict__.keys() and not token._immutables.IS_UP:
-            return  # TODO: rebasing tokens that rebase downwards are causing trouble here.
 
     i, j = random.sample(range(swap.N_COINS()), 2)
 

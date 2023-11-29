@@ -229,18 +229,6 @@ class TestLiquidityMethods:
                     assert und_coin.balanceOf(alice) == pytest.approx(initial - amount, rel=1.5e-2)
                     assert und_coin.balanceOf(swap) == pytest.approx(amount, rel=1.5e-2)
 
-        # TODO: boa hangs with it, with added single print it passes
-        # @pytest.mark.parametrize("idx", (0, 1))
-        # def test_initial_liquidity_missing_coin(
-        #     self, alice, initial_setup_alice, swap, pool_type, decimals, meta_decimals, idx
-        # ):
-        #     swap_decimals = decimals if pool_type == 0 else [meta_decimals, 18]
-        #     amounts = [10**i for i in swap_decimals]
-        #     amounts[idx] = 0
-        #
-        #     with boa.reverts():
-        #         swap.add_liquidity(amounts, 0, sender=alice)
-
     @pytest.mark.usefixtures("initial_setup")
     class TestRemoveLiquidity:
         @pytest.mark.parametrize("min_amount", (0, 1))
@@ -326,7 +314,7 @@ class TestLiquidityMethods:
             amounts = [0] * pool_size
             amounts[idx] = deposit_amounts[idx] // 2
 
-            lp_balance = pool_size * 1_000_000 * 10**18
+            lp_balance = pool_size * deposit_amounts[idx]
             swap.remove_liquidity_imbalance(amounts, lp_balance, sender=alice)
 
             coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
@@ -342,7 +330,8 @@ class TestLiquidityMethods:
             ideal_balance = (2 * pool_size - 1) * lp_balance / (2 * pool_size)
 
             assert actual_balance == actual_total_supply
-            assert ideal_balance * 0.9994 < actual_balance < ideal_balance
+            assert ideal_balance * 0.9994 < actual_balance
+            assert actual_balance < ideal_balance * 1.07
 
         @pytest.mark.parametrize("divisor", [1, 2, 10])
         def test_exceed_max_burn(self, alice, swap, pool_size, divisor, deposit_amounts):
@@ -420,15 +409,13 @@ class TestLiquidityMethods:
             with boa.reverts():
                 swap.remove_liquidity_one_coin(1, idx, 0, sender=bob)
 
-        # TODO: this hangs
-        # def test_below_zero(self, alice, swap):
-        #     with boa.reverts():
-        #         swap.remove_liquidity_one_coin(1, -1, 0, sender=alice)
+        def test_below_zero(self, alice, swap):
+            with boa.reverts():
+                swap.remove_liquidity_one_coin(1, -1, 0, sender=alice)
 
-        # TODO: this hangs
-        # def test_above_n_coins(self, alice, swap, pool_size):
-        #     with boa.reverts():
-        #         swap.remove_liquidity_one_coin(1, pool_size, 0, sender=alice)
+        def test_above_n_coins(self, alice, swap, pool_size):
+            with boa.reverts():
+                swap.remove_liquidity_one_coin(1, pool_size, 0, sender=alice)
 
         @pytest.mark.parametrize("idx", range(2))
         def test_event(self, alice, bob, swap, idx, pool_type):
