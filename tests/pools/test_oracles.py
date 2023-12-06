@@ -149,9 +149,6 @@ def test_price_ema_remove_imbalance(swap, alice, dt0, dt, pool_size, deposit_amo
 @pytest.mark.only_for_pool_type(0)
 def test_manipulate_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount):
 
-    p_oracle_before = swap.price_oracle(0)
-    print("before", p_oracle_before)
-
     # calc amount in:
     amount_in = amount * 10 ** (decimals[0])
 
@@ -170,7 +167,6 @@ def test_manipulate_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amo
 
     # check if price oracle is way too high
     p_oracle_after = swap.price_oracle(0)
-    print("after", p_oracle_after)
 
     assert p_oracle_after < 2 * 10**18
 

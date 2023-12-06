@@ -10,6 +10,8 @@
      of another pool. This exposes methods such as exchange_underlying, which
      exchanges token 0 <> token b1, b2, .. bn, where b is base pool and bn is the
      nth coin index of the base pool.
+     CAUTION: Does not work if base pool is an NG pool. Use a different metapool
+              implementation index in the factory.
      Asset Types:
         0. Standard ERC20 token with no additional features.
                           Note: Users are advised to do careful due-diligence on
@@ -325,6 +327,9 @@ def __init__(
     @param _oracles Array of rate oracle addresses.
     """
     assert len(_base_coins) <= 3  # dev: implementation does not support base pool with more than 3 coins
+
+    # The following reverts if BASE_POOL is an NG implementaion.
+    assert not raw_call(_base_pool, method_id("D_ma_time()"), revert_on_failure=False)
 
     math = Math(_math_implementation)
     BASE_POOL = _base_pool

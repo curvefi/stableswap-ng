@@ -2,6 +2,7 @@ import boa
 import pytest
 
 from tests.fixtures.constants import INITIAL_AMOUNT
+from tests.utils import get_asset_types_in_pool
 from tests.utils.tokens import mint_for_testing
 
 SWAP_AMOUNT = INITIAL_AMOUNT // 1000
@@ -143,6 +144,6 @@ def test_exchange_received_no_dos(bob, charlie, swap, pool_tokens, sending, rece
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_rebasing_reverts(bob, swap, transfer_and_swap, pool_tokens, sending, receiving):
 
-    if 2 in swap._immutables.asset_types:
+    if 2 in get_asset_types_in_pool(swap):
         with boa.reverts():
             transfer_and_swap(swap, sending, receiving, False)
