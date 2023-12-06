@@ -483,10 +483,10 @@ def _transfer_out(
     """
     if asset_type != 2:
 
+        self.stored_balances[_coin_idx] -= _amount
         assert ERC20(coins[_coin_idx]).transfer(
             receiver, _amount, default_return_value=True
         )
-        self.stored_balances[_coin_idx] -= _amount
 
     else:
 

@@ -29,12 +29,8 @@ class TestLiquidityMethods:
                 for i, (pool_token, amount) in enumerate(zip(pool_tokens, deposit_amounts)):
                     if pool_token_types[i] == 2:
                         is_ideal = False
-                        if i == 0:  # up rebasing
-                            assert pool_token.balanceOf(bob) >= initial_amounts[i] - deposit_amounts[i]
-                            assert pool_token.balanceOf(swap.address) >= deposit_amounts[i] * 2
-                        else:  # down rebasing
-                            assert pool_token.balanceOf(bob) <= initial_amounts[i] - deposit_amounts[i]
-                            assert pool_token.balanceOf(swap.address) <= deposit_amounts[i] * 2
+                        assert pool_token.balanceOf(bob) >= initial_amounts[i] - deposit_amounts[i]
+                        assert pool_token.balanceOf(swap.address) >= deposit_amounts[i] * 2
                     else:
                         assert pool_token.balanceOf(bob) == initial_amounts[i] - deposit_amounts[i]
                         assert pool_token.balanceOf(swap.address) == deposit_amounts[i] * 2
@@ -86,12 +82,8 @@ class TestLiquidityMethods:
                 for i, pool_token in enumerate(pool_tokens):
                     if pool_token_types[i] == 2:
                         is_ideal = False
-                        if i == 0:  # up rebasing
-                            assert pool_token.balanceOf(bob) >= initial_amounts[i] - amounts[i] - 1
-                            assert pool_token.balanceOf(swap.address) >= deposit_amounts[i] + amounts[i] - 1
-                        else:  # down rebasing
-                            assert pool_token.balanceOf(bob) <= initial_amounts[i] - amounts[i] + 1
-                            assert pool_token.balanceOf(swap.address) <= deposit_amounts[i] + amounts[i] + 1
+                        assert pool_token.balanceOf(bob) >= initial_amounts[i] - amounts[i] - 1
+                        assert pool_token.balanceOf(swap.address) >= deposit_amounts[i] + amounts[i] - 1
                     else:
                         assert pool_token.balanceOf(bob) == initial_amounts[i] - amounts[i]
                         assert pool_token.balanceOf(swap.address) == deposit_amounts[i] + amounts[i]

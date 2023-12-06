@@ -404,10 +404,10 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
 
     if not 2 in asset_types:
 
+        self.stored_balances[_coin_idx] -= _amount
         assert ERC20(coins[_coin_idx]).transfer(
             receiver, _amount, default_return_value=True
         )
-        self.stored_balances[_coin_idx] -= _amount
 
     else:
 
@@ -847,6 +847,7 @@ def remove_liquidity(
 
 
 @external
+@nonreentrant('lock')
 def withdraw_admin_fees():
     """
     @notice Claim admin fees. Callable by anyone.
