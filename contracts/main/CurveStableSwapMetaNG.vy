@@ -1537,7 +1537,9 @@ def transferFrom(_from : address, _to : address, _value : uint256) -> bool:
 
     _allowance: uint256 = self.allowance[_from][msg.sender]
     if _allowance != max_value(uint256):
-        self.allowance[_from][msg.sender] = _allowance - _value
+        _new_allowance: uint256 = _allowance - _value
+        self.allowance[_from][msg.sender] = _new_allowance
+        log Approval(_from, msg.sender, _new_allowance)
 
     return True
 
