@@ -890,8 +890,6 @@ def remove_liquidity_one_coin(
 
     self._burnFrom(msg.sender, _burn_amount)
 
-    log Transfer(msg.sender, empty(address), _burn_amount)
-
     self._transfer_out(i, dy, _receiver)
 
     log RemoveLiquidityOne(msg.sender, i, _burn_amount, dy, self.total_supply)
