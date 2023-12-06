@@ -955,7 +955,7 @@ def _exchange(
 
     # ------------------------------------------------------------------------
 
-    log TokenExchange(msg.sender, i, _dx, j, dy)
+    log TokenExchange(msg.sender, i, dx, j, dy)
 
     return dy
 
