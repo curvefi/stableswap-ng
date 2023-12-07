@@ -401,6 +401,7 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     @param _amount Amount of token to transfer out
     @param receiver Address to send the tokens to
     """
+    assert receiver != empty(address)  # dev: do not send tokens to zero_address
 
     if not 2 in asset_types:
 
@@ -568,6 +569,8 @@ def add_liquidity(
     @param _receiver Address that owns the minted LP tokens
     @return Amount of LP tokens received by depositing
     """
+    assert _receiver != empty(address)  # dev: do not send LP tokens to zero_address
+
     amp: uint256 = self._A()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
     rates: DynArray[uint256, MAX_COINS] = self._stored_rates()

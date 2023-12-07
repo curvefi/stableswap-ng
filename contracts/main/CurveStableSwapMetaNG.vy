@@ -485,6 +485,8 @@ def _transfer_out(
     @param _amount Amount of token to transfer out
     @param receiver Address to send the tokens to
     """
+    assert receiver != empty(address)  # dev: do not send tokens to zero_address
+
     if asset_type != 2:
 
         self.stored_balances[_coin_idx] -= _amount
@@ -649,6 +651,8 @@ def exchange_underlying(
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
+    assert _receiver != empty(address)  # dev: do not send tokens to zero_address
+
     rates: uint256[N_COINS] = self._stored_rates()
     old_balances: uint256[N_COINS] = self._balances()
     xp: uint256[N_COINS]  = self._xp_mem(rates, old_balances)
@@ -738,6 +742,8 @@ def add_liquidity(
     @param _receiver Address that owns the minted LP tokens
     @return Amount of LP tokens received by depositing
     """
+    assert _receiver != empty(address)  # dev: do not send LP tokens to zero_address
+
     amp: uint256 = self._A()
     old_balances: uint256[N_COINS] = self._balances()
     rates: uint256[N_COINS] = self._stored_rates()
@@ -872,6 +878,7 @@ def remove_liquidity_one_coin(
     @return Amount of coin received
     """
     assert _burn_amount > 0  # dev: do not remove 0 LP tokens
+
     dy: uint256 = 0
     fee: uint256 = 0
     xp: uint256[N_COINS] = empty(uint256[N_COINS])
