@@ -427,7 +427,6 @@ def _transfer_in(
     @return amount of coins received
     """
     _input_coin: ERC20 = ERC20(coins[coin_metapool_idx])
-    _stored_balance: uint256 = self.stored_balances[coin_metapool_idx]
     _input_coin_is_in_base_pool: bool = False
 
     # Check if _transfer_in is being called by _exchange_underlying:
@@ -443,7 +442,7 @@ def _transfer_in(
     if expect_optimistic_transfer:
 
         if not _input_coin_is_in_base_pool:
-            _dx = _dx - _stored_balance
+            _dx = _dx - self.stored_balances[coin_metapool_idx]
             assert _dx >= dx  # dev: pool did not receive tokens for swap
 
     else:
