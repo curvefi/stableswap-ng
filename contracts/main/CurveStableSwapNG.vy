@@ -973,7 +973,8 @@ def _exchange(
 @internal
 def _withdraw_admin_fees():
     fee_receiver: address = factory.fee_receiver()
-    assert fee_receiver != empty(address)  # dev: fee receiver not set
+    if fee_receiver == empty(address):
+        return  # Do nothing.
 
     admin_balances: DynArray[uint256, MAX_COINS] = self.admin_balances
     for i in range(N_COINS_128, bound=MAX_COINS_128):
