@@ -807,6 +807,7 @@ def remove_liquidity(
     """
     total_supply: uint256 = self.total_supply
     assert _burn_amount > 0  # dev: invalid burn amount
+    assert len(_min_amounts) == N_COINS  # dev: invalid array length for _min_amounts
 
     amounts: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = self._balances()
