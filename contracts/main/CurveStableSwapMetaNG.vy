@@ -694,20 +694,7 @@ def exchange_underlying(
 
     if i == 0 or j == 0:  # meta swap
 
-        if i == 0:
-
-            # xp[i] + dx_w_fee * rates[i] / PRECISION
-            x = xp[i] + unsafe_div(dx_w_fee * rates[i], PRECISION)
-
-        else:
-
-            # dx_w_fee is the number of base_pool LP tokens minted after
-            # base_pool.add_liquidity in self._transfer_in:
-
-            # dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX] / PRECISION
-            x = unsafe_div(dx_w_fee * rates[MAX_METAPOOL_COIN_INDEX], PRECISION)
-            x += xp[MAX_METAPOOL_COIN_INDEX]
-
+        x = xp[meta_i] + unsafe_div(dx_w_fee * rates[meta_i], PRECISION)
         dy = self.__exchange(x, xp, rates, meta_i, meta_j)
 
         # Adjust stored balances of meta-level tokens:

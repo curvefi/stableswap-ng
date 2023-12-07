@@ -218,7 +218,7 @@ def exp(x: int256) -> uint256:
 
     # If the result is `< 0.5`, we return zero. This happens when we have the following:
     # "x <= floor(log(0.5e18) * 1e18) ~ -42e18".
-    if (x <= -42139678854452767551):
+    if (x <= -41446531673892822313):
         return empty(uint256)
 
     # When the result is "> (2 ** 255 - 1) / 1e18" we cannot represent it as a signed integer.
