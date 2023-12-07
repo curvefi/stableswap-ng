@@ -986,7 +986,7 @@ def remove_liquidity_imbalance(
         [_amounts[0], _amounts[1]],
         [fees[0], fees[1]],
         D1,
-        total_supply
+        total_supply - burn_amount
     )
 
     return burn_amount

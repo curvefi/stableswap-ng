@@ -776,10 +776,15 @@ def remove_liquidity_imbalance(
     assert burn_amount > 1  # dev: zero tokens burned
     assert burn_amount <= _max_burn_amount, "Slippage screwed you"
 
-    total_supply -= burn_amount
     self._burnFrom(msg.sender, burn_amount)
 
-    log RemoveLiquidityImbalance(msg.sender, _amounts, fees, D1, total_supply)
+    log RemoveLiquidityImbalance(
+        msg.sender,
+        _amounts,
+        fees,
+        D1,
+        total_supply - burn_amount
+    )
 
     return burn_amount
 
