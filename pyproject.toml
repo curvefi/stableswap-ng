@@ -65,4 +65,5 @@ known_first_party = "poetry"
 markers = [
     "only_for_pool_type: running tests only for specific pool types",
     "only_for_token_types: running tests only if tokens of specific types are in pool",
+    "no_auto_generate: dont generate tests for this one",
 ]

@@ -573,7 +573,7 @@ def permit(
     assert ecrecover(digest, _v, _r, _s) == _owner  # dev: invalid signature
 
     self.allowance[_owner][_spender] = _value
-    self.nonces[_owner] = nonce + 1
+    self.nonces[_owner] = unsafe_add(nonce, 1)
 
     log Approval(_owner, _spender, _value)
     return True

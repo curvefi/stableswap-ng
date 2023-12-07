@@ -519,15 +519,14 @@ def _stored_rates() -> uint256[N_COINS]:
     if asset_type == 1 and not rate_oracle == 0:
 
         # NOTE: fetched_rate is assumed to be 10**18 precision
-        fetched_rate: uint256 = convert(
-            raw_call(
-                convert(rate_oracle % 2**160, address),
-                _abi_encode(rate_oracle & ORACLE_BIT_MASK),
-                max_outsize=32,
-                is_static_call=True,
-            ),
-            uint256
+        oracle_response: Bytes[32] = raw_call(
+            convert(rate_oracle % 2**160, address),
+            _abi_encode(rate_oracle & ORACLE_BIT_MASK),
+            max_outsize=32,
+            is_static_call=True,
         )
+        assert len(oracle_response) == 32
+        fetched_rate: uint256 = convert(oracle_response, uint256)
 
         # rates[0] * fetched_rate / PRECISION
         rates[0] = unsafe_div(rates[0] * fetched_rate, PRECISION)
@@ -839,6 +838,12 @@ def add_liquidity(
 
         # (re)instantiate D oracle if totalSupply is zero.
         self.last_D_packed = self.pack_2(D1, D1)
+
+        # Update D ma time:
+        ma_last_time_unpacked: uint256[2] = self.unpack_2(self.ma_last_time)
+        if ma_last_time_unpacked[1] < block.timestamp:
+            ma_last_time_unpacked[1] = block.timestamp
+            self.ma_last_time = self.pack_2(ma_last_time_unpacked[0], ma_last_time_unpacked[1])
 
     assert mint_amount >= _min_mint_amount, "Slippage screwed you"
 

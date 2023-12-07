@@ -109,15 +109,14 @@ def get_D(
 
     D: uint256 = S
     Ann: uint256 = _amp * _n_coins
-    D_P: uint256 = 0
-    Dprev: uint256 = 0
 
     for i in range(255):
 
-        D_P = D
+        D_P: uint256 = D
         for x in _xp:
-            D_P = D_P * D / (x * _n_coins)  # If division by 0, this will be borked: only withdrawal will work. And that is good
-        Dprev = D
+            D_P = D_P * D / x  # If division by 0, this will be borked: only withdrawal will work. And that is good
+        D_P /= pow_mod256(_n_coins, _n_coins)
+        Dprev: uint256 = D
 
         # (Ann * S / A_PRECISION + D_P * _n_coins) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (_n_coins + 1) * D_P)
         D = (

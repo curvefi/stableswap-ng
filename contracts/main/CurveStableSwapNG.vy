@@ -437,15 +437,14 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
         if asset_types[i] == 1 and not rate_oracles[i] == 0:
 
             # NOTE: fetched_rate is assumed to be 10**18 precision
-            fetched_rate: uint256 = convert(
-                raw_call(
-                    convert(rate_oracles[i] % 2**160, address),
-                    _abi_encode(rate_oracles[i] & ORACLE_BIT_MASK),
-                    max_outsize=32,
-                    is_static_call=True,
-                ),
-                uint256
+            oracle_response: Bytes[32] = raw_call(
+                convert(rate_oracles[i] % 2**160, address),
+                _abi_encode(rate_oracles[i] & ORACLE_BIT_MASK),
+                max_outsize=32,
+                is_static_call=True,
             )
+            assert len(oracle_response) == 32
+            fetched_rate: uint256 = convert(oracle_response, uint256)
 
             rates[i] = unsafe_div(rates[i] * fetched_rate, PRECISION)
 
@@ -652,6 +651,12 @@ def add_liquidity(
 
         # (re)instantiate D oracle if totalSupply is zero.
         self.last_D_packed = self.pack_2(D1, D1)
+
+        # Update D ma time:
+        ma_last_time_unpacked: uint256[2] = self.unpack_2(self.ma_last_time)
+        if ma_last_time_unpacked[1] < block.timestamp:
+            ma_last_time_unpacked[1] = block.timestamp
+            self.ma_last_time = self.pack_2(ma_last_time_unpacked[0], ma_last_time_unpacked[1])
 
     assert mint_amount >= _min_mint_amount, "Slippage screwed you"
 
@@ -1069,15 +1074,14 @@ def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
 
     D: uint256 = S
     Ann: uint256 = _amp * N_COINS
-    D_P: uint256 = 0
-    Dprev: uint256 = 0
 
     for i in range(255):
 
-        D_P = D
+        D_P: uint256 = D
         for x in _xp:
-            D_P = D_P * D / (x * N_COINS)
-        Dprev = D
+            D_P *= D / x
+        D_P /= pow_mod256(N_COINS, N_COINS)
+        Dprev: uint256 = D
 
         # (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
         D = (
