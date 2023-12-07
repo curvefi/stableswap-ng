@@ -504,7 +504,7 @@ def exchange(
     @notice Perform an exchange between two coins
     @dev Index values can be found via the `coins` public getter method
     @param i Index value for the coin to send
-    @param j Index value of the coin to recieve
+    @param j Index value of the coin to receive
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
@@ -538,7 +538,7 @@ def exchange_received(
          directly to the contract and call `exchange_received`.
          Note: This is disabled if pool contains rebasing tokens.
     @param i Index value for the coin to send
-    @param j Index valie of the coin to recieve
+    @param j Index value of the coin to receive
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
     @return Actual amount of `j` received
@@ -1346,7 +1346,7 @@ def upkeep_oracles(xp: DynArray[uint256, MAX_COINS], amp: uint256, D: uint256):
 
         if spot_price[i] != 0:
 
-            # Upate packed prices -----------------
+            # Update packed prices -----------------
             last_prices_packed_new[i] = self.pack_2(
                 min(spot_price[i], 2 * 10**18),  # <----- Cap spot value by 2.
                 self._calc_moving_average(
@@ -1680,7 +1680,7 @@ def get_dx(i: int128, j: int128, dy: uint256) -> uint256:
     @notice Calculate the current input dx given output dy
     @dev Index values can be found via the `coins` public getter method
     @param i Index value for the coin to send
-    @param j Index valie of the coin to recieve
+    @param j Index value of the coin to receive
     @param dy Amount of `j` being received after exchange
     @return Amount of `i` predicted
     """
@@ -1694,7 +1694,7 @@ def get_dy(i: int128, j: int128, dx: uint256) -> uint256:
     @notice Calculate the current output dy given input dx
     @dev Index values can be found via the `coins` public getter method
     @param i Index value for the coin to send
-    @param j Index valie of the coin to recieve
+    @param j Index value of the coin to receive
     @param dx Amount of `i` being exchanged
     @return Amount of `j` predicted
     """
@@ -1802,7 +1802,7 @@ def dynamic_fee(i: int128, j: int128) -> uint256:
     """
     @notice Return the fee for swapping between `i` and `j`
     @param i Index value for the coin to send
-    @param j Index value of the coin to recieve
+    @param j Index value of the coin to receive
     @return Swap fee expressed as an integer with 1e10 precision
     """
     return StableSwapViews(factory.views_implementation()).dynamic_fee(i, j, self)
