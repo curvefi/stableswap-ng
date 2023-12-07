@@ -481,6 +481,9 @@ def _transfer_out(
 ):
     """
     @notice Transfer a single token from the pool to receiver.
+    @dev This function is called by `remove_liquidity` and
+         `remove_liquidity_one_coin`, `_exchange`, `_withdraw_admin_fees` and
+         `remove_liquidity_imbalance` methods.
     @param _coin_idx Index of the token to transfer out
     @param _amount Amount of token to transfer out
     @param receiver Address to send the tokens to
@@ -585,6 +588,7 @@ def exchange(
     @param j Index value of the coin to receive
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
+    @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
     return self._exchange(
@@ -619,6 +623,7 @@ def exchange_received(
     @param j Index value of the coin to receive
     @param _dx Amount of `i` being exchanged
     @param _min_dy Minimum amount of `j` to receive
+    @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
     assert asset_type != 2  # dev: exchange_received not supported if pool contains rebasing tokens
@@ -1858,7 +1863,8 @@ def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
 def set_ma_exp_time(_ma_exp_time: uint256, _D_ma_time: uint256):
     """
     @notice Set the moving average window of the price oracles.
-    @param _ma_exp_time Moving average window. It is time_in_seconds / ln(2)
+    @param _ma_exp_time Moving average window for the price oracle. It is time_in_seconds / ln(2).
+    @param _D_ma_time Moving average window for the D oracle. It is time_in_seconds / ln(2).
     """
     assert msg.sender == factory.admin()  # dev: only owner
     assert unsafe_mul(_ma_exp_time, _D_ma_time) > 0  # dev: 0 in input values
