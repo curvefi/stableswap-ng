@@ -170,7 +170,7 @@ def meta_decimals(initial_decimals, metapool_token_type, decimals):
 #
 # @pytest.mark.only_for_token_types(2)
 # class TestPoolsWithOracleToken:
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def skip_by_token_type(request, pool_tokens):
     only_for_token_types = request.node.get_closest_marker("only_for_token_types")
     if only_for_token_types:
@@ -179,7 +179,7 @@ def skip_by_token_type(request, pool_tokens):
             pytest.skip("skipped because no tokens for these types")
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def skip_rebasing(request, swap):
     only_for_token_types = request.node.get_closest_marker("skip_rebasing_tokens")
     if only_for_token_types:
@@ -187,7 +187,7 @@ def skip_rebasing(request, swap):
             pytest.skip("skipped because test includes rebasing tokens")
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def skip_oracle(request, pool_tokens):
     only_for_token_types = request.node.get_closest_marker("skip_oracle_tokens")
     if only_for_token_types:
@@ -197,7 +197,7 @@ def skip_oracle(request, pool_tokens):
             pytest.skip("skipped because test includes oraclised tokens")
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def only_oracle(request, pool_tokens):
     only_for_token_types = request.node.get_closest_marker("only_oracle_tokens")
     if only_for_token_types:
@@ -207,7 +207,7 @@ def only_oracle(request, pool_tokens):
             pytest.skip("skipped because test excludes oraclised tokens")
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def only_rebasing(request, swap):
     marker = request.node.get_closest_marker("contains_rebasing_tokens")
     if marker:
@@ -219,7 +219,7 @@ def only_rebasing(request, swap):
 # Usage
 # @pytest.mark.only_for_pool_type(1)
 # class TestMetaPool...
-@pytest.fixture()
+@pytest.fixture(autouse=True)
 def skip_by_pool_type(request, pool_type):
     only_for_pool_type = request.node.get_closest_marker("only_for_pool_type")
     if only_for_pool_type:
@@ -227,7 +227,7 @@ def skip_by_pool_type(request, pool_type):
             pytest.skip("skipped because another pool type")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def forked_chain():
     rpc_url = os.getenv("WEB3_PROVIDER_URL")
     assert rpc_url is not None, "Provider url is not set, add WEB3_PROVIDER_URL param to env"
