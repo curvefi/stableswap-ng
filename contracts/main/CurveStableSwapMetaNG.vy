@@ -89,6 +89,12 @@ interface StableSwap2:
 interface StableSwap3:
     def add_liquidity(amounts: uint256[3], min_mint_amount: uint256): nonpayable
 
+interface StableSwapNG:
+    def add_liquidity(
+        amounts: DynArray[uint256, MAX_COINS],
+        min_mint_amount: uint256
+    ) -> uint256: nonpayable
+
 interface StableSwap:
     def remove_liquidity_one_coin(_token_amount: uint256, i: int128, min_amount: uint256): nonpayable
     def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256): nonpayable
@@ -201,6 +207,7 @@ N_COINS_128: constant(int128) = 2
 PRECISION: constant(uint256) = 10 ** 18
 
 BASE_POOL: public(immutable(address))
+BASE_POOL_IS_NG: immutable(bool)
 BASE_N_COINS: public(immutable(uint256))
 BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
 
@@ -326,10 +333,11 @@ def __init__(
                        Calculated as: keccak(text=event_signature.replace(" ", ""))[:4]
     @param _oracles Array of rate oracle addresses.
     """
-    assert len(_base_coins) <= 3  # dev: implementation does not support base pool with more than 3 coins
-
     # The following reverts if BASE_POOL is an NG implementaion.
-    assert not raw_call(_base_pool, method_id("D_ma_time()"), revert_on_failure=False)
+    BASE_POOL_IS_NG = raw_call(_base_pool, method_id("D_ma_time()"), revert_on_failure=False)
+
+    if not BASE_POOL_IS_NG:
+        assert len(_base_coins) <= 3  # dev: implementation does not support old gen base pool with more than 3 coins
 
     math = Math(_math_implementation)
     BASE_POOL = _base_pool
@@ -1178,6 +1186,16 @@ def _exchange(
 
 @internal
 def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
+
+    if BASE_POOL_IS_NG:
+
+        base_inputs: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+        for i in range(BASE_N_COINS, bound=MAX_COINS):
+            if i == convert(base_i, uint256):
+                base_inputs.append(dx)
+            else:
+                base_inputs.append(0)
+        return StableSwapNG(BASE_POOL).add_liquidity(base_inputs, 0)
 
     coin_i: address = coins[MAX_METAPOOL_COIN_INDEX]
     x: uint256 = ERC20(coin_i).balanceOf(self)

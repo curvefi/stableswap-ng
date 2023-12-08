@@ -1091,7 +1091,7 @@ def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
 
         D_P: uint256 = D
         for x in _xp:
-            D_P *= D / x
+            D_P = D_P * D / x
         D_P /= pow_mod256(N_COINS, N_COINS)
         Dprev: uint256 = D
 

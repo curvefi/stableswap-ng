@@ -471,7 +471,13 @@ def _base_calc_token_amount(
 
     else:
 
-        raise "base_n_coins > 3 not supported yet."
+        base_inputs: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+        for i in range(base_n_coins, bound=MAX_COINS):
+            if i == convert(base_i, uint256):
+                base_inputs.append(dx)
+            else:
+                base_inputs.append(0)
+        return StableSwapNG(base_pool).calc_token_amount(base_inputs, is_deposit)
 
 
 @internal
