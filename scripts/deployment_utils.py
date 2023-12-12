@@ -1,48 +1,6 @@
 from dataclasses import dataclass
 
-import click
-from ape import networks, project
-from ape.api.address import Address
-
-# from eth_utils import function_signature_to_4byte_selector
-
-DOLLAR_VALUE_OF_TOKENS_TO_DEPOSIT = 5
-
-
-def _get_tx_params():
-
-    if "mainnet-fork" == networks.active_provider.network.name:
-        return {}
-
-    if "sepolia" == networks.active_provider.network.name:
-        return {}
-
-    active_provider = networks.active_provider
-    max_fee = int(active_provider.base_fee * 1.2)
-    max_priority_fee = int(0.5e9)
-
-    return {"max_fee": max_fee, "max_priority_fee": max_priority_fee}
-
-
-def deploy_blueprint(contract, account):
-
-    initcode = contract.contract_type.deployment_bytecode.bytecode
-    if isinstance(initcode, str):
-        initcode = bytes.fromhex(initcode.removeprefix("0x"))
-    initcode = b"\xfe\x71\x00" + initcode  # eip-5202 preamble version 0
-    initcode = b"\x61" + len(initcode).to_bytes(2, "big") + b"\x3d\x81\x60\x0a\x3d\x39\xf3" + initcode
-
-    tx = project.provider.network.ecosystem.create_transaction(
-        chain_id=project.provider.chain_id,
-        data=initcode,
-        gas_price=project.provider.gas_price,
-        nonce=account.nonce,
-        **_get_tx_params(),
-    )
-    receipt = account.call(tx)
-    click.echo(f"blueprint deployed at: {receipt.contract_address}")
-    return receipt.contract_address
-
+from eth_typing import Address
 
 # ------ IMMUTABLES ------
 
@@ -145,8 +103,8 @@ curve_dao_network_settings = {
         fee_receiver_address="",
     ),
     "mantle:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="",
-        fee_receiver_address="",
+        dao_ownership_contract="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
+        fee_receiver_address="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
     ),
 }
 

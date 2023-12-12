@@ -109,15 +109,14 @@ def get_D(
 
     D: uint256 = S
     Ann: uint256 = _amp * _n_coins
-    D_P: uint256 = 0
-    Dprev: uint256 = 0
 
     for i in range(255):
 
-        D_P = D
+        D_P: uint256 = D
         for x in _xp:
-            D_P = D_P * D / (x * _n_coins)  # If division by 0, this will be borked: only withdrawal will work. And that is good
-        Dprev = D
+            D_P = D_P * D / x  # If division by 0, this will be borked: only withdrawal will work. And that is good
+        D_P /= pow_mod256(_n_coins, _n_coins)
+        Dprev: uint256 = D
 
         # (Ann * S / A_PRECISION + D_P * _n_coins) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (_n_coins + 1) * D_P)
         D = (
@@ -219,7 +218,7 @@ def exp(x: int256) -> uint256:
 
     # If the result is `< 0.5`, we return zero. This happens when we have the following:
     # "x <= floor(log(0.5e18) * 1e18) ~ -42e18".
-    if (x <= -42139678854452767551):
+    if (x <= -41446531673892822313):
         return empty(uint256)
 
     # When the result is "> (2 ** 255 - 1) / 1e18" we cannot represent it as a signed integer.

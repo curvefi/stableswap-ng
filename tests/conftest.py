@@ -4,6 +4,8 @@ import os
 import boa
 import pytest
 
+from tests.utils import get_asset_types_in_pool
+
 pytest_plugins = [
     "tests.fixtures.accounts",
     "tests.fixtures.constants",
@@ -172,7 +174,7 @@ def meta_decimals(initial_decimals, metapool_token_type, decimals):
 def skip_by_token_type(request, pool_tokens):
     only_for_token_types = request.node.get_closest_marker("only_for_token_types")
     if only_for_token_types:
-        asset_types = [tkn.asset_types() for tkn in pool_tokens]
+        asset_types = [tkn.asset_type() for tkn in pool_tokens]
         if not any(asset_type in only_for_token_types.args for asset_type in asset_types):
             pytest.skip("skipped because no tokens for these types")
 
@@ -181,7 +183,7 @@ def skip_by_token_type(request, pool_tokens):
 def skip_rebasing(request, swap):
     only_for_token_types = request.node.get_closest_marker("skip_rebasing_tokens")
     if only_for_token_types:
-        if 2 in swap._immutables.asset_types:
+        if 2 in get_asset_types_in_pool(swap):
             pytest.skip("skipped because test includes rebasing tokens")
 
 
@@ -189,7 +191,7 @@ def skip_rebasing(request, swap):
 def skip_oracle(request, pool_tokens):
     only_for_token_types = request.node.get_closest_marker("skip_oracle_tokens")
     if only_for_token_types:
-        asset_types = [tkn.asset_types() for tkn in pool_tokens]
+        asset_types = [tkn.asset_type() for tkn in pool_tokens]
         asset_types_contains_oracle = 1 in asset_types
         if asset_types_contains_oracle:
             pytest.skip("skipped because test includes oraclised tokens")
@@ -199,7 +201,7 @@ def skip_oracle(request, pool_tokens):
 def only_oracle(request, pool_tokens):
     only_for_token_types = request.node.get_closest_marker("only_oracle_tokens")
     if only_for_token_types:
-        asset_types = [tkn.asset_types() for tkn in pool_tokens]
+        asset_types = [tkn.asset_type() for tkn in pool_tokens]
         asset_types_contains_rebasing = 1 in asset_types
         if not asset_types_contains_rebasing:
             pytest.skip("skipped because test excludes oraclised tokens")
@@ -209,7 +211,7 @@ def only_oracle(request, pool_tokens):
 def only_rebasing(request, swap):
     marker = request.node.get_closest_marker("contains_rebasing_tokens")
     if marker:
-        asset_types_contains_rebasing = 2 in swap._immutables.asset_types
+        asset_types_contains_rebasing = 2 in get_asset_types_in_pool(swap)
         if not asset_types_contains_rebasing:
             pytest.skip("skipped because test excludes rebasing tokens")
 
@@ -225,7 +227,7 @@ def skip_by_pool_type(request, pool_type):
             pytest.skip("skipped because another pool type")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def forked_chain():
     rpc_url = os.getenv("WEB3_PROVIDER_URL")
     assert rpc_url is not None, "Provider url is not set, add WEB3_PROVIDER_URL param to env"

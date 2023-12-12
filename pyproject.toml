@@ -10,7 +10,7 @@ packages = []
 [tool.poetry.dependencies]
 python = "^3.10"
 poetry = "1.5.1"
-titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "1924f4888e2ef261efb2367fce2cf467de16f529"}
+titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "03949fe9e3b1c15b8d88dd169b4f5e44fb64fae0"}
 vyper = "0.3.10"
 pycryptodome = "^3.18.0"
 pre-commit = "^3.3.3"
@@ -20,7 +20,6 @@ black = "22.3.0"
 flake8 = "4.0.1"
 isort = "5.12.0"
 mamushi = "^0.0.2a1"
-eth-ape = "^0.6.18"
 
 
 [tool.poetry.group.testing.dependencies]
@@ -66,4 +65,8 @@ known_first_party = "poetry"
 markers = [
     "only_for_pool_type: running tests only for specific pool types",
     "only_for_token_types: running tests only if tokens of specific types are in pool",
+    "no_auto_generate: dont generate tests for this one",
+]
+filterwarnings = [
+  "ignore:PytestUnknownMarkWarning"
 ]

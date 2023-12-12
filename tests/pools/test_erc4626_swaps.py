@@ -4,6 +4,7 @@ import boa
 import pytest
 from eth_utils import function_signature_to_4byte_selector
 
+from tests.utils import get_asset_types_in_pool
 from tests.utils.tokens import mint_for_testing
 
 
@@ -191,7 +192,7 @@ def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
 
     if "RebasingConditional" in pool_tokens[i].filename:
         pool_tokens[i].rebase()
-        assert 2 in swap._immutables.asset_types
+        assert 2 in get_asset_types_in_pool(swap)
 
     calculated = swap.get_dy(i, j, amount_in)
     dy = swap.exchange(i, j, amount_in, int(0.99 * calculated), sender=charlie)

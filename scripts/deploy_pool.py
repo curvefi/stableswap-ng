@@ -5,6 +5,7 @@ from typing import List
 
 import boa
 from boa.network import NetworkEnv
+from deployment_utils import FIDDYDEPLOYER
 from eth_account import Account
 from eth_typing import Address
 from rich.console import Console as RichConsole
@@ -93,37 +94,36 @@ class PoolSettings:
 
 
 pool_settings = {
-    "gnosis:mainnet": {
-        "plain": [
-            "WXDAI/USDC/USDT",  # name
-            "3pool-ng",  # symbol
-            [
-                "0xe91D153E0b41518A2Ce8Dd3D7944Fa863463a97d",  # wxdai
-                "0xDDAfbb505ad214D7b80b1f830fcCc89B60fb7A83",  # usdc
-                "0x4ECaBa5870353805a9F068101A40E0f32ed605C6",  # usdt
-            ],
-            1000,  # A
-            1000000,  # fee
-            20000000000,  # offpeg_fee_multiplier
-            865,  # ma_exp_time
-            0,  # implementation index
-            [0, 0, 0],  # asset_types
-            [b"", b"", b""],  # method_ids
-            [ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
-        ],
+    "ethereum:mainnet": {
         "meta": [
-            "0x7f90122bf0700f9e7e1f688fe926940e8839f353",  # base_pool
-            "EURE/3CRV",  # name
-            "eure3crvng",  # symbol
-            "0xcb444e90d8198415266c6a2724b7900fb12fc56e",  # eure
+            "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7",  # 3pool
+            "USDV-3crv",  # name
+            "USDV3crv",  # symbol
+            "0x0E573Ce2736Dd9637A0b21058352e1667925C7a8",
             500,  # A
             1000000,  # fee
-            20000000000,  # offpeg_fee_multiplier
-            865,  # ma_exp_time
+            50000000000,  # offpeg_fee_multiplier
+            866,  # ma_exp_time
             0,  # implementation index
             0,  # asset_types
             b"",  # method_ids
             ZERO_ADDRESS,  # oracles
+        ],
+        "plain": [
+            "FRAXsDAI",  # name
+            "FRAXSDAI",  # symbol
+            [
+                "0x853d955aCEf822Db058eb8505911ED77F175b99e",  # frax
+                "0x83F20F44975D03b1b09e64809B757c47f942BEeA",  # sdai
+            ],
+            1500,  # A
+            1000000,  # fee
+            10000000000,  # offpeg_fee_multiplier
+            865,  # ma_exp_time
+            0,  # implementation index
+            [0, 3],  # asset_types
+            [b"", b""],  # method_ids
+            [ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
         ],
     }
 }
@@ -136,14 +136,14 @@ def deploy_pool(network, url, account, pool_type, fork):
     if fork:
         boa.env.fork(url)
         logger.log("Forkmode ...")
-        boa.env.eoa = ""  # set eoa address here
+        boa.env.eoa = FIDDYDEPLOYER  # set eoa address here
     else:
         logger.log("Prodmode ...")
         boa.set_env(NetworkEnv(url))
         boa.env.add_account(Account.from_key(os.environ[account]))
 
     factory = boa.load_partial("./contracts/main/CurveStableSwapFactoryNG.vy")
-    factory = factory.at(deployments["gnosis:mainnet"]["factory"])
+    factory = factory.at(deployments[network]["factory"])
 
     logger.log("Deploying pool ...")
     args = pool_settings[network][pool_type]
@@ -152,12 +152,69 @@ def deploy_pool(network, url, account, pool_type, fork):
     elif pool_type == "meta":
         amm_address = factory.deploy_metapool(*args)
 
-    logger.log(f"Deployed Plain pool {amm_address}.")
+    logger.log(f"Deployed pool {amm_address}.")
+
+    return amm_address
+
+
+def deploy_gauge(network, url, account, pool_addr, fork):
+
+    logger.log(f"Deploying gauge for pool {pool_addr} on {network} ...")
+
+    if fork:
+        boa.env.fork(url)
+        logger.log("Forkmode ...")
+        boa.env.eoa = FIDDYDEPLOYER  # set eoa address here
+        assert boa.env.eoa  # EOA NOT SET!
+    else:
+        logger.log("Prodmode ...")
+        boa.set_env(NetworkEnv(url))
+        boa.env.add_account(Account.from_key(os.environ[account]))
+
+    factory = boa.load_partial("./contracts/main/CurveStableSwapFactoryNG.vy")
+    factory = factory.at(deployments[network]["factory"])
+
+    logger.log("Deploying gauge ...")
+    gauge_address = factory.deploy_gauge(pool_addr)
+
+    logger.log(f"Deployed Gauge {gauge_address} for pool {pool_addr}.")
+
+
+def deploy_pool_and_gauge(network, url, account, pool_type, fork):
+
+    logger.log(f"Deploying pool on {network} ...")
+
+    if fork:
+        boa.env.fork(url)
+        logger.log("Forkmode ...")
+        boa.env.eoa = FIDDYDEPLOYER  # set eoa address here
+    else:
+        logger.log("Prodmode ...")
+        boa.set_env(NetworkEnv(url))
+        boa.env.add_account(Account.from_key(os.environ[account]))
+
+    factory = boa.load_partial("./contracts/main/CurveStableSwapFactoryNG.vy")
+    factory = factory.at(deployments[network]["factory"])
+
+    logger.log("Deploying pool ...")
+    args = pool_settings[network][pool_type]
+    if pool_type == "plain":
+        amm_address = factory.deploy_plain_pool(*args)
+    elif pool_type == "meta":
+        amm_address = factory.deploy_metapool(*args)
+
+    logger.log(f"Deployed pool {amm_address}.")
+
+    gauge_address = factory.deploy_gauge(amm_address)
+
+    logger.log(f"Deployed Gauge {gauge_address} for pool {amm_address}.")
 
 
 def main():
-    fork = True
-    deploy_pool("gnosis:mainnet", "https://gnosis.drpc.org", "FIDDYDEPLOYER", "meta", fork)
+
+    fork = False
+    deploy_pool_and_gauge("ethereum:mainnet", os.environ["RPC_ETHEREUM"], "FIDDYDEPLOYER", "plain", fork)
+    deploy_pool_and_gauge("ethereum:mainnet", "http://localhost:9090/", "FIDDYDEPLOYER", "meta", fork)
 
 
 if __name__ == "__main__":
