@@ -28,6 +28,8 @@
                      Note: Some ERC4626 implementations may be susceptible to
                            Donation/Inflation attacks. Users are advised to
                            proceed with caution.
+        NOTE: Pool Cannot support tokens with multiple asset types: e.g. ERC4626
+              with fees are not supported.
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
