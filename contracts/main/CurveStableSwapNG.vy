@@ -159,6 +159,7 @@ PRECISION: constant(uint256) = 10 ** 18
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_types: immutable(DynArray[uint8, MAX_COINS])
+pool_is_rebasing: immutable(bool)
 stored_balances: DynArray[uint256, MAX_COINS]
 
 # Fee specific vars
@@ -274,6 +275,7 @@ def __init__(
 
     coins = _coins
     asset_types = _asset_types
+    pool_is_rebasing = 2 in asset_types
     __n_coins: uint256 = len(_coins)
     N_COINS = __n_coins
     N_COINS_128 = convert(__n_coins, int128)
@@ -403,7 +405,7 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     """
     assert receiver != empty(address)  # dev: do not send tokens to zero_address
 
-    if not 2 in asset_types:
+    if not pool_is_rebasing:
 
         self.stored_balances[_coin_idx] -= _amount
         assert ERC20(coins[_coin_idx]).transfer(
@@ -478,7 +480,7 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
 
     for i in range(N_COINS_128, bound=MAX_COINS_128):
 
-        if 2 in asset_types:
+        if pool_is_rebasing:
             balances_i = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
         else:
             balances_i = self.stored_balances[i] - self.admin_balances[i]
@@ -545,7 +547,7 @@ def exchange_received(
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
-    assert not 2 in asset_types  # dev: exchange_received not supported if pool contains rebasing tokens
+    assert not pool_is_rebasing  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange(
         msg.sender,
         i,

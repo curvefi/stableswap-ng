@@ -215,6 +215,7 @@ math: immutable(Math)
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_type: immutable(uint8)
+pool_is_rebasing: immutable(bool)
 stored_balances: uint256[N_COINS]
 
 # Fee specific vars
@@ -346,6 +347,7 @@ def __init__(
     coins = _coins  # <---------------- coins[1] is always base pool LP token.
 
     asset_type = _asset_types[0]
+    pool_is_rebasing = asset_type == 2
     rate_multiplier = _rate_multipliers[0]
 
     for i in range(MAX_COINS):
@@ -498,7 +500,7 @@ def _transfer_out(
     """
     assert receiver != empty(address)  # dev: do not send tokens to zero_address
 
-    if asset_type != 2:
+    if not pool_is_rebasing:
 
         self.stored_balances[_coin_idx] -= _amount
         assert ERC20(coins[_coin_idx]).transfer(
@@ -569,7 +571,7 @@ def _balances() -> uint256[N_COINS]:
     admin_balances: DynArray[uint256, MAX_COINS] = self.admin_balances
     for i in range(N_COINS_128):
 
-        if asset_type != 2:
+        if pool_is_rebasing:
             result[i] = ERC20(coins[i]).balanceOf(self) - admin_balances[i]
         else:
             result[i] = self.stored_balances[i] - admin_balances[i]
@@ -634,7 +636,7 @@ def exchange_received(
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
-    assert asset_type != 2  # dev: exchange_received not supported if pool contains rebasing tokens
+    assert not pool_is_rebasing  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange(
         msg.sender,
         i,
