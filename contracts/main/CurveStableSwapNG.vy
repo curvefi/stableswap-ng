@@ -161,7 +161,7 @@ PRECISION: constant(uint256) = 10 ** 18
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_types: immutable(DynArray[uint8, MAX_COINS])
-pool_is_rebasing: immutable(bool)
+pool_contains_rebasing_tokens: immutable(bool)
 stored_balances: DynArray[uint256, MAX_COINS]
 
 # Fee specific vars
@@ -277,7 +277,7 @@ def __init__(
 
     coins = _coins
     asset_types = _asset_types
-    pool_is_rebasing = 2 in asset_types
+    pool_contains_rebasing_tokens = 2 in asset_types
     __n_coins: uint256 = len(_coins)
     N_COINS = __n_coins
     N_COINS_128 = convert(__n_coins, int128)
@@ -407,8 +407,9 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
     """
     assert receiver != empty(address)  # dev: do not send tokens to zero_address
 
-    if not pool_is_rebasing:
+    if not pool_contains_rebasing_tokens:
 
+        # we need not cache balanceOf pool before swap out
         self.stored_balances[_coin_idx] -= _amount
         assert ERC20(coins[_coin_idx]).transfer(
             receiver, _amount, default_return_value=True
@@ -416,6 +417,7 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
 
     else:
 
+        # cache balances pre and post to account for fee on transfers etc.
         coin_balance: uint256 = ERC20(coins[_coin_idx]).balanceOf(self)
         assert ERC20(coins[_coin_idx]).transfer(
             receiver, _amount, default_return_value=True
@@ -482,9 +484,11 @@ def _balances() -> DynArray[uint256, MAX_COINS]:
 
     for i in range(N_COINS_128, bound=MAX_COINS_128):
 
-        if pool_is_rebasing:
+        if pool_contains_rebasing_tokens:
+            # Read balances by gulping to account for rebases
             balances_i = ERC20(coins[i]).balanceOf(self) - self.admin_balances[i]
         else:
+            # Use cached balances
             balances_i = self.stored_balances[i] - self.admin_balances[i]
 
         result.append(balances_i)
@@ -549,7 +553,7 @@ def exchange_received(
     @param _receiver Address that receives `j`
     @return Actual amount of `j` received
     """
-    assert not pool_is_rebasing  # dev: exchange_received not supported if pool contains rebasing tokens
+    assert not pool_contains_rebasing_tokens  # dev: exchange_received not supported if pool contains rebasing tokens
     return self._exchange(
         msg.sender,
         i,
