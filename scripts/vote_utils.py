@@ -1,14 +1,16 @@
 import json
 import os
 import pprint
+import sys
 import warnings
 from typing import Dict, List, Tuple
 
 import ape
 import requests
-from ape.logging import logger
+from rich.console import Console as RichConsole
 
 warnings.filterwarnings("ignore")
+logger = RichConsole(file=sys.stdout)
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 CONVEX_VOTERPROXY = "0x989AEB4D175E16225E39E87D0D97A3360524AD80"
