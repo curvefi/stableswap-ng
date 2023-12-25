@@ -50,6 +50,7 @@ curve_dao_network_settings = {
         fee_receiver_address="0xbF7E49483881C76487b0989CD7d9A8239B20CA41",
     ),
     "base:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0x2c163fe0f079d138b9c04f780d735289344C8B80",
         thin_proxy_contract="0xe8269B33E47761f552E1a3070119560d5fa8bBD6",
         fee_receiver_address="0xe8269B33E47761f552E1a3070119560d5fa8bBD6",
     ),
@@ -107,6 +108,7 @@ curve_dao_network_settings = {
         fee_receiver_address="",
     ),
     "mantle:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0xfe87a6CDCa1EEb90987c6A196a1C5F5C76F5F2b0",
         thin_proxy_contract="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
         fee_receiver_address="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
     ),

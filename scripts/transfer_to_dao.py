@@ -60,8 +60,8 @@ def main():
     forkmode = False
 
     transfer_ownership(
-        "optimism:mainnet",
-        os.environ["RPC_OPTIMISM"],
+        "base:mainnet",
+        os.environ["RPC_BASE"],
         "FIDDYDEPLOYER",
         fork=forkmode,
     )
