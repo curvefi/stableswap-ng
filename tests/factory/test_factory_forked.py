@@ -13,7 +13,6 @@ def empty_factory(deployer, fee_receiver, owner):
     return _factory
 
 
-@pytest.mark.only_for_pool_type(1)
 def test_add_base_pool(empty_factory, owner, forked_chain):
     fraxusdc = "0xdcef968d416a41cdac0ed8702fac8128a64241a2"
     lp_token = "0x3175df0976dfa876431c2e9ee6bc45b65d3473cc"

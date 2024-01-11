@@ -22,6 +22,7 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -35,9 +36,9 @@ jobs:
           - name: pools
             tests: tests/pools/
           - name: factory
+            tests: tests/factory/
+          - name: other
             tests: >-
-              tests/test_factory.py
-              tests/test_factory_forked.py
               tests/test_get_D.py
               tests/test_token.py
 

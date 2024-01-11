@@ -39,7 +39,7 @@ pytest tests/gauge/
 Testing factory
 
 ```shell
-pytest tests/test_factory.py
+pytest tests/factory/
 ```
 
 Testing swap is ERC20
