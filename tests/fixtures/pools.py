@@ -9,8 +9,6 @@ def swap(
     factory,
     pool_size,
     pool_type,
-    pool_token_types,
-    metapool_token_type,
     pool_tokens,
     zero_address,
     amm_interface,

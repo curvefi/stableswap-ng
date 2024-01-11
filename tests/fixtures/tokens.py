@@ -47,31 +47,14 @@ def rebase_tokens(deployer, decimals):
 
 @pytest.fixture(scope="module")
 def pool_tokens(pool_token_types, plain_tokens, oracle_tokens, rebase_tokens):
-    pool_tokens = []
-    for i, t in enumerate(pool_token_types):
-        if t == 0:
-            pool_tokens.append(plain_tokens[i])
-        elif t == 1:
-            pool_tokens.append(oracle_tokens[i])
-        elif t == 2:
-            pool_tokens.append(rebase_tokens[i])
-        else:
-            raise ValueError("Wrong pool token type")
-
-    return pool_tokens
+    tokens = {0: plain_tokens, 1: oracle_tokens, 2: rebase_tokens}
+    return [tokens[t][i] for i, t in enumerate(pool_token_types)]
 
 
 # <---------------------   Metapool configuration   --------------------->
 @pytest.fixture(scope="module")
 def metapool_token(metapool_token_type, plain_tokens, oracle_tokens, rebase_tokens):
-    if metapool_token_type == 0:
-        return plain_tokens[0]
-    elif metapool_token_type == 1:
-        return oracle_tokens[0]
-    elif metapool_token_type == 2:
-        return rebase_tokens[0]
-    else:
-        raise ValueError("Wrong pool token type")
+    return {0: plain_tokens, 1: oracle_tokens, 2: rebase_tokens}[metapool_token_type][0]
 
 
 @pytest.fixture(scope="module")
@@ -81,12 +64,11 @@ def base_pool_decimals():
 
 @pytest.fixture(scope="module")
 def base_pool_tokens(deployer, base_pool_decimals):
-    tokens = []
     with boa.env.prank(deployer):
-        tokens.append(boa.load("contracts/mocks/ERC20.vy", "DAI", "DAI", base_pool_decimals[0]))
-        tokens.append(boa.load("contracts/mocks/ERC20.vy", "USDC", "USDC", base_pool_decimals[1]))
-        tokens.append(boa.load("contracts/mocks/ERC20.vy", "USDT", "USDT", base_pool_decimals[2]))
-    return tokens
+        return [
+            boa.load("contracts/mocks/ERC20.vy", c, c, base_pool_decimals[i])
+            for i, c in enumerate(("DAI", "USDC", "USDT"))
+        ]
 
 
 @pytest.fixture(scope="module")

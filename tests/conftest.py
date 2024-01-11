@@ -18,148 +18,85 @@ pytest_plugins = [
 pool_types = {"basic": 0, "meta": 1}
 token_types = {"plain": 0, "oracle": 1, "rebasing": 2}
 return_types = {"revert": 0, "False": 1, "None": 2}
-
-
-def pytest_addoption(parser):
-    parser.addoption(
-        "--pool-size",
-        action="store",
-        default="2",
-        help="pool size to test against",
-    )
-    parser.addoption(
-        "--pool-types",
-        action="store",
-        default="basic,meta",
-        help="pool type to test against",
-    )
-    parser.addoption(
-        "--token-types",
-        action="store",
-        default="plain,oracle,rebasing",
-        help="comma-separated list of ERC20 token types to test against",
-    )
-    parser.addoption(
-        "--decimals",
-        action="store",
-        default="18,18",
-        help="comma-separated list of ERC20 token precisions to test against",
-    )
-    parser.addoption(
-        "--return-type",
-        action="store",
-        default="revert,False,None",
-        help="comma-separated list of ERC20 token return types to test against",
-    )
+decimal_types = [(18, 18), (10, 12)]
 
 
 def pytest_generate_tests(metafunc):
-    pool_size = int(metafunc.config.getoption("pool_size"))
-
-    if "pool_size" in metafunc.fixturenames:
-        metafunc.parametrize(
-            "pool_size",
-            [pool_size],
-            indirect=True,
-            ids=[f"(PoolSize={pool_size})"],
-        )
-
     if "pool_type" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("pool_types").split(",")
+        pool_type_items = sorted(pool_types.items())
         metafunc.parametrize(
             "pool_type",
-            [pool_types[pool_type] for pool_type in cli_options],
-            indirect=True,
-            ids=[f"(PoolType={pool_type})" for pool_type in cli_options],
+            [v for k, v in pool_type_items],
+            ids=[f"(PoolType={k})" for k, v in pool_type_items],
+            indirect=True,  # to declare the fixture scope
         )
 
     if "pool_token_types" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("token_types").split(",")
-        if "eth" in cli_options:
-            cli_options.remove("eth")
-            cli_options = ["eth"] + cli_options
-
-        combinations = list(itertools.combinations_with_replacement(cli_options, pool_size))
-
+        combinations = sorted(itertools.combinations_with_replacement(token_types.items(), 2))
         metafunc.parametrize(
             "pool_token_types",
-            [[token_types[idx] for idx in c] for c in combinations],
-            indirect=True,
-            ids=[f"(PoolTokenTypes={c})" for c in combinations],
+            [(v1, v2) for (k1, v1), (k2, v2) in combinations],
+            ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in combinations],
+            indirect=True,  # to declare the fixture scope
         )
 
     if "metapool_token_type" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("token_types").split(",")
-
         # for meta pool only 1st coin is selected
+        token_type_items = sorted(token_types.items())
         metafunc.parametrize(
             "metapool_token_type",
-            [token_types[c] for c in cli_options],
-            indirect=True,
-            ids=[f"(MetaTokenType={c})" for c in cli_options],
+            [v for k, v in token_type_items],
+            ids=[f"(MetaTokenType={k})" for k, v in token_type_items],
+            indirect=True,  # to declare the fixture scope
         )
 
     if "initial_decimals" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("decimals")
         metafunc.parametrize(
             "initial_decimals",
-            [[int(i) for i in cli_options.split(",")]],
-            indirect=True,
-            ids=[f"(Decimals={cli_options})"],
-        )
-
-    if "return_type" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("return_type").split(",")
-        return_type_ids = [return_types[v] for v in cli_options]
-
-        metafunc.parametrize(
-            "return_type",
-            return_type_ids,
-            indirect=True,
-            ids=[f"(ReturnType={i})" for i in cli_options],
+            decimal_types,
+            ids=[f"(Decimals={i},{j})" for i, j in decimal_types],
+            indirect=True,  # to declare the fixture scope
         )
 
 
 @pytest.fixture(scope="session")
-def pool_size(request):
+def pool_size():
+    return 2
+
+
+@pytest.fixture(scope="session")
+def pool_type(request):  # to declare the fixture scope
     return request.param
 
 
 @pytest.fixture(scope="session")
-def pool_type(request):
+def pool_token_types(request):  # to declare the fixture scope
     return request.param
 
 
 @pytest.fixture(scope="session")
-def pool_token_types(request):
+def metapool_token_type(request):  # to declare the fixture scope
     return request.param
 
 
 @pytest.fixture(scope="session")
-def metapool_token_type(request):
-    return request.param
-
-
-@pytest.fixture(scope="session")
-def return_type(request):
-    return request.param
-
-
-@pytest.fixture(scope="session")
-def initial_decimals(request):
+def initial_decimals(request):  # to declare the fixture scope
     return request.param
 
 
 @pytest.fixture(scope="session")
 def decimals(initial_decimals, pool_token_types):
-    # oracle tokens are always 18 decimals
-    return [d if t != 1 else 18 for d, t in zip(initial_decimals, pool_token_types)]
+    return [
+        # oracle tokens are always 18 decimals
+        18 if token_type == 1 else decimals
+        for decimals, token_type in zip(initial_decimals, pool_token_types)
+    ]
 
 
 @pytest.fixture(scope="session")
-def meta_decimals(initial_decimals, metapool_token_type, decimals):
+def meta_decimals(metapool_token_type, decimals):
     # oracle tokens are always 18 decimals
-    return decimals[0] if metapool_token_type != 1 else 18
+    return 18 if metapool_token_type == 1 else decimals[0]
 
 
 # Usage
