@@ -112,7 +112,7 @@ def asset_types(pool_tokens):
     return _asset_types
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def empty_swap(
     deployer,
     factory,
@@ -176,9 +176,8 @@ def deposit_amounts(pool_erc20_tokens, token_a, bob):
     return _deposit_amounts
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def swap(empty_swap, bob, deposit_amounts, pool_tokens):
-
     for token in pool_tokens:
         token.approve(empty_swap, 2**256 - 1, sender=bob)
     empty_swap.add_liquidity(deposit_amounts, 0, bob, sender=bob)

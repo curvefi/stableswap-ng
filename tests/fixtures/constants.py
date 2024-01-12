@@ -8,7 +8,7 @@ def initial_balance() -> int:
     return INITIAL_AMOUNT * 10**18
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def initial_amounts(pool_type, decimals, meta_decimals) -> list[int]:
     return (
         [INITIAL_AMOUNT * 10**precision for precision in decimals]
@@ -17,7 +17,7 @@ def initial_amounts(pool_type, decimals, meta_decimals) -> list[int]:
     )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def deposit_amounts(
     initial_amounts: list[int], pool_type, pool_token_types, metapool_token_type, pool_tokens, underlying_tokens
 ) -> list[int]:
