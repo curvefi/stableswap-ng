@@ -30,17 +30,6 @@ jobs:
           - gauge
           - pools
           - factory
-        include:
-          - name: gauge
-            tests: tests/gauge/
-          - name: pools
-            tests: tests/pools/
-          - name: factory
-            tests: tests/factory/
-          - name: other
-            tests: >-
-              tests/test_get_D.py
-              tests/test_token.py
 
     steps:
       - uses: actions/checkout@v3
@@ -67,4 +56,4 @@ jobs:
           WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
         run: |
           source .venv/bin/activate
-          pytest -n auto ${{ matrix.tests }}
+          pytest -n auto tests/${{ matrix.name }}/

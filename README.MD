@@ -45,7 +45,7 @@ pytest tests/factory/
 Testing swap is ERC20
 
 ```shell
-pytest tests/test_token.py
+pytest tests/token/
 ```
 
 Testing swaps
