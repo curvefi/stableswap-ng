@@ -146,9 +146,7 @@ def test_price_ema_remove_imbalance(swap, alice, dt0, dt, pool_size, deposit_amo
     amount=strategy("uint256", min_value=10**9, max_value=10**15),
 )
 @settings(**SETTINGS)
-@pytest.mark.only_for_pool_type(0)
-def test_manipulate_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount):
-
+def test_manipulate_ema(basic_swap, bob, pool_tokens, underlying_tokens, decimals, amount):
     # calc amount in:
     amount_in = amount * 10 ** (decimals[0])
 
@@ -158,7 +156,7 @@ def test_manipulate_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amo
 
     # do large swap
     try:
-        swap.exchange(0, 1, amount_in, 0, sender=bob)
+        basic_swap.exchange(0, 1, amount_in, 0, sender=bob)
     except boa.BoaError:
         return  # we're okay with failure to manipulate here
 
@@ -166,7 +164,7 @@ def test_manipulate_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amo
     boa.env.time_travel(blocks=500)
 
     # check if price oracle is way too high
-    p_oracle_after = swap.price_oracle(0)
+    p_oracle_after = basic_swap.price_oracle(0)
 
     assert p_oracle_after < 2 * 10**18
 

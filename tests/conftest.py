@@ -51,6 +51,7 @@ def pytest_generate_tests(metafunc):
         )
 
     if "initial_decimals" in metafunc.fixturenames:
+        # this is only used in the decimals fixture
         metafunc.parametrize(
             "initial_decimals",
             decimal_types,
@@ -99,69 +100,16 @@ def meta_decimals(metapool_token_type, decimals):
     return 18 if metapool_token_type == 1 else decimals[0]
 
 
-# Usage
-# @pytest.mark.only_for_token_types(1,2)
-#
-# will not be skipped only if at least one of tokens in pool is eth or oracle
-# can be applied to classes
-#
-# @pytest.mark.only_for_token_types(2)
-# class TestPoolsWithOracleToken:
 @pytest.fixture(autouse=True)
-def skip_by_token_type(request, pool_tokens):
-    only_for_token_types = request.node.get_closest_marker("only_for_token_types")
-    if only_for_token_types:
-        asset_types = [tkn.asset_type() for tkn in pool_tokens]
-        if not any(asset_type in only_for_token_types.args for asset_type in asset_types):
-            pytest.skip("skipped because no tokens for these types")
+def skip_rebasing(request, pool_token_types):
+    if request.node.get_closest_marker("skip_rebasing_tokens") and 2 in pool_token_types:
+        pytest.skip("skipped because test includes rebasing tokens")
 
 
 @pytest.fixture(autouse=True)
-def skip_rebasing(request, swap):
-    only_for_token_types = request.node.get_closest_marker("skip_rebasing_tokens")
-    if only_for_token_types:
-        if 2 in get_asset_types_in_pool(swap):
-            pytest.skip("skipped because test includes rebasing tokens")
-
-
-@pytest.fixture(autouse=True)
-def skip_oracle(request, pool_tokens):
-    only_for_token_types = request.node.get_closest_marker("skip_oracle_tokens")
-    if only_for_token_types:
-        asset_types = [tkn.asset_type() for tkn in pool_tokens]
-        asset_types_contains_oracle = 1 in asset_types
-        if asset_types_contains_oracle:
-            pytest.skip("skipped because test includes oraclised tokens")
-
-
-@pytest.fixture(autouse=True)
-def only_oracle(request, pool_tokens):
-    only_for_token_types = request.node.get_closest_marker("only_oracle_tokens")
-    if only_for_token_types:
-        asset_types = [tkn.asset_type() for tkn in pool_tokens]
-        asset_types_contains_rebasing = 1 in asset_types
-        if not asset_types_contains_rebasing:
-            pytest.skip("skipped because test excludes oraclised tokens")
-
-
-@pytest.fixture(autouse=True)
-def only_rebasing(request, swap):
-    marker = request.node.get_closest_marker("contains_rebasing_tokens")
-    if marker:
-        asset_types_contains_rebasing = 2 in get_asset_types_in_pool(swap)
-        if not asset_types_contains_rebasing:
-            pytest.skip("skipped because test excludes rebasing tokens")
-
-
-# Usage
-# @pytest.mark.only_for_pool_type(1)
-# class TestMetaPool...
-@pytest.fixture(autouse=True)
-def skip_by_pool_type(request, pool_type):
-    only_for_pool_type = request.node.get_closest_marker("only_for_pool_type")
-    if only_for_pool_type:
-        if pool_type not in only_for_pool_type.args:
-            pytest.skip("skipped because another pool type")
+def skip_oracle(request, pool_token_types):
+    if request.node.get_closest_marker("skip_oracle_tokens") and  1 in pool_token_types:
+        pytest.skip("skipped because test includes oraclised tokens")
 
 
 @pytest.fixture(scope="module")
