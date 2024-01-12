@@ -4,7 +4,7 @@ import pytest
 
 from tests.utils import approx
 
-pytestmark = pytest.mark.usefixtures("initial_setup")
+pytest.mark.usefixtures("initial_setup")
 
 
 @pytest.mark.skip_oracle_tokens

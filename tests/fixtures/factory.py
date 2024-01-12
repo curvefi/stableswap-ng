@@ -59,18 +59,18 @@ def factory(
     math_implementation,
 ):
     with boa.env.prank(deployer):
-        _factory = boa.load(
+        factory = boa.load(
             "contracts/main/CurveStableSwapFactoryNG.vy",
             fee_receiver,
             owner,
         )
 
     with boa.env.prank(owner):
-        _factory.set_gauge_implementation(gauge_implementation.address)
-        _factory.set_views_implementation(views_implementation.address)
-        _factory.set_math_implementation(math_implementation.address)
+        factory.set_gauge_implementation(gauge_implementation.address)
+        factory.set_views_implementation(views_implementation.address)
+        factory.set_math_implementation(math_implementation.address)
 
-    return _factory
+    return factory
 
 
 # <---------------------   Functions   --------------------->
@@ -86,7 +86,7 @@ def set_metapool_implementations(owner, factory, amm_implementation_meta):
         factory.set_metapool_implementations(0, amm_implementation_meta.address)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def add_base_pool(
     owner,
     factory,
@@ -121,7 +121,7 @@ def set_math_implementation(owner, factory, math_implementation):
         factory.set_math_implementation(math_implementation.address)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def gauge(owner, factory, swap, gauge_interface, set_gauge_implementation):
     with boa.env.prank(owner):
         gauge_address = factory.deploy_gauge(swap.address)

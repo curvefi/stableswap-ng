@@ -6,7 +6,7 @@ oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
 offpeg_fee_multiplier = 20000000000
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def basic_swap(deployer, factory, pool_size, pool_tokens, zero_address, amm_interface):
     A = 2000
     fee = 1000000
@@ -49,7 +49,7 @@ def basic_swap(deployer, factory, pool_size, pool_tokens, zero_address, amm_inte
     return amm_interface.at(pool)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def meta_swap(factory, zero_address, underlying_tokens, base_pool, amm_interface_meta):
     A = 2000
     fee = 1000000
@@ -91,13 +91,13 @@ def meta_swap(factory, zero_address, underlying_tokens, base_pool, amm_interface
     return amm_interface_meta.at(pool)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def swap(basic_swap, meta_swap, pool_type):
     return {0: basic_swap, 1: meta_swap}[pool_type]
 
 
 # <---------------------   Metapool configuration   --------------------->
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def base_pool(deployer, owner, alice, base_pool_decimals, base_pool_tokens, base_pool_lp_token, zero_address):
     with boa.env.prank(deployer):
         base_pool = boa.load(

@@ -70,12 +70,12 @@ def test_add_base_pool_only_admin(
 
 
 def test_deploy_plain_pool(
-        empty_factory_with_implementations, amm_interface, pool_tokens, pool_size, zero_address
+        empty_factory_with_implementations, amm_interface, plain_tokens, pool_size, zero_address
 ):
     swap_address = empty_factory_with_implementations.deploy_plain_pool(
         "test",
         "test",
-        [t.address for t in pool_tokens],
+        [t.address for t in (plain_tokens)],
         2000,
         1000000,
         20000000000,
@@ -88,20 +88,19 @@ def test_deploy_plain_pool(
     assert swap_address != zero_address
 
     swap = amm_interface.at(swap_address)
-    assert swap.coins(0) == pool_tokens[0].address
-    assert swap.coins(1) == pool_tokens[1].address
+    assert swap.coins(0) == plain_tokens[0].address
+    assert swap.coins(1) == plain_tokens[1].address
 
     assert swap.A() == 2000
     assert swap.fee() == 1000000
 
     assert empty_factory_with_implementations.pool_count() == 1
     assert empty_factory_with_implementations.pool_list(0) == swap.address
-    assert empty_factory_with_implementations.get_decimals(swap) == [t.decimals() for t in pool_tokens]
+    assert empty_factory_with_implementations.get_decimals(swap) == [t.decimals() for t in (plain_tokens)]
 
 
 def test_pool_count(
         empty_factory_with_implementations,
-        swap,
         add_base_pool,
         amm_interface,
         set_pool_implementations,
