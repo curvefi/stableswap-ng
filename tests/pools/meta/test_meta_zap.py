@@ -11,12 +11,7 @@ warnings.filterwarnings("ignore")
 @pytest.fixture(scope="module")
 def meta_token(deployer):
     with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/mocks/ERC20.vy",
-            "OTA",
-            "OTA",
-            18,
-        )
+        return boa.load("contracts/mocks/ERC20.vy", "OTA", "OTA", 18)
 
 
 @pytest.fixture(scope="module")
@@ -30,32 +25,16 @@ def tokens_all(meta_token, base_pool_tokens):
 
 
 @pytest.fixture(scope="module")
-def add_base_pool(
-    owner,
-    factory,
-    base_pool,
-    base_pool_lp_token,
-    base_pool_tokens,
-):
+def add_base_pool(owner, factory, base_pool, base_pool_lp_token, base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
-            base_pool.address,
-            base_pool_lp_token.address,
-            [0] * len(base_pool_tokens),
-            len(base_pool_tokens),
+            base_pool.address, base_pool_lp_token.address, [0] * len(base_pool_tokens), len(base_pool_tokens)
         )
 
 
 @pytest.fixture(scope="module")
 def empty_swap(
-    deployer,
-    factory,
-    zero_address,
-    meta_token,
-    base_pool,
-    amm_interface_meta,
-    add_base_pool,
-    set_metapool_implementations,
+    deployer, factory, zero_address, meta_token, base_pool, meta_deployer, add_base_pool, set_metapool_implementations
 ):
     method_id = bytes(b"")
     oracle = zero_address
@@ -80,7 +59,7 @@ def empty_swap(
             oracle,  # _oracle: address
         )
 
-    return amm_interface_meta.at(pool)
+    return meta_deployer.at(pool)
 
 
 @pytest.fixture(scope="module")
@@ -97,7 +76,6 @@ def initial_amts():
 
 @pytest.fixture(scope="module")
 def swap(zap, base_pool, empty_swap, charlie, tokens_all, initial_amts):
-
     for i in range(3):
         assert base_pool.balances(i) == 0
 
@@ -114,7 +92,6 @@ def swap(zap, base_pool, empty_swap, charlie, tokens_all, initial_amts):
 
 
 def test_calc_amts_add(zap, swap, charlie, tokens_all):
-
     deposit_amount = 2 * 100 * 10**18
 
     for token in tokens_all:
@@ -132,7 +109,6 @@ def test_calc_amts_add(zap, swap, charlie, tokens_all):
 def test_calc_amts_remove_imbalance(
     zap, swap, meta_token, base_pool_tokens, base_pool_lp_token, base_pool, charlie, tokens_all, initial_amts
 ):
-
     amounts = [i // 4 for i in initial_amts]
     initial_balance = swap.balanceOf(charlie)
     swap.approve(zap, 2**256 - 1, sender=charlie)
@@ -152,7 +128,6 @@ def test_calc_amts_remove_imbalance(
 
 
 def test_calc_amts_remove(zap, swap, charlie, tokens_all, meta_token, base_pool, base_pool_tokens):
-
     charlie_bal_before = []
     for _t in tokens_all:
         charlie_bal_before.append(_t.balanceOf(charlie))

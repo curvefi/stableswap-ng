@@ -1,4 +1,4 @@
-def test_get_A(factory, swap):
+def test_get_A(factory, swap, set_metapool_implementations):
     assert factory.get_A(swap.address) == swap.A()
 
 

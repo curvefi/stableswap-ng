@@ -9,7 +9,6 @@ from tests.utils.tokens import mint_for_testing
 
 
 def mint_vault_tokens(deposit_amount, underlying_token, vault_contract, user):
-
     mint_for_testing(user, deposit_amount, underlying_token, False)
     underlying_token.approve(vault_contract, 2**256 - 1, sender=user)
     vault_contract.deposit(deposit_amount, user, sender=user)
@@ -17,14 +16,12 @@ def mint_vault_tokens(deposit_amount, underlying_token, vault_contract, user):
 
 
 def donate_to_vault(donation_amount, underlying_token, vault_contract, user):
-
     donation_amount = donation_amount * 10 ** underlying_token.decimals()
     mint_for_testing(user, donation_amount, underlying_token, False)
     underlying_token.transfer(vault_contract, donation_amount, sender=user)
 
 
 def mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i):
-
     amount_erc20_in = 10 ** pool_erc20_tokens[i].decimals()
 
     if amount_erc20_in > pool_erc20_tokens[i].balanceOf(charlie):
@@ -41,58 +38,55 @@ def mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i):
 
 
 @pytest.fixture(scope="module")
-def asset(deployer):
+def erc20_deployer():
+    return boa.load_partial("contracts/mocks/ERC20.vy")
+
+
+@pytest.fixture()
+def asset(deployer, erc20_deployer):
     with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/mocks/ERC20.vy",
-            "Asset",
-            "AST",
-            8,  # 8 decimals
-        )
+        return erc20_deployer.deploy("Asset", "AST", 8)  # 8 decimals
 
 
 @pytest.fixture(scope="module")
-def token_a(deployer, asset):
-    with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/mocks/ERC4626.vy",
-            "Vault",
-            "VLT",
-            18,  # 8 decimals
-            asset.address,
-        )
+def erc4626_deployer():
+    return boa.load_partial("contracts/mocks/ERC4626.vy")
 
 
 @pytest.fixture(scope="module")
-def token_b(deployer):
-    with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/mocks/ERC20Oracle.vy",
-            "Oracle",
-            "ORC",
-            18,
-            1006470359024000000,
-        )
+def erc20oracle_deployer():
+    return boa.load_partial("contracts/mocks/ERC20Oracle.vy")
 
 
 @pytest.fixture(scope="module")
-def token_c(deployer):
+def erc20rebasing_conditional_deployer():
+    return boa.load_partial("contracts/mocks/ERC20RebasingConditional.vy")
+
+
+@pytest.fixture()
+def token_a(deployer, asset, erc4626_deployer):
     with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/mocks/ERC20RebasingConditional.vy",
-            "Rebasing",
-            "RBSN",
-            6,
-            True,
-        )
+        return erc4626_deployer.deploy("Vault", "VLT", 18, asset.address)  # 8 decimals
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
+def token_b(deployer, erc20oracle_deployer):
+    with boa.env.prank(deployer):
+        return erc20oracle_deployer.deploy("Oracle", "ORC", 18, 1006470359024000000)
+
+
+@pytest.fixture()
+def token_c(deployer, erc20rebasing_conditional_deployer):
+    with boa.env.prank(deployer):
+        return erc20rebasing_conditional_deployer.deploy("Rebasing", "RBSN", 6, True)
+
+
+@pytest.fixture()
 def pool_tokens(token_a, token_b, token_c):
     return [token_a, token_b, token_c]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def pool_erc20_tokens(asset, token_b, token_c):
     return [asset, token_b, token_c]
 
@@ -113,15 +107,7 @@ def asset_types(pool_tokens):
 
 
 @pytest.fixture()
-def empty_swap(
-    deployer,
-    factory,
-    pool_tokens,
-    zero_address,
-    amm_interface,
-    asset_types,
-    set_pool_implementations,
-):
+def empty_swap(deployer, factory, pool_tokens, zero_address, amm_deployer, asset_types, set_pool_implementations):
     pool_size = len(pool_tokens)
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
     offpeg_fee_multiplier = 20000000000
@@ -131,7 +117,6 @@ def empty_swap(
     fee = 3000000
 
     for i in range(pool_size):
-
         if asset_types[i] == 1:
             method_ids[i] = oracle_method_id
             oracles[i] = pool_tokens[i].address
@@ -151,10 +136,10 @@ def empty_swap(
             oracles,
         )
 
-    return amm_interface.at(pool)
+    return amm_deployer.at(pool)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def deposit_amounts(pool_erc20_tokens, token_a, bob):
     _deposit_amounts = []
     for i, token in enumerate(pool_erc20_tokens):
@@ -186,7 +171,6 @@ def swap(empty_swap, bob, deposit_amounts, pool_tokens):
 
 @pytest.mark.parametrize("i,j", itertools.permutations(range(3), 2))
 def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
-
     amount_in = mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i)
 
     if "RebasingConditional" in pool_tokens[i].filename:
@@ -205,7 +189,6 @@ def test_swap(swap, i, j, charlie, pool_tokens, pool_erc20_tokens):
 
 @pytest.mark.parametrize("i,j", itertools.permutations(range(3), 2))
 def test_donate_swap(swap, i, j, alice, charlie, pool_tokens, pool_erc20_tokens):
-
     amount_in = mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i)
 
     # rebase:
@@ -228,7 +211,6 @@ def test_donate_swap(swap, i, j, alice, charlie, pool_tokens, pool_erc20_tokens)
 
 
 def test_rebase(swap, charlie, bob, pool_tokens):
-
     amount_rewards = 10**4 * 10**18
     i = 1
     if amount_rewards > pool_tokens[i].balanceOf(charlie):

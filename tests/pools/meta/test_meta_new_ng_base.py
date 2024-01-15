@@ -24,23 +24,11 @@ def ng_base_pool_tokens(ng_base_pool_decimals):
 
 @pytest.fixture(scope="module")
 def meta_token():
-    return boa.load(
-        "contracts/mocks/ERC20.vy",
-        "OTA",
-        "OTA",
-        18,
-    )
+    return boa.load("contracts/mocks/ERC20.vy", "OTA", "OTA", 18)
 
 
 @pytest.fixture(scope="module")
-def ng_base_pool(
-    deployer,
-    factory,
-    ng_base_pool_tokens,
-    zero_address,
-    amm_interface,
-    set_pool_implementations,
-):
+def ng_base_pool(deployer, factory, ng_base_pool_tokens, zero_address, amm_deployer, set_pool_implementations):
     pool_size = len(ng_base_pool_tokens)
     offpeg_fee_multiplier = 20000000000
     method_ids = [bytes(b"")] * pool_size
@@ -63,7 +51,7 @@ def ng_base_pool(
             oracles,
         )
 
-    return amm_interface.at(pool)
+    return amm_deployer.at(pool)
 
 
 @pytest.fixture(scope="module")
@@ -72,18 +60,10 @@ def ng_metapool_tokens(meta_token, ng_base_pool):
 
 
 @pytest.fixture(scope="module")
-def add_ng_base_pool(
-    owner,
-    factory,
-    ng_base_pool,
-    ng_base_pool_tokens,
-):
+def add_ng_base_pool(owner, factory, ng_base_pool, ng_base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
-            ng_base_pool.address,
-            ng_base_pool.address,
-            [0] * len(ng_base_pool_tokens),
-            len(ng_base_pool_tokens),
+            ng_base_pool.address, ng_base_pool.address, [0] * len(ng_base_pool_tokens), len(ng_base_pool_tokens)
         )
 
 
@@ -94,7 +74,7 @@ def empty_swap(
     zero_address,
     meta_token,
     ng_base_pool,
-    amm_interface_meta,
+    meta_deployer,
     add_ng_base_pool,
     set_metapool_implementations,
 ):
@@ -120,7 +100,7 @@ def empty_swap(
             oracle,  # _oracle: address
         )
 
-    return amm_interface_meta.at(pool)
+    return meta_deployer.at(pool)
 
 
 @pytest.fixture(scope="module")
@@ -133,13 +113,7 @@ def mint_and_approve_for_bob(meta_token, ng_base_pool_tokens, bob, empty_swap, n
 
 @pytest.fixture(scope="module")
 def deposit_amounts(
-    meta_token,
-    ng_base_pool,
-    ng_base_pool_tokens,
-    ng_base_pool_decimals,
-    empty_swap,
-    bob,
-    mint_and_approve_for_bob,
+    meta_token, ng_base_pool, ng_base_pool_tokens, ng_base_pool_decimals, empty_swap, bob, mint_and_approve_for_bob
 ):
     _deposit_amounts = []
     INITIAL_AMOUNT = 1_000_000 * BASE_N_COINS
@@ -164,12 +138,7 @@ def swap(empty_swap, bob, deposit_amounts):
 
 
 @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(4), 2))
-def test_exchange_underlying_ng_base(
-    swap,
-    bob,
-    sending,
-    receiving,
-):
+def test_exchange_underlying_ng_base(swap, bob, sending, receiving):
     amount = 10**19
     expected_out = swap.get_dy_underlying(sending, receiving, amount)
     actual_out = swap.exchange_underlying(sending, receiving, amount, 0, sender=bob)

@@ -7,18 +7,18 @@ from tests.utils.transactions import call_returning_result_and_logs
 
 
 @pytest.mark.parametrize("idx", range(4))
-def test_initial_approval_is_zero(swap, alice, accounts, idx):
+def test_initial_approval_is_zero(swap, alice, accounts, idx, set_metapool_implementations):
     assert swap.allowance(alice, accounts[idx]) == 0
 
 
 def test_approve(swap, alice, bob):
-    swap.approve(bob, 10 ** 19, sender=alice)
-    assert swap.allowance(alice, bob) == 10 ** 19
+    swap.approve(bob, 10**19, sender=alice)
+    assert swap.allowance(alice, bob) == 10**19
 
 
 def test_modify_approve_zero_nonzero(swap, alice, bob):
     with boa.env.prank(alice):
-        swap.approve(bob, 10 ** 19)
+        swap.approve(bob, 10**19)
         swap.approve(bob, 0)
         swap.approve(bob, 12345678)
 
@@ -27,29 +27,29 @@ def test_modify_approve_zero_nonzero(swap, alice, bob):
 
 def test_revoke_approve(swap, alice, bob):
     with boa.env.prank(alice):
-        swap.approve(bob, 10 ** 19)
+        swap.approve(bob, 10**19)
         swap.approve(bob, 0)
 
     assert swap.allowance(alice, bob) == 0
 
 
 def test_approve_self(swap, alice):
-    swap.approve(alice, 10 ** 19, sender=alice)
-    assert swap.allowance(alice, alice) == 10 ** 19
+    swap.approve(alice, 10**19, sender=alice)
+    assert swap.allowance(alice, alice) == 10**19
 
 
 def test_only_affects_target(swap, alice, bob):
-    swap.approve(bob, 10 ** 19, sender=alice)
+    swap.approve(bob, 10**19, sender=alice)
     assert swap.allowance(bob, alice) == 0
 
 
 def test_returns_true(swap, alice, bob):
-    tx = swap.approve(bob, 10 ** 19, sender=alice)
+    tx = swap.approve(bob, 10**19, sender=alice)
     assert tx is True
 
 
 def test_approval_event_fires(alice, bob, swap):
-    value = 10 ** 19
+    value = 10**19
     res, events = call_returning_result_and_logs(swap, "approve", bob, value, sender=alice)
 
     assert res is True
@@ -58,9 +58,9 @@ def test_approval_event_fires(alice, bob, swap):
 
 
 def test_infinite_approval(initial_setup, swap, alice, bob):
-    swap.approve(bob, 2 ** 256 - 1, sender=alice)
-    swap.transferFrom(alice, bob, 10 ** 18, sender=bob)
-    assert swap.allowance(alice, bob) == 2 ** 256 - 1
+    swap.approve(bob, 2**256 - 1, sender=alice)
+    swap.transferFrom(alice, bob, 10**18, sender=bob)
+    assert swap.allowance(alice, bob) == 2**256 - 1
 
 
 def permit_class(swap) -> type[EIP712Message]:
@@ -77,13 +77,13 @@ def permit_class(swap) -> type[EIP712Message]:
         spender: "address"  # noqa: F821
         value: "uint256"  # noqa: F821
         nonce: "uint256"  # noqa: F821
-        deadline: "uint256" = 2 ** 256 - 1  # noqa: F821
+        deadline: "uint256" = 2**256 - 1  # noqa: F821
 
     return Permit
 
 
 def test_permit(eth_acc, bob, swap):
-    value = 2 ** 256 - 1
+    value = 2**256 - 1
     permit = permit_class(swap)(owner=eth_acc.address, spender=bob, value=value, nonce=0)
     sig = eth_acc.sign_message(permit.signable_message)
 
@@ -92,15 +92,15 @@ def test_permit(eth_acc, bob, swap):
         "permit",
         eth_acc.address,
         bob,
-        2 ** 256 - 1,
-        2 ** 256 - 1,
+        2**256 - 1,
+        2**256 - 1,
         sig.v,
         to_bytes32(sig.r),
         to_bytes32(sig.s),
         sender=bob,
     )
 
-    assert swap.allowance(eth_acc.address, bob) == 2 ** 256 - 1
+    assert swap.allowance(eth_acc.address, bob) == 2**256 - 1
     assert res is True
     assert len(events) == 1
     assert repr(events[0]) == f"Approval(owner={eth_acc.address}, spender={bob}, value={value})"
@@ -136,7 +136,7 @@ def test_permit_contract(eth_acc, bob, swap):
     with boa.env.prank(eth_acc.address):
         mock_contract = boa.loads(src)
 
-    permit = permit_class(swap)(owner=mock_contract.address, spender=bob, value=2 ** 256 - 1, nonce=0)
+    permit = permit_class(swap)(owner=mock_contract.address, spender=bob, value=2**256 - 1, nonce=0)
     sig = eth_acc.sign_message(permit.signable_message)
 
     res, events = call_returning_result_and_logs(
@@ -144,13 +144,13 @@ def test_permit_contract(eth_acc, bob, swap):
         "permit",
         mock_contract.address,
         bob,
-        2 ** 256 - 1,
-        2 ** 256 - 1,
+        2**256 - 1,
+        2**256 - 1,
         sig.v,
         to_bytes32(sig.r),
         to_bytes32(sig.s),
         sender=bob,
     )
-    assert swap.allowance(mock_contract.address, bob) == 2 ** 256 - 1
+    assert swap.allowance(mock_contract.address, bob) == 2**256 - 1
     assert res is True
     assert len(events) == 1

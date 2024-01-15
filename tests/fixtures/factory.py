@@ -2,68 +2,72 @@ import boa
 import pytest
 
 
-@pytest.fixture()
-def gauge_interface():
+@pytest.fixture(scope="session")
+def gauge_deployer():
     return boa.load_partial("contracts/main/LiquidityGauge.vy")
 
 
-@pytest.fixture()
-def gauge_implementation(deployer, gauge_interface):
-    with boa.env.prank(deployer):
-        return gauge_interface.deploy_as_blueprint()
-
-
-@pytest.fixture()
-def amm_interface():
+@pytest.fixture(scope="session")
+def amm_deployer():
     return boa.load_partial("contracts/main/CurveStableSwapNG.vy")
 
 
-@pytest.fixture()
-def amm_implementation(deployer, amm_interface):
-    with boa.env.prank(deployer):
-        impl = amm_interface.deploy_as_blueprint()
-    return impl
-
-
-@pytest.fixture()
-def amm_interface_meta():
+@pytest.fixture(scope="session")
+def meta_deployer():
     return boa.load_partial("contracts/main/CurveStableSwapMetaNG.vy")
 
 
-@pytest.fixture()
-def amm_implementation_meta(deployer, amm_interface_meta):
-    with boa.env.prank(deployer):
-        impl = amm_interface_meta.deploy_as_blueprint()
-    return impl
+@pytest.fixture(scope="session")
+def factory_deployer():
+    return boa.load_partial("contracts/main/CurveStableSwapFactoryNG.vy")
+
+
+@pytest.fixture(scope="session")
+def views_deployer():
+    return boa.load_partial("contracts/main/CurveStableSwapNGViews.vy")
+
+
+@pytest.fixture(scope="session")
+def math_deployer():
+    return boa.load_partial("contracts/main/CurveStableSwapNGMath.vy")
 
 
 @pytest.fixture()
-def views_implementation(deployer):
+def gauge_implementation(deployer, gauge_deployer):
     with boa.env.prank(deployer):
-        return boa.load("contracts/main/CurveStableSwapNGViews.vy")
+        return gauge_deployer.deploy_as_blueprint()
 
 
 @pytest.fixture()
-def math_implementation(deployer):
+def amm_implementation(deployer, amm_deployer):
     with boa.env.prank(deployer):
-        return boa.load("contracts/main/CurveStableSwapNGMath.vy")
+        return amm_deployer.deploy_as_blueprint()
+
+
+@pytest.fixture()
+def amm_implementation_meta(deployer, meta_deployer):
+    with boa.env.prank(deployer):
+        return meta_deployer.deploy_as_blueprint()
+
+
+@pytest.fixture()
+def views_implementation(deployer, views_deployer):
+    with boa.env.prank(deployer):
+        return views_deployer.deploy()
+
+
+@pytest.fixture()
+def math_implementation(deployer, math_deployer):
+    with boa.env.prank(deployer):
+        return math_deployer.deploy()
 
 
 @pytest.fixture()
 def factory(
-    deployer,
-    fee_receiver,
-    owner,
-    gauge_implementation,
-    views_implementation,
-    math_implementation,
+    deployer, fee_receiver, owner, gauge_implementation, views_implementation, math_implementation, factory_deployer
 ):
     with boa.env.prank(deployer):
-        factory = boa.load(
-            "contracts/main/CurveStableSwapFactoryNG.vy",
-            fee_receiver,
-            owner,
-        )
+        factory = factory_deployer.deploy(fee_receiver, owner)
 
     with boa.env.prank(owner):
         factory.set_gauge_implementation(gauge_implementation.address)
@@ -74,32 +78,23 @@ def factory(
 
 
 # <---------------------   Functions   --------------------->
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def set_pool_implementations(owner, factory, amm_implementation):
     with boa.env.prank(owner):
         factory.set_pool_implementations(0, amm_implementation.address)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def set_metapool_implementations(owner, factory, amm_implementation_meta):
     with boa.env.prank(owner):
         factory.set_metapool_implementations(0, amm_implementation_meta.address)
 
 
 @pytest.fixture()
-def add_base_pool(
-    owner,
-    factory,
-    base_pool,
-    base_pool_lp_token,
-    base_pool_tokens,
-):
+def add_base_pool(owner, factory, base_pool, base_pool_lp_token, base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
-            base_pool.address,
-            base_pool_lp_token.address,
-            [0] * len(base_pool_tokens),
-            len(base_pool_tokens),
+            base_pool.address, base_pool_lp_token.address, [0] * len(base_pool_tokens), len(base_pool_tokens)
         )
 
 
@@ -122,7 +117,7 @@ def set_math_implementation(owner, factory, math_implementation):
 
 
 @pytest.fixture()
-def gauge(owner, factory, swap, gauge_interface, set_gauge_implementation):
+def gauge(owner, factory, swap, gauge_deployer, set_gauge_implementation):
     with boa.env.prank(owner):
         gauge_address = factory.deploy_gauge(swap.address)
-    return gauge_interface.at(gauge_address)
+    return gauge_deployer.at(gauge_address)

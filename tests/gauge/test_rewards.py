@@ -1,13 +1,13 @@
 import boa
 import pytest
 
-REWARD = 10 ** 20
+REWARD = 10**20
 WEEK = 7 * 86400
-LP_AMOUNT = 10 ** 18
+LP_AMOUNT = 10**18
 
 
 @pytest.fixture(autouse=True)
-def initial_setup(forked_chain, owner, gauge, swap, add_initial_liquidity_owner, set_gauge_implementation):
+def initial_setup(forked_chain, factory, owner, gauge, swap, add_initial_liquidity_owner):
     with boa.env.prank(owner):
         swap.approve(gauge.address, LP_AMOUNT)
         gauge.deposit(LP_AMOUNT)
