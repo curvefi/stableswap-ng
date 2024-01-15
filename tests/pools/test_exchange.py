@@ -91,7 +91,6 @@ class TestExchange:
         def test_insufficient_balance(
             self, charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals
         ):
-
             amount = 10 ** decimals[sending]
 
             for token in pool_tokens + underlying_tokens:

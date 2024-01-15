@@ -4,7 +4,6 @@ import pytest
 
 @pytest.fixture(scope="module")
 def new_math():
-
     return boa.loads(
         """
 A_PRECISION: constant(uint256) = 100

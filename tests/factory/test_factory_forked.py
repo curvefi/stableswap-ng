@@ -5,11 +5,7 @@ import pytest
 @pytest.fixture
 def empty_factory(deployer, fee_receiver, owner):
     with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/main/CurveStableSwapFactoryNG.vy",
-            fee_receiver,
-            owner,
-        )
+        return boa.load("contracts/main/CurveStableSwapFactoryNG.vy", fee_receiver, owner)
 
 
 def test_add_base_pool(empty_factory, owner, forked_chain):

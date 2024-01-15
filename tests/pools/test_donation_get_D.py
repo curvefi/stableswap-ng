@@ -5,7 +5,6 @@ from tests.utils.tokens import mint_for_testing
 
 
 def test_donate_get_D(bob, basic_swap, underlying_tokens, pool_tokens):
-
     # check if pool is empty:
     for i in range(basic_swap.N_COINS()):
         assert basic_swap.balances(i) == 0

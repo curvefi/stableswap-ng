@@ -9,13 +9,7 @@ class TestFees:
         self, bob, swap, pool_type, pool_tokens, underlying_tokens, initial_amounts, sending, receiving
     ):
         for send, recv in [(sending, receiving), (receiving, sending)]:
-            swap.exchange(
-                send,
-                recv,
-                initial_amounts[send],
-                0,
-                sender=bob,
-            )
+            swap.exchange(send, recv, initial_amounts[send], 0, sender=bob)
 
         for i in (sending, receiving):
             if pool_type == 0:
@@ -39,13 +33,7 @@ class TestFees:
         receiving,
         initial_amounts,
     ):
-        swap.exchange(
-            sending,
-            receiving,
-            initial_amounts[sending],
-            0,
-            sender=bob,
-        )
+        swap.exchange(sending, receiving, initial_amounts[sending], 0, sender=bob)
 
         admin_balance = swap.admin_balances(receiving)
 

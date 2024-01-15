@@ -170,7 +170,6 @@ class TestLiquidityMethods:
                 mint_for_testing(alice, 1 * 10**18, None, True)
 
                 if pool_type == 0:
-
                     mint_account(alice, pool_tokens, initial_balance, initial_amounts)
                     with boa.env.prank(alice):
                         for token in pool_tokens:
@@ -203,11 +202,7 @@ class TestLiquidityMethods:
             deposit_amounts,
             initial_amounts,
         ):
-            swap.add_liquidity(
-                deposit_amounts,
-                len(pool_tokens) * min_amount,
-                sender=alice,
-            )
+            swap.add_liquidity(deposit_amounts, len(pool_tokens) * min_amount, sender=alice)
 
             token_types = pool_token_types if pool_type == 0 else [metapool_token_type, 18]
 

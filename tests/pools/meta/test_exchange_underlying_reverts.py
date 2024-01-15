@@ -20,7 +20,7 @@ def test_min_dy_too_high(bob, meta_swap, underlying_tokens, meta_decimals, base_
 
 @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(4), 2))
 def test_insufficient_balance(
-        bob, meta_swap, underlying_tokens, meta_decimals, base_pool_decimals, sending, receiving, zero_address
+    bob, meta_swap, underlying_tokens, meta_decimals, base_pool_decimals, sending, receiving, zero_address
 ):
     underlying_decimals = [meta_decimals] + base_pool_decimals
     underlying_tokens = [underlying_tokens[0], *underlying_tokens[2:]]
@@ -39,25 +39,25 @@ def test_same_coin(bob, meta_swap, idx):
         meta_swap.exchange_underlying(idx, idx, 0, 0, sender=bob)
 
 
-@pytest.mark.parametrize("idx", [-1, -(2 ** 127)])
+@pytest.mark.parametrize("idx", [-1, -(2**127)])
 def test_i_below_zero(bob, meta_swap, idx):
     with boa.reverts():
         meta_swap.exchange_underlying(idx, 0, 0, 0, sender=bob)
 
 
-@pytest.mark.parametrize("idx", [4, 2 ** 127 - 1])
+@pytest.mark.parametrize("idx", [4, 2**127 - 1])
 def test_i_above_n_coins(bob, meta_swap, idx):
     with boa.reverts():
         meta_swap.exchange_underlying(idx, 0, 0, 0, sender=bob)
 
 
-@pytest.mark.parametrize("idx", [-1, -(2 ** 127)])
+@pytest.mark.parametrize("idx", [-1, -(2**127)])
 def test_j_below_zero(bob, meta_swap, idx):
     with boa.reverts():
         meta_swap.exchange_underlying(0, idx, 0, 0, sender=bob)
 
 
-@pytest.mark.parametrize("idx", [4, 2 ** 127 - 1])
+@pytest.mark.parametrize("idx", [4, 2**127 - 1])
 def test_j_above_n_coins(bob, meta_swap, idx):
     with boa.reverts():
         meta_swap.exchange_underlying(0, idx, 0, 0, sender=bob)

@@ -15,24 +15,8 @@ def plain_tokens(deployer, decimals):
 def oracle_tokens(deployer, decimals):
     tokens = []
     with boa.env.prank(deployer):
-        tokens.append(
-            boa.load(
-                "contracts/mocks/ERC20Oracle.vy",
-                "OTA",
-                "OTA",
-                18,
-                1006470359024000000,
-            )
-        )
-        tokens.append(
-            boa.load(
-                "contracts/mocks/ERC20Oracle.vy",
-                "OTB",
-                "OTB",
-                18,
-                1007580460035000000,
-            )
-        )
+        tokens.append(boa.load("contracts/mocks/ERC20Oracle.vy", "OTA", "OTA", 18, 1006470359024000000))
+        tokens.append(boa.load("contracts/mocks/ERC20Oracle.vy", "OTB", "OTB", 18, 1007580460035000000))
     return tokens
 
 

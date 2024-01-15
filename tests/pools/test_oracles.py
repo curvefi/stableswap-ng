@@ -14,7 +14,6 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
 def get_D(swap, math):
-
     _rates = swap.stored_rates()
     _balances = swap.internal._balances()
     xp = swap.internal._xp_mem(_rates, _balances)
@@ -26,7 +25,6 @@ def check_oracle(swap, dt):
     # amm prices:
     p_amm = []
     for n in range(swap.N_COINS() - 1):
-
         _p = swap.get_p(n)
 
         assert approx(swap.last_price(n), _p, 1e-5)
@@ -42,17 +40,13 @@ def check_oracle(swap, dt):
 
     # check:
     for n in range(swap.N_COINS() - 1):
-
         p1 = int(10**18 * w + p_amm[n] * (1 - w))
         assert approx(swap.price_oracle(n), p1, 1e-5)
 
 
-@given(
-    amount=strategy("uint256", min_value=1, max_value=10**6),
-)
+@given(amount=strategy("uint256", min_value=1, max_value=10**6))
 @settings(**SETTINGS)
 def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
-
     i, j = random.sample(range(swap.N_COINS()), 2)
 
     # calc amount in:
@@ -69,7 +63,6 @@ def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
     p_numeric = []
     stored_rates = swap.stored_rates()
     for n in range(1, swap.N_COINS()):
-
         expected_jth_out = views_implementation.get_dy(0, n, 10**18, swap)
         p_numeric.append(stored_rates[0] / expected_jth_out)
 
@@ -90,7 +83,6 @@ def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
 )
 @settings(**SETTINGS)
 def test_price_ema_exchange(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt):
-
     i, j = random.sample(range(swap.N_COINS()), 2)
 
     # calc amount in:
@@ -112,7 +104,6 @@ def test_price_ema_exchange(swap, bob, pool_tokens, underlying_tokens, decimals,
 )
 @settings(**SETTINGS)
 def test_price_ema_remove_one(swap, alice, amount, dt0, dt):
-
     i = random.sample(range(swap.N_COINS()), 1)[0]
     alice_lp_bal = swap.balanceOf(alice)
     amt_to_remove = int(alice_lp_bal * amount / (10**5 - 1))
@@ -130,7 +121,6 @@ def test_price_ema_remove_one(swap, alice, amount, dt0, dt):
 )
 @settings(**SETTINGS)
 def test_price_ema_remove_imbalance(swap, alice, dt0, dt, pool_size, deposit_amounts, frac):
-
     i = random.sample(range(swap.N_COINS()), 1)[0]
     amounts = [0] * pool_size
     amounts[i] = deposit_amounts[i] // frac
@@ -142,9 +132,7 @@ def test_price_ema_remove_imbalance(swap, alice, dt0, dt, pool_size, deposit_amo
     check_oracle(swap, dt)
 
 
-@given(
-    amount=strategy("uint256", min_value=10**9, max_value=10**15),
-)
+@given(amount=strategy("uint256", min_value=10**9, max_value=10**15))
 @settings(**SETTINGS)
 def test_manipulate_ema(basic_swap, bob, pool_tokens, underlying_tokens, decimals, amount):
     # calc amount in:
@@ -176,7 +164,6 @@ def test_manipulate_ema(basic_swap, bob, pool_tokens, underlying_tokens, decimal
 )
 @settings(**SETTINGS)
 def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt, math_implementation):
-
     i, j = random.sample(range(swap.N_COINS()), 2)
 
     # calc amount in:

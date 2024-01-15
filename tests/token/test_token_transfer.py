@@ -5,7 +5,8 @@ from tests.utils.transactions import call_returning_result_and_logs
 
 
 @pytest.fixture(autouse=True)
-def added_liquidity(initial_setup): ...
+def added_liquidity(initial_setup):
+    ...
 
 
 def test_sender_balance_decreases(alice, bob, swap):

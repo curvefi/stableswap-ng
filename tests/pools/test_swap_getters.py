@@ -12,7 +12,6 @@ SETTINGS = {"max_examples": 100, "deadline": None}
 )
 @settings(**SETTINGS)
 def test_get_dx(i, j, amount_in, swap, factory, initial_setup):
-
     n_coins = swap.N_COINS()
     if i == j or max(i, j) >= n_coins:
         return
