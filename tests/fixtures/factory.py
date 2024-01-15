@@ -2,36 +2,6 @@ import boa
 import pytest
 
 
-@pytest.fixture(scope="session")
-def gauge_deployer():
-    return boa.load_partial("contracts/main/LiquidityGauge.vy")
-
-
-@pytest.fixture(scope="session")
-def amm_deployer():
-    return boa.load_partial("contracts/main/CurveStableSwapNG.vy")
-
-
-@pytest.fixture(scope="session")
-def meta_deployer():
-    return boa.load_partial("contracts/main/CurveStableSwapMetaNG.vy")
-
-
-@pytest.fixture(scope="session")
-def factory_deployer():
-    return boa.load_partial("contracts/main/CurveStableSwapFactoryNG.vy")
-
-
-@pytest.fixture(scope="session")
-def views_deployer():
-    return boa.load_partial("contracts/main/CurveStableSwapNGViews.vy")
-
-
-@pytest.fixture(scope="session")
-def math_deployer():
-    return boa.load_partial("contracts/main/CurveStableSwapNGMath.vy")
-
-
 @pytest.fixture()
 def gauge_implementation(deployer, gauge_deployer):
     with boa.env.prank(deployer):

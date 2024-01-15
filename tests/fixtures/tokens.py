@@ -3,30 +3,27 @@ import pytest
 
 
 @pytest.fixture()
-def plain_tokens(deployer, decimals):
-    tokens = []
+def plain_tokens(erc20_deployer, deployer, decimals):
     with boa.env.prank(deployer):
-        for i, d in enumerate(decimals):
-            tokens.append(boa.load("contracts/mocks/ERC20.vy", f"TKN{i}", f"TKN{i}", decimals[i]))
-    return tokens
+        return [erc20_deployer.deploy(f"TKN{i}", f"TKN{i}", decimals[i]) for i, d in enumerate(decimals)]
 
 
 @pytest.fixture()
-def oracle_tokens(deployer, decimals):
-    tokens = []
+def oracle_tokens(erc20oracle_deployer, deployer, decimals):
     with boa.env.prank(deployer):
-        tokens.append(boa.load("contracts/mocks/ERC20Oracle.vy", "OTA", "OTA", 18, 1006470359024000000))
-        tokens.append(boa.load("contracts/mocks/ERC20Oracle.vy", "OTB", "OTB", 18, 1007580460035000000))
-    return tokens
+        return [
+            erc20oracle_deployer.deploy("OTA", "OTA", 18, 1006470359024000000),
+            erc20oracle_deployer.deploy("OTB", "OTB", 18, 1007580460035000000),
+        ]
 
 
 @pytest.fixture()
-def rebase_tokens(deployer, decimals):
-    tokens = []
+def rebase_tokens(erc20_rebasing_deployer, deployer, decimals):
     with boa.env.prank(deployer):
-        for i, d in enumerate(decimals):
-            tokens.append(boa.load("contracts/mocks/ERC20Rebasing.vy", f"OR_TKN{i}", f"OR_TKN{i}", decimals[i], True))
-    return tokens
+        return [
+            erc20_rebasing_deployer.deploy(f"OR_TKN{i}", f"OR_TKN{i}", decimals[i], True)
+            for i, d in enumerate(decimals)
+        ]
 
 
 @pytest.fixture()
@@ -47,18 +44,15 @@ def base_pool_decimals():
 
 
 @pytest.fixture()
-def base_pool_tokens(deployer, base_pool_decimals):
+def base_pool_tokens(erc20_deployer, deployer, base_pool_decimals):
     with boa.env.prank(deployer):
-        return [
-            boa.load("contracts/mocks/ERC20.vy", c, c, base_pool_decimals[i])
-            for i, c in enumerate(("DAI", "USDC", "USDT"))
-        ]
+        return [erc20_deployer.deploy(c, c, base_pool_decimals[i]) for i, c in enumerate(("DAI", "USDC", "USDT"))]
 
 
 @pytest.fixture()
-def base_pool_lp_token(deployer):
+def base_pool_lp_token(deployer, curve_token_v3_deployer):
     with boa.env.prank(deployer):
-        return boa.load("contracts/mocks/CurveTokenV3.vy", "LP", "LP")
+        return curve_token_v3_deployer.deploy("LP", "LP")
 
 
 @pytest.fixture()
@@ -68,28 +62,24 @@ def underlying_tokens(metapool_token, base_pool_tokens, base_pool_lp_token):
 
 # <---------------------   Gauge rewards  --------------------->
 @pytest.fixture()
-def coin_reward(owner):
+def coin_reward(owner, erc20_deployer):
     with boa.env.prank(owner):
-        return boa.load("contracts/mocks/ERC20.vy", "CR", "CR", 18)
+        return erc20_deployer.deploy("CR", "CR", 18)
 
 
 @pytest.fixture()
-def coin_reward_a(owner, mint_owner):
+def coin_reward_a(owner, mint_owner, erc20_deployer):
     with boa.env.prank(owner):
-        return boa.load("contracts/mocks/ERC20.vy", "CRa", "CRa", 18)
+        return erc20_deployer.deploy("CRa", "CRa", 18)
 
 
 @pytest.fixture()
-def coin_reward_b(owner):
+def coin_reward_b(owner, erc20_deployer):
     with boa.env.prank(owner):
-        return boa.load("contracts/mocks/ERC20.vy", "CRb", "CRb", 18)
+        return erc20_deployer.deploy("CRb", "CRb", 18)
 
 
 @pytest.fixture()
-def coin_rewards_additional(owner):
-    coins = []
+def coin_rewards_additional(owner, erc20_deployer):
     with boa.env.prank(owner):
-        for i in range(8):
-            coins.append(boa.load("contracts/mocks/ERC20.vy", f"CR{i}", f"CR{i}", 18))
-
-    return coins
+        return [erc20_deployer.deploy(f"CR{i}", f"CR{i}", 18) for i in range(8)]

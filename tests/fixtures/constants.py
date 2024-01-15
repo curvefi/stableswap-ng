@@ -3,7 +3,7 @@ import pytest
 INITIAL_AMOUNT = 3_000_000
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def initial_balance() -> int:
     return INITIAL_AMOUNT * 10**18
 
@@ -43,6 +43,6 @@ def deposit_amounts(
     return amounts
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def zero_address() -> str:
     return "0x0000000000000000000000000000000000000000"

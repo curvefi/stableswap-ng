@@ -9,9 +9,9 @@ warnings.filterwarnings("ignore")
 
 
 @pytest.fixture(scope="module")
-def meta_token(deployer):
+def meta_token(deployer, erc20_deployer):
     with boa.env.prank(deployer):
-        return boa.load("contracts/mocks/ERC20.vy", "OTA", "OTA", 18)
+        return erc20_deployer.deploy("OTA", "OTA", 18)
 
 
 @pytest.fixture(scope="module")
@@ -63,10 +63,8 @@ def empty_swap(
 
 
 @pytest.fixture(scope="module")
-def zap(base_pool, base_pool_tokens, base_pool_lp_token):
-    return boa.load(
-        "contracts/mocks/Zap.vy", base_pool.address, base_pool_lp_token.address, [a.address for a in base_pool_tokens]
-    )
+def zap(base_pool, base_pool_tokens, base_pool_lp_token, zap_deployer):
+    return zap_deployer.deploy(base_pool.address, base_pool_lp_token.address, [a.address for a in base_pool_tokens])
 
 
 @pytest.fixture(scope="module")

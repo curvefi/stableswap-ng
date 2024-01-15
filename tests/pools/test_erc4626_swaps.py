@@ -37,30 +37,10 @@ def mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i):
     return amount_in
 
 
-@pytest.fixture(scope="module")
-def erc20_deployer():
-    return boa.load_partial("contracts/mocks/ERC20.vy")
-
-
 @pytest.fixture()
 def asset(deployer, erc20_deployer):
     with boa.env.prank(deployer):
         return erc20_deployer.deploy("Asset", "AST", 8)  # 8 decimals
-
-
-@pytest.fixture(scope="module")
-def erc4626_deployer():
-    return boa.load_partial("contracts/mocks/ERC4626.vy")
-
-
-@pytest.fixture(scope="module")
-def erc20oracle_deployer():
-    return boa.load_partial("contracts/mocks/ERC20Oracle.vy")
-
-
-@pytest.fixture(scope="module")
-def erc20rebasing_conditional_deployer():
-    return boa.load_partial("contracts/mocks/ERC20RebasingConditional.vy")
 
 
 @pytest.fixture()
@@ -91,7 +71,7 @@ def pool_erc20_tokens(asset, token_b, token_c):
     return [asset, token_b, token_c]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="session")
 def asset_types(pool_tokens):
     _asset_types = []
     for token in pool_tokens:

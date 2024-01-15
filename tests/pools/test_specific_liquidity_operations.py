@@ -6,21 +6,21 @@ from tests.utils.tokens import mint_for_testing
 
 
 @pytest.fixture(scope="module")
-def token_a(deployer):
+def token_a(deployer, erc20oracle_deployer):
     with boa.env.prank(deployer):
-        return boa.load("contracts/mocks/ERC20Oracle.vy", "OTA", "OTA", 18, 1006470359024000000)
+        return erc20oracle_deployer.deploy("OTA", "OTA", 18, 1006470359024000000)
 
 
 @pytest.fixture(scope="module")
-def token_b(deployer):
+def token_b(deployer, erc20oracle_deployer):
     with boa.env.prank(deployer):
-        return boa.load("contracts/mocks/ERC20Oracle.vy", "OTB", "OTB", 18, 1000000000000000000)
+        return erc20oracle_deployer.deploy("OTB", "OTB", 18, 1000000000000000000)
 
 
 @pytest.fixture(scope="module")
-def token_c(deployer):
+def token_c(deployer, erc20_deployer):
     with boa.env.prank(deployer):
-        return boa.load("contracts/mocks/ERC20.vy", "OTC", "OTC", 18)
+        return erc20_deployer.deploy("OTC", "OTC", 18)
 
 
 @pytest.fixture(scope="module")

@@ -13,21 +13,17 @@ def ng_base_pool_decimals():
     return [18] * BASE_N_COINS
 
 
-@pytest.fixture(scope="module")
-def ng_base_pool_tokens(ng_base_pool_decimals):
-    tokens = []
-    for i in range(BASE_N_COINS):
-        tokens.append(boa.load("contracts/mocks/ERC20.vy", f"tkn{i}", f"tkn{i}", ng_base_pool_decimals[i]))
-
-    return tokens
+@pytest.fixture()
+def ng_base_pool_tokens(ng_base_pool_decimals, erc20_deployer):
+    return [erc20_deployer.deploy(f"tkn{i}", f"tkn{i}", ng_base_pool_decimals[i]) for i in range(BASE_N_COINS)]
 
 
-@pytest.fixture(scope="module")
-def meta_token():
-    return boa.load("contracts/mocks/ERC20.vy", "OTA", "OTA", 18)
+@pytest.fixture()
+def meta_token(erc20_deployer):
+    return erc20_deployer.deploy("OTA", "OTA", 18)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def ng_base_pool(deployer, factory, ng_base_pool_tokens, zero_address, amm_deployer, set_pool_implementations):
     pool_size = len(ng_base_pool_tokens)
     offpeg_fee_multiplier = 20000000000

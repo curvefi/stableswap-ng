@@ -98,11 +98,6 @@ def swap(basic_swap, meta_swap, pool_type):
 
 
 # <---------------------   Metapool configuration   --------------------->
-@pytest.fixture(scope="session")
-def base_pool_deployer():
-    return boa.load_partial("contracts/mocks/CurvePool.vy")
-
-
 @pytest.fixture()
 def base_pool(deployer, owner, alice, base_pool_tokens, base_pool_lp_token, base_pool_deployer):
     with boa.env.prank(deployer):
