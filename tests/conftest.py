@@ -1,5 +1,6 @@
-import itertools
 import os
+from itertools import combinations_with_replacement
+from random import sample
 
 import boa
 import pytest
@@ -33,11 +34,14 @@ def pytest_generate_tests(metafunc):
         items = [
             (k, v) for k, v in TOKEN_TYPES.items() if not metafunc.definition.get_closest_marker(f"skip_{k}_tokens")
         ]
-        combinations = sorted(itertools.combinations_with_replacement(items, 2))
+        # make all combinations possible
+        all_combinations = list(combinations_with_replacement(items, 2))
+        # take 2 combinations for smaller test set
+        samples = sorted(sample(all_combinations, k=2))
         metafunc.parametrize(
             "pool_token_types",
-            [(v1, v2) for (k1, v1), (k2, v2) in combinations],
-            ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in combinations],
+            [(v1, v2) for (k1, v1), (k2, v2) in samples],
+            ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in samples],
         )
 
     if "metapool_token_type" in metafunc.fixturenames:

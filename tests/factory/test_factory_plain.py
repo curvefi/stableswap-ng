@@ -3,11 +3,8 @@ import pytest
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_find_pool_for_coins(factory, basic_swap, plain_tokens, sending, receiving):
-    assert (
-        factory.find_pool_for_coins(plain_tokens[sending].address, plain_tokens[receiving].address)
-        == basic_swap.address
-    )
+def test_find_pool_for_coins(factory, swap, plain_tokens, sending, receiving):
+    assert factory.find_pool_for_coins(plain_tokens[sending].address, plain_tokens[receiving].address) == swap.address
 
 
 def test_get_n_coins(factory, swap, plain_tokens, pool_size):
