@@ -4,7 +4,7 @@ from math import exp, log
 import boa
 import pytest
 from boa.test import strategy
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 
 from tests.utils import approx
 from tests.utils.tokens import mint_for_testing
@@ -132,7 +132,10 @@ def test_price_ema_remove_imbalance(swap, alice, dt0, dt, pool_size, deposit_amo
     check_oracle(swap, dt)
 
 
-@given(amount=strategy("uint256", min_value=10**9, max_value=10**15))
+@given(
+    amount=strategy("uint256", min_value=10**9, max_value=10**15),
+    suppress_health_check=HealthCheck.function_scoped_fixture,
+)
 @settings(**SETTINGS)
 def test_manipulate_ema(basic_swap, bob, pool_tokens, underlying_tokens, decimals, amount):
     # calc amount in:

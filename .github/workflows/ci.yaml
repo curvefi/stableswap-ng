@@ -28,7 +28,10 @@ jobs:
       matrix:
         name:
           - gauge
-          - pools
+          - pools/exchange
+          - pools/general
+          - pools/meta
+          - pools/oracle
           - factory
 
     steps:

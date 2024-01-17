@@ -71,7 +71,7 @@ def pool_erc20_tokens(asset, token_b, token_c):
     return [asset, token_b, token_c]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def asset_types(pool_tokens):
     _asset_types = []
     for token in pool_tokens:

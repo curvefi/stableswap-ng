@@ -8,39 +8,32 @@ from tests.utils.tokens import mint_for_testing
 DEPOSIT_AMOUNT = INITIAL_AMOUNT // 100
 
 
-@pytest.fixture(scope="module")
-def initial_setup_alice(
-    alice,
-    deposit_amounts,
-    swap,
-    pool_type,
-    base_pool,
-    base_oracle_tokens,
-    base_pool_decimals,
-    base_pool_lp_token,
-    initial_balance,
-    initial_amounts,
-    oracle_tokens,
-    underlying_tokens,
+@pytest.fixture()
+def initial_setup_alice(pool_type, basic_setup_alice, meta_setup_alice):
+    if pool_type == 0:
+        return basic_setup_alice
+    return meta_setup_alice
+
+
+@pytest.fixture()
+def basic_setup_alice(alice, initial_amounts, initial_balance, oracle_tokens, basic_swap):
+    mint_for_testing(alice, 1 * 10**18, None, True)
+    mint_account(alice, oracle_tokens, initial_balance, initial_amounts)
+    with boa.env.prank(alice):
+        for token in oracle_tokens:
+            token.approve(basic_swap.address, 2**256 - 1)
+
+
+@pytest.fixture()
+def meta_setup_alice(
+    alice, base_pool_tokens, base_pool, base_pool_decimals, initial_amounts, meta_swap, underlying_tokens
 ):
-    with boa.env.anchor():
-        mint_for_testing(alice, 1 * 10**18, None, True)
-
-        if pool_type == 0:
-            mint_account(alice, oracle_tokens, initial_balance, initial_amounts)
-            with boa.env.prank(alice):
-                for token in oracle_tokens:
-                    token.approve(swap.address, 2**256 - 1)
-
-        else:
-            add_base_pool_liquidity(alice, base_pool, base_oracle_tokens, base_pool_decimals)
-            mint_for_testing(alice, initial_amounts[0], underlying_tokens[0], False)
-
-            with boa.env.prank(alice):
-                for token in underlying_tokens:
-                    token.approve(swap.address, 2**256 - 1)
-
-        yield
+    mint_for_testing(alice, 1 * 10**18, None, True)
+    add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
+    mint_for_testing(alice, initial_amounts[0], underlying_tokens[0], False)
+    with boa.env.prank(alice):
+        for token in underlying_tokens:
+            token.approve(meta_swap.address, 2**256 - 1)
 
 
 def test_initial_liquidity(
@@ -79,8 +72,8 @@ def test_initial_liquidity(
     assert swap.admin_balances(1) == 0
 
 
-def test_oracles(alice, swap, pool_size, pool_type, pool_token_types, metapool_token_type):
-    assert swap._storage.oracles.get() != [0] * pool_size
+def test_oracles(alice, swap, pool_size):
+    assert swap._immutables.rate_oracles.get() != [0] * pool_size
 
 
 def test_get_dy(
