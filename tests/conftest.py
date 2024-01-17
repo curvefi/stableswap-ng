@@ -1,6 +1,6 @@
 import os
 from itertools import combinations_with_replacement
-from random import sample, seed
+from random import Random
 
 import boa
 import pytest
@@ -31,17 +31,11 @@ def pytest_generate_tests(metafunc):
         )
 
     if "pool_token_types" in metafunc.fixturenames:
-        items = [
-            (k, v) for k, v in TOKEN_TYPES.items() if not metafunc.definition.get_closest_marker(f"skip_{k}_tokens")
-        ]
-
-        all_combinations = list(combinations_with_replacement(items, 2))  # make all combinations possible
-        seed(len(metafunc.fixturenames))  # make sure we get the same result in each worker
-        samples = sorted(sample(all_combinations, k=2))  # take 2 combinations for smaller test set
+        pool_token_pairs = get_pool_token_pairs(metafunc)
         metafunc.parametrize(
             "pool_token_types",
-            [(v1, v2) for (k1, v1), (k2, v2) in samples],
-            ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in samples],
+            [(v1, v2) for (k1, v1), (k2, v2) in pool_token_pairs],
+            ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in pool_token_pairs],
         )
 
     if "metapool_token_type" in metafunc.fixturenames:
@@ -56,6 +50,24 @@ def pytest_generate_tests(metafunc):
     if "initial_decimals" in metafunc.fixturenames:
         # this is only used in the decimals fixture
         metafunc.parametrize("initial_decimals", DECIMAL_PAIRS, ids=[f"(Decimals={i},{j})" for i, j in DECIMAL_PAIRS])
+
+
+def get_pool_token_pairs(metafunc):
+    for name, number in TOKEN_TYPES.items():
+        if metafunc.definition.get_closest_marker(f"only_{name}_tokens"):
+            return [((name, number), (name, number))]
+
+    items = [
+        (name, number)
+        for name, number in TOKEN_TYPES.items()
+        if not metafunc.definition.get_closest_marker(f"skip_{name}_tokens")
+    ]
+    # make all combinations possible
+    all_combinations = list(combinations_with_replacement(items, 2))
+    # make sure we get the same result in each worker
+    random = Random(len(metafunc.fixturenames))
+    # take 2 combinations for smaller test set
+    return sorted(random.sample(all_combinations, k=2))
 
 
 @pytest.fixture(scope="session")
