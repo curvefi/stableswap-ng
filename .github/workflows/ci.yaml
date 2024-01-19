@@ -30,6 +30,7 @@ jobs:
           - gauge
           - pools/exchange
           - pools/general
+          - pools/liquidity
           - pools/meta
           - pools/oracle
           - factory
@@ -59,4 +60,4 @@ jobs:
           WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
         run: |
           source .venv/bin/activate
-          pytest -n auto tests/${{ matrix.name }}/
+          pytest --exitfirst --numprocesses=auto tests/${{ matrix.name }}/
