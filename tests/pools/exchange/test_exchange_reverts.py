@@ -12,11 +12,8 @@ def test_insufficient_balance(charlie, pool_tokens, underlying_tokens, swap, sen
         assert token.balanceOf(charlie) == 0
 
     # Charlie doesn't have any tokens, all balances are 0
-    try:
+    with boa.reverts():
         swap.exchange(sending, receiving, amount + 1, 0, sender=charlie)
-        assert False
-    except:  # noqa: E722
-        assert True
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])

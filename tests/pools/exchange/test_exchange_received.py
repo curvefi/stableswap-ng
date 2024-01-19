@@ -98,8 +98,8 @@ def transfer_and_swap(
     return _transfer_and_swap
 
 
-@pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 @pytest.mark.skip_rebasing_tokens
+@pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_nonrebasing(bob, swap, pool_tokens, sending, receiving, transfer_and_swap):
     swap_data = transfer_and_swap(swap, sending, receiving, False)
 

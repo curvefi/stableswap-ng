@@ -1,6 +1,7 @@
 import boa
 import pytest
 
+from tests.constants import POOL_TYPES, TOKEN_TYPES
 from tests.fixtures.accounts import add_base_pool_liquidity, mint_account
 from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils.tokens import mint_for_testing
@@ -9,14 +10,27 @@ DEPOSIT_AMOUNT = INITIAL_AMOUNT // 100
 
 
 @pytest.fixture()
-def initial_setup_alice(pool_type, basic_setup_alice, meta_setup_alice):
-    if pool_type == 0:
-        return basic_setup_alice
-    return meta_setup_alice
+def initial_setup_alice(pool_type, request):
+    """
+    Set up the initial state for Alice.
+    Run either the basic or meta fixture depending on the pool type.
+    """
+    fixtures = {POOL_TYPES["basic"]: "basic_setup_alice", POOL_TYPES["meta"]: "meta_setup_alice"}
+    return request.getfixturevalue(fixtures[pool_type])
 
 
 @pytest.fixture()
-def basic_setup_alice(alice, initial_amounts, initial_balance, oracle_tokens, basic_swap):
+def basic_setup_alice(
+    alice,
+    initial_amounts,
+    initial_balance,
+    oracle_tokens,
+    basic_swap,
+    base_pool_tokens,
+    base_pool,
+    base_pool_decimals,
+    underlying_tokens,
+):
     mint_for_testing(alice, 1 * 10**18, None, True)
     mint_account(alice, oracle_tokens, initial_balance, initial_amounts)
     with boa.env.prank(alice):
@@ -48,22 +62,22 @@ def test_initial_liquidity(
     oracle_tokens,
     metapool_token,
 ):
-    amounts = []
-
     if pool_type == 0:
-        for i, t in enumerate(pool_token_types):
-            if t != 1:
-                amounts.append(DEPOSIT_AMOUNT * 10 ** decimals[i])
-            else:
-                amounts.append(DEPOSIT_AMOUNT * 10 ** decimals[i] * 10**18 // oracle_tokens[i].exchangeRate())
+        amounts = [
+            DEPOSIT_AMOUNT * 10 ** decimals[i] * 10**18 // oracle_tokens[i].exchangeRate()
+            if t == TOKEN_TYPES["oracle"]
+            else DEPOSIT_AMOUNT * 10 ** decimals[i]
+            for i, t in enumerate(pool_token_types)
+        ]
     else:
-        if metapool_token_type == 1:
-            amounts = [
+        amounts = (
+            [
                 DEPOSIT_AMOUNT * 10**meta_decimals * 10**18 // metapool_token.exchangeRate(),
                 DEPOSIT_AMOUNT * 10**18,
             ]
-        else:
-            amounts = [DEPOSIT_AMOUNT * 10**meta_decimals, DEPOSIT_AMOUNT * 10**18]
+            if metapool_token_type == 1
+            else [DEPOSIT_AMOUNT * 10**meta_decimals, DEPOSIT_AMOUNT * 10**18]
+        )
 
     swap.add_liquidity(amounts, 0, sender=alice)
     swap.add_liquidity(amounts, 0, sender=alice)
@@ -76,44 +90,35 @@ def test_oracles(alice, swap, pool_size):
     assert swap._immutables.rate_oracles.get() != [0] * pool_size
 
 
-def test_get_dy(
-    alice,
-    initial_setup_alice,
-    swap,
-    pool_type,
-    pool_token_types,
-    metapool_token_type,
-    decimals,
-    meta_decimals,
-    oracle_tokens,
-    metapool_token,
+def test_get_dy_basic(
+    alice, initial_setup_alice, basic_swap, pool_token_types, decimals, meta_decimals, oracle_tokens, metapool_token
 ):
-    amounts = []
+    amounts = [
+        DEPOSIT_AMOUNT * 10 ** decimals[i] * 10**18 // oracle_tokens[i].exchangeRate()
+        if t == 1
+        else DEPOSIT_AMOUNT * 10 ** decimals[i]
+        for i, t in enumerate(pool_token_types)
+    ]
 
-    if pool_type == 0:
-        for i, t in enumerate(pool_token_types):
-            if t != 1:
-                amounts.append(DEPOSIT_AMOUNT * 10 ** decimals[i])
-            else:
-                amounts.append(DEPOSIT_AMOUNT * 10 ** decimals[i] * 10**18 // oracle_tokens[i].exchangeRate())
-    else:
-        if metapool_token_type == 1:
-            amounts = [
-                DEPOSIT_AMOUNT * 10**meta_decimals * 10**18 // metapool_token.exchangeRate(),
-                DEPOSIT_AMOUNT * 10**18,
-            ]
-        else:
-            amounts = [DEPOSIT_AMOUNT * 10**meta_decimals, DEPOSIT_AMOUNT * 10**18]
+    basic_swap.add_liquidity(amounts, 0, sender=alice)
 
-    swap.add_liquidity(amounts, 0, sender=alice)
+    rate_1 = 10**18 if pool_token_types[0] != 1 else oracle_tokens[0].exchangeRate()
+    rate_2 = 10**18 if pool_token_types[1] != 1 else oracle_tokens[1].exchangeRate()
 
-    if pool_type == 0:
-        rate_1 = 10**18 if pool_token_types[0] != 1 else oracle_tokens[0].exchangeRate()
-        rate_2 = 10**18 if pool_token_types[1] != 1 else oracle_tokens[1].exchangeRate()
+    assert basic_swap.get_dy(0, 1, rate_2) == pytest.approx(rate_1, rel=1e-3)
 
-        assert swap.get_dy(0, 1, rate_2) == pytest.approx(rate_1, rel=1e-3)
 
-    else:
-        rate_1 = 1 if metapool_token_type != 1 else metapool_token.exchangeRate()
+def test_get_dy_meta(
+    alice, initial_setup_alice, meta_swap, metapool_token_type, decimals, meta_decimals, oracle_tokens, metapool_token
+):
+    amounts = (
+        [DEPOSIT_AMOUNT * 10**meta_decimals * 10**18 // metapool_token.exchangeRate(), DEPOSIT_AMOUNT * 10**18]
+        if metapool_token_type == 1
+        else [DEPOSIT_AMOUNT * 10**meta_decimals, DEPOSIT_AMOUNT * 10**18]
+    )
 
-        assert swap.get_dy(0, 1, 10**18) == pytest.approx(rate_1, rel=1e-3)
+    meta_swap.add_liquidity(amounts, 0, sender=alice)
+
+    rate_1 = 1 if metapool_token_type != 1 else metapool_token.exchangeRate()
+
+    assert meta_swap.get_dy(0, 1, 10**18) == pytest.approx(rate_1, rel=1e-3)

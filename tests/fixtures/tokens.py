@@ -1,6 +1,8 @@
 import boa
 import pytest
 
+from tests.constants import TOKEN_TYPES
+
 
 @pytest.fixture()
 def plain_tokens(erc20_deployer, deployer, decimals):
@@ -18,7 +20,7 @@ def oracle_tokens(erc20oracle_deployer, deployer, decimals):
 
 
 @pytest.fixture()
-def rebase_tokens(erc20_rebasing_deployer, deployer, decimals):
+def rebasing_tokens(erc20_rebasing_deployer, deployer, decimals):
     with boa.env.prank(deployer):
         return [
             erc20_rebasing_deployer.deploy(f"OR_TKN{i}", f"OR_TKN{i}", decimals[i], True)
@@ -27,15 +29,29 @@ def rebase_tokens(erc20_rebasing_deployer, deployer, decimals):
 
 
 @pytest.fixture()
-def pool_tokens(pool_token_types, plain_tokens, oracle_tokens, rebase_tokens):
-    tokens = {0: plain_tokens, 1: oracle_tokens, 2: rebase_tokens}
-    return [tokens[t][i] for i, t in enumerate(pool_token_types)]
+def pool_tokens(pool_token_types, request):
+    fixtures = {
+        TOKEN_TYPES["plain"]: "plain_tokens",
+        TOKEN_TYPES["oracle"]: "oracle_tokens",
+        TOKEN_TYPES["rebasing"]: "rebasing_tokens",
+    }
+    type1, type2 = pool_token_types
+    first, _ = request.getfixturevalue(fixtures[type1])
+    _, second = request.getfixturevalue(fixtures[type2])
+    return first, second
 
 
 # <---------------------   Metapool configuration   --------------------->
 @pytest.fixture()
-def metapool_token(metapool_token_type, plain_tokens, oracle_tokens, rebase_tokens):
-    return {0: plain_tokens, 1: oracle_tokens, 2: rebase_tokens}[metapool_token_type][0]
+def metapool_token(metapool_token_type, request, initial_decimals):
+    assert initial_decimals, "Fixture required for requesting `decimals` downstream"
+    fixture = {
+        TOKEN_TYPES["plain"]: "plain_tokens",
+        TOKEN_TYPES["oracle"]: "oracle_tokens",
+        TOKEN_TYPES["rebasing"]: "rebasing_tokens",
+    }
+    metapool_token, _ = request.getfixturevalue(fixture[metapool_token_type])
+    return metapool_token
 
 
 @pytest.fixture()

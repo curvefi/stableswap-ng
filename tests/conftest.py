@@ -40,11 +40,11 @@ def pytest_generate_tests(metafunc):
 
     if "metapool_token_type" in metafunc.fixturenames:
         # for meta pool only 1st coin is selected
-        token_type_items = sorted(TOKEN_TYPES.items())
+        token_type_items = get_tokens_for_metafunc(metafunc)
         metafunc.parametrize(
             "metapool_token_type",
-            [v for k, v in token_type_items],
-            ids=[f"(MetaTokenType={k})" for k, v in token_type_items],
+            [number for name, number in token_type_items],
+            ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
         )
 
     if "initial_decimals" in metafunc.fixturenames:
@@ -57,17 +57,21 @@ def get_pool_token_pairs(metafunc):
         if metafunc.definition.get_closest_marker(f"only_{name}_tokens"):
             return [((name, number), (name, number))]
 
-    items = [
-        (name, number)
-        for name, number in TOKEN_TYPES.items()
-        if not metafunc.definition.get_closest_marker(f"skip_{name}_tokens")
-    ]
+    items = get_tokens_for_metafunc(metafunc)
     # make all combinations possible
     all_combinations = list(combinations_with_replacement(items, 2))
     # make sure we get the same result in each worker
     random = Random(len(metafunc.fixturenames))
     # take 2 combinations for smaller test set
     return sorted(random.sample(all_combinations, k=2))
+
+
+def get_tokens_for_metafunc(metafunc):
+    return [
+        (name, number)
+        for name, number in TOKEN_TYPES.items()
+        if not metafunc.definition.get_closest_marker(f"skip_{name}_tokens")
+    ]
 
 
 @pytest.fixture(scope="session")

@@ -6,6 +6,7 @@ from eth_account.account import Account, LocalAccount
 
 from tests.utils.tokens import mint_for_testing
 
+from ..constants import POOL_TYPES
 from .constants import INITIAL_AMOUNT
 
 
@@ -66,9 +67,9 @@ def accounts(bob, charlie, dave, erin, frank):
 
 # <---------------------   Functions   --------------------->
 def mint_account(account, pool_tokens, initial_balance, initial_amounts):
-    mint_for_testing(account, initial_balance, None, True)
+    mint_for_testing(account, initial_balance, token_contract=None, mint_eth=True)
     for pool_token, amount in zip(pool_tokens, initial_amounts):
-        mint_for_testing(account, amount, pool_token, False)
+        mint_for_testing(account, amount, pool_token, mint_eth=False)
 
 
 def approve_account(account, pool_tokens, swap):
@@ -196,7 +197,9 @@ def approve_meta_bob(bob, underlying_tokens, swap):
 
 
 @pytest.fixture()
-def basic_setup(alice, bob, mint_alice, deposit_amounts, basic_swap, initial_balance, initial_amounts, pool_tokens):
+def basic_setup(
+    alice, approve_alice, bob, mint_alice, deposit_amounts, basic_swap, initial_balance, initial_amounts, pool_tokens
+):
     mint_for_testing(bob, 1 * 10**18, None, True)
 
     with boa.env.prank(alice):
@@ -250,7 +253,10 @@ def meta_setup(
 
 
 @pytest.fixture()
-def initial_setup(meta_setup, basic_setup, pool_type):
-    if pool_type == 0:
-        return basic_setup
-    return meta_setup
+def initial_setup(pool_type, request):
+    """
+    Set up the initial state for a pool test.
+    Run either basic_setup or meta_setup depending on the pool_type.
+    """
+    fixture_name = {POOL_TYPES["basic"]: "basic_setup", POOL_TYPES["meta"]: "meta_setup"}[pool_type]
+    return request.getfixturevalue(fixture_name)

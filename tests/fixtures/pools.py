@@ -2,12 +2,16 @@ import boa
 import pytest
 from eth_utils import function_signature_to_4byte_selector
 
+from tests.constants import POOL_TYPES
+
 ORACLE_METHOD_ID = function_signature_to_4byte_selector("exchangeRate()")
 OFFPEG_FEE_MULTIPLIER = 20000000000
 
 
 @pytest.fixture()
 def basic_swap(deployer, factory, pool_size, pool_tokens, zero_address, amm_deployer, set_pool_implementations):
+    #    factory, set_metapool_implementations, zero_address, metapool_token, base_pool, meta_deployer, add_base_pool
+
     A = 2000
     fee = 1000000
     method_ids = [b""] * pool_size
@@ -93,8 +97,9 @@ def meta_swap(
 
 
 @pytest.fixture()
-def swap(basic_swap, meta_swap, pool_type):
-    return {0: basic_swap, 1: meta_swap}[pool_type]
+def swap(request, pool_type):
+    fixture_name = {POOL_TYPES["basic"]: "basic_swap", POOL_TYPES["meta"]: "meta_swap"}[pool_type]
+    return request.getfixturevalue(fixture_name)
 
 
 # <---------------------   Metapool configuration   --------------------->
