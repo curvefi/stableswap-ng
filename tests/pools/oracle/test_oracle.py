@@ -7,6 +7,7 @@ from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils.tokens import mint_for_testing
 
 DEPOSIT_AMOUNT = INITIAL_AMOUNT // 100
+pytestmark = pytest.mark.only_oracle_tokens
 
 
 @pytest.fixture()
@@ -31,7 +32,7 @@ def basic_setup_alice(
     base_pool_decimals,
     underlying_tokens,
 ):
-    mint_for_testing(alice, 1 * 10**18, None, True)
+    mint_for_testing(alice, amount=1 * 10**18, token_contract=None, mint_eth=True)
     mint_account(alice, oracle_tokens, initial_balance, initial_amounts)
     with boa.env.prank(alice):
         for token in oracle_tokens:
@@ -42,7 +43,7 @@ def basic_setup_alice(
 def meta_setup_alice(
     alice, base_pool_tokens, base_pool, base_pool_decimals, initial_amounts, meta_swap, underlying_tokens
 ):
-    mint_for_testing(alice, 1 * 10**18, None, True)
+    mint_for_testing(alice, amount=1 * 10**18, token_contract=None, mint_eth=True)
     add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
     mint_for_testing(alice, initial_amounts[0], underlying_tokens[0], False)
     with boa.env.prank(alice):
@@ -86,8 +87,11 @@ def test_initial_liquidity(
     assert swap.admin_balances(1) == 0
 
 
-def test_oracles(alice, swap, pool_size):
-    assert swap._immutables.rate_oracles.get() != [0] * pool_size
+def test_oracles(alice, swap, pool_size, pool_type):
+    if pool_type == POOL_TYPES["basic"]:
+        assert swap._immutables.rate_oracles != [0] * pool_size
+    else:
+        assert swap._immutables.rate_oracle
 
 
 def test_get_dy_basic(

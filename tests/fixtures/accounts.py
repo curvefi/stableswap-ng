@@ -198,8 +198,18 @@ def approve_meta_bob(bob, underlying_tokens, swap):
 
 @pytest.fixture()
 def basic_setup(
-    alice, approve_alice, bob, mint_alice, deposit_amounts, basic_swap, initial_balance, initial_amounts, pool_tokens
+    alice,
+    approve_alice,
+    bob,
+    mint_alice,
+    deposit_amounts,
+    basic_swap,
+    initial_balance,
+    initial_amounts,
+    pool_tokens,
+    metapool_token_type,
 ):
+    assert metapool_token_type is not None, "Fixture required downstream"
     mint_for_testing(bob, 1 * 10**18, None, True)
 
     with boa.env.prank(alice):
@@ -253,10 +263,11 @@ def meta_setup(
 
 
 @pytest.fixture()
-def initial_setup(pool_type, request):
+def initial_setup(pool_type, request, metapool_token_type):
     """
     Set up the initial state for a pool test.
     Run either basic_setup or meta_setup depending on the pool_type.
     """
+    assert metapool_token_type is not None, "Fixture required downstream"
     fixture_name = {POOL_TYPES["basic"]: "basic_setup", POOL_TYPES["meta"]: "meta_setup"}[pool_type]
     return request.getfixturevalue(fixture_name)

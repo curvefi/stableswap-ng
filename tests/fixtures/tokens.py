@@ -29,7 +29,8 @@ def rebasing_tokens(erc20_rebasing_deployer, deployer, decimals):
 
 
 @pytest.fixture()
-def pool_tokens(pool_token_types, request):
+def pool_tokens(pool_token_types, request, initial_decimals):
+    assert initial_decimals, "Fixture required for requesting `decimals` downstream"
     fixtures = {
         TOKEN_TYPES["plain"]: "plain_tokens",
         TOKEN_TYPES["oracle"]: "oracle_tokens",
@@ -38,7 +39,7 @@ def pool_tokens(pool_token_types, request):
     type1, type2 = pool_token_types
     first, _ = request.getfixturevalue(fixtures[type1])
     _, second = request.getfixturevalue(fixtures[type2])
-    return first, second
+    return [first, second]
 
 
 # <---------------------   Metapool configuration   --------------------->

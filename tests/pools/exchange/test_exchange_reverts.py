@@ -12,7 +12,7 @@ def test_insufficient_balance(charlie, pool_tokens, underlying_tokens, swap, sen
         assert token.balanceOf(charlie) == 0
 
     # Charlie doesn't have any tokens, all balances are 0
-    with boa.reverts():
+    with boa.reverts(), boa.env.prank(charlie):
         swap.exchange(sending, receiving, amount + 1, 0, sender=charlie)
 
 

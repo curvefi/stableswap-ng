@@ -53,13 +53,13 @@ def pytest_generate_tests(metafunc):
 
 
 def get_pool_token_pairs(metafunc):
-    for name, number in TOKEN_TYPES.items():
-        if metafunc.definition.get_closest_marker(f"only_{name}_tokens"):
-            return [((name, number), (name, number))]
-
     items = get_tokens_for_metafunc(metafunc)
     # make all combinations possible
     all_combinations = list(combinations_with_replacement(items, 2))
+
+    if len(all_combinations) < 2:
+        return all_combinations
+
     # make sure we get the same result in each worker
     random = Random(len(metafunc.fixturenames))
     # take 2 combinations for smaller test set
@@ -67,6 +67,10 @@ def get_pool_token_pairs(metafunc):
 
 
 def get_tokens_for_metafunc(metafunc):
+    for name, number in TOKEN_TYPES.items():
+        if metafunc.definition.get_closest_marker(f"only_{name}_tokens"):
+            return [(name, number)]
+
     return [
         (name, number)
         for name, number in TOKEN_TYPES.items()

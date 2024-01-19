@@ -44,7 +44,10 @@ def check_oracle(swap, dt):
         assert approx(swap.price_oracle(n), p1, 1e-5)
 
 
-@given(amount=strategy("uint256", min_value=1, max_value=10**6))
+@given(
+    amount=strategy("uint256", min_value=1, max_value=10**6),
+    suppress_health_check=HealthCheck.function_scoped_fixture,
+)
 @settings(**SETTINGS)
 def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
     i, j = random.sample(range(swap.N_COINS()), 2)
@@ -80,6 +83,7 @@ def test_get_p(swap, views_implementation, bob, pool_tokens, decimals, amount):
     amount=strategy("uint256", min_value=1, max_value=10**5),
     dt0=strategy("uint256", min_value=0, max_value=10**6),
     dt=strategy("uint256", min_value=0, max_value=10**6),
+    suppress_health_check=HealthCheck.function_scoped_fixture,
 )
 @settings(**SETTINGS)
 def test_price_ema_exchange(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt):
@@ -101,6 +105,7 @@ def test_price_ema_exchange(swap, bob, pool_tokens, underlying_tokens, decimals,
     amount=strategy("uint256", min_value=1, max_value=10**5),
     dt0=strategy("uint256", min_value=0, max_value=10**6),
     dt=strategy("uint256", min_value=0, max_value=10**6),
+    suppress_health_check=HealthCheck.function_scoped_fixture,
 )
 @settings(**SETTINGS)
 def test_price_ema_remove_one(swap, alice, amount, dt0, dt):
@@ -118,6 +123,7 @@ def test_price_ema_remove_one(swap, alice, amount, dt0, dt):
     frac=strategy("uint256", min_value=1, max_value=8),
     dt0=strategy("uint256", min_value=0, max_value=10**6),
     dt=strategy("uint256", min_value=0, max_value=10**6),
+    suppress_health_check=HealthCheck.function_scoped_fixture,
 )
 @settings(**SETTINGS)
 def test_price_ema_remove_imbalance(swap, alice, dt0, dt, pool_size, deposit_amounts, frac):
@@ -164,6 +170,7 @@ def test_manipulate_ema(basic_swap, bob, pool_tokens, underlying_tokens, decimal
     amount=strategy("uint256", min_value=1, max_value=10**5),
     dt0=strategy("uint256", min_value=0, max_value=10**6),
     dt=strategy("uint256", min_value=0, max_value=10**6),
+    suppress_health_check=HealthCheck.function_scoped_fixture,
 )
 @settings(**SETTINGS)
 def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt, math_implementation):

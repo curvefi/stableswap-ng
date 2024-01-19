@@ -10,8 +10,6 @@ OFFPEG_FEE_MULTIPLIER = 20000000000
 
 @pytest.fixture()
 def basic_swap(deployer, factory, pool_size, pool_tokens, zero_address, amm_deployer, set_pool_implementations):
-    #    factory, set_metapool_implementations, zero_address, metapool_token, base_pool, meta_deployer, add_base_pool
-
     A = 2000
     fee = 1000000
     method_ids = [b""] * pool_size
@@ -55,8 +53,17 @@ def basic_swap(deployer, factory, pool_size, pool_tokens, zero_address, amm_depl
 
 @pytest.fixture()
 def meta_swap(
-    factory, set_metapool_implementations, zero_address, metapool_token, base_pool, meta_deployer, add_base_pool
+    factory,
+    set_metapool_implementations,
+    zero_address,
+    metapool_token,
+    base_pool,
+    meta_deployer,
+    add_base_pool,
+    pool_token_types,
 ):
+    assert pool_token_types, "Fixture required downstream"
+
     A = 2000
     fee = 1000000
     method_id = bytes(b"")
@@ -97,7 +104,10 @@ def meta_swap(
 
 
 @pytest.fixture()
-def swap(request, pool_type):
+def swap(request, pool_type, pool_token_types, initial_decimals, metapool_token_type):
+    assert all(
+        fixture is not None for fixture in (initial_decimals, pool_token_types, metapool_token_type)
+    ), "Fixtures required downstream"
     fixture_name = {POOL_TYPES["basic"]: "basic_swap", POOL_TYPES["meta"]: "meta_swap"}[pool_type]
     return request.getfixturevalue(fixture_name)
 
