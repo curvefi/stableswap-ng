@@ -18,9 +18,11 @@ pytest_plugins = [
 ]
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 def fast_mode():
     boa.env.enable_fast_mode()
+    yield
+    boa.reset_env()
 
 
 def pytest_generate_tests(metafunc):
