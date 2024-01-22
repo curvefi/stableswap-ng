@@ -60,4 +60,4 @@ jobs:
           WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
         run: |
           source .venv/bin/activate
-          pytest --exitfirst --numprocesses=auto tests/${{ matrix.name }}/
+          pytest --numprocesses=auto tests/${{ matrix.name }}/

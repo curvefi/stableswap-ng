@@ -104,7 +104,7 @@ def test_price_ema_exchange(swap, bob, pool_tokens, underlying_tokens, decimals,
 )
 @settings(**SETTINGS)
 def test_price_ema_remove_one(swap, alice, amount, dt0, dt):
-    i = random.sample(range(swap.N_COINS()), 1)[0]
+    i = random.choice(range(swap.N_COINS()))
     alice_lp_bal = swap.balanceOf(alice)
     amt_to_remove = int(alice_lp_bal * amount / (10**5 - 1))
 
@@ -121,7 +121,7 @@ def test_price_ema_remove_one(swap, alice, amount, dt0, dt):
 )
 @settings(**SETTINGS)
 def test_price_ema_remove_imbalance(swap, alice, dt0, dt, pool_size, deposit_amounts, frac):
-    i = random.sample(range(swap.N_COINS()), 1)[0]
+    i = random.choice(range(swap.N_COINS()))
     amounts = [0] * pool_size
     amounts[i] = deposit_amounts[i] // frac
     lp_balance = pool_size * deposit_amounts[i]

@@ -14,8 +14,13 @@ def meta_initial_amounts(meta_decimals) -> list[int]:
 
 
 @pytest.fixture()
-def initial_amounts(pool_type, decimals, meta_initial_amounts) -> list[int]:
-    return [INITIAL_AMOUNT * 10**precision for precision in decimals] if pool_type == 0 else meta_initial_amounts
+def basic_initial_amounts(decimals) -> list[int]:
+    return [INITIAL_AMOUNT * 10**precision for precision in decimals]
+
+
+@pytest.fixture()
+def initial_amounts(pool_type, basic_initial_amounts, meta_initial_amounts) -> list[int]:
+    return basic_initial_amounts if pool_type == 0 else meta_initial_amounts
 
 
 @pytest.fixture()

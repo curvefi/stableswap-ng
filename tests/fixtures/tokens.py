@@ -2,6 +2,7 @@ import boa
 import pytest
 
 from tests.constants import TOKEN_TYPES
+from tests.fixtures.accounts import mint_account
 
 
 @pytest.fixture()
@@ -85,7 +86,8 @@ def coin_reward(owner, erc20_deployer):
 
 
 @pytest.fixture()
-def coin_reward_a(owner, mint_owner, erc20_deployer):
+def coin_reward_a(owner, erc20_deployer, pool_tokens, initial_balance, initial_amounts):
+    mint_account(owner, pool_tokens, initial_balance, initial_amounts)
     with boa.env.prank(owner):
         return erc20_deployer.deploy("CRa", "CRa", 18)
 
