@@ -53,17 +53,8 @@ def basic_swap(deployer, factory, pool_size, pool_tokens, zero_address, amm_depl
 
 @pytest.fixture()
 def meta_swap(
-    factory,
-    set_metapool_implementations,
-    zero_address,
-    metapool_token,
-    base_pool,
-    meta_deployer,
-    add_base_pool,
-    pool_token_types,
+    factory, set_metapool_implementations, zero_address, metapool_token, base_pool, meta_deployer, add_base_pool
 ):
-    assert pool_token_types, "Fixture required downstream"
-
     A = 2000
     fee = 1000000
     method_id = bytes(b"")

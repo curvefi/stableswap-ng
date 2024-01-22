@@ -5,7 +5,7 @@ from tests.fixtures.accounts import add_base_pool_liquidity, mint_account
 from tests.utils.tokens import mint_for_testing
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def initial_setup_alice(
     alice,
     deposit_amounts,
@@ -20,24 +20,21 @@ def initial_setup_alice(
     pool_tokens,
     underlying_tokens,
 ):
-    with boa.env.anchor():
-        mint_for_testing(alice, 1 * 10**18, None, True)
+    mint_for_testing(alice, 1 * 10**18, None, True)
 
-        if pool_type == 0:
-            mint_account(alice, pool_tokens, initial_balance, initial_amounts)
-            with boa.env.prank(alice):
-                for token in pool_tokens:
-                    token.approve(swap.address, 2**256 - 1)
+    if pool_type == 0:
+        mint_account(alice, pool_tokens, initial_balance, initial_amounts)
+        with boa.env.prank(alice):
+            for token in pool_tokens:
+                token.approve(swap.address, 2**256 - 1)
 
-        else:
-            add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
-            mint_for_testing(alice, initial_amounts[0], underlying_tokens[0], False)
+    else:
+        add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
+        mint_for_testing(alice, initial_amounts[0], underlying_tokens[0], False)
 
-            with boa.env.prank(alice):
-                for token in underlying_tokens:
-                    token.approve(swap.address, 2**256 - 1)
-
-        yield
+        with boa.env.prank(alice):
+            for token in underlying_tokens:
+                token.approve(swap.address, 2**256 - 1)
 
 
 @pytest.mark.parametrize("min_amount", [0, 10**18])

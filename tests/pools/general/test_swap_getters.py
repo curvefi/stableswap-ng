@@ -2,14 +2,13 @@ import pytest
 from boa.test import strategy
 from hypothesis import HealthCheck, given, settings
 
-SETTINGS = {"max_examples": 100, "deadline": None}
+SETTINGS = {"max_examples": 100, "deadline": None, "suppress_health_check": [HealthCheck.function_scoped_fixture]}
 
 
 @given(
     amount_in=strategy("decimal", min_value=0.001, max_value=10**6),
     i=strategy("uint", min_value=0, max_value=2),
     j=strategy("uint", min_value=0, max_value=2),
-    suppress_health_check=HealthCheck.function_scoped_fixture,
 )
 @settings(**SETTINGS)
 def test_get_dx(i, j, amount_in, swap, factory, initial_setup):
@@ -31,7 +30,6 @@ def test_get_dx(i, j, amount_in, swap, factory, initial_setup):
     amount_in=strategy("decimal", min_value=0.001, max_value=10**6),
     i=strategy("uint", min_value=0, max_value=4),
     j=strategy("uint", min_value=0, max_value=4),
-    suppress_health_check=HealthCheck.function_scoped_fixture,
 )
 @settings(**SETTINGS)
 def test_get_dx_underlying(i, j, amount_in, meta_swap, factory, initial_setup):

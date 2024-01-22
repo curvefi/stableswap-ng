@@ -4,11 +4,13 @@ import pytest
 
 from tests.utils import approx
 
-pytestmark = pytest.mark.usefixtures("initial_setup")
+pytestmark = pytest.mark.usefixtures("meta_setup")
+
+permutations = list(itertools.permutations(range(4), 2))  # 0,1...3,2
 
 
 @pytest.mark.only_plain_tokens
-@pytest.mark.parametrize("sending,receiving", filter(lambda k: 0 in k, itertools.permutations(range(4), 2)))
+@pytest.mark.parametrize("sending,receiving", [p for p in permutations if 0 in p])
 def test_amounts(bob, meta_swap, underlying_tokens, sending, receiving, meta_decimals, base_pool_decimals):
     underlying_decimals = [meta_decimals] + base_pool_decimals
     underlying_tokens = [underlying_tokens[0], *underlying_tokens[2:]]
@@ -23,7 +25,7 @@ def test_amounts(bob, meta_swap, underlying_tokens, sending, receiving, meta_dec
 
 
 @pytest.mark.only_plain_tokens
-@pytest.mark.parametrize("sending,receiving", itertools.permutations(range(4), 2))
+@pytest.mark.parametrize("sending,receiving", permutations)
 def test_min_dy_underlying(bob, meta_swap, underlying_tokens, sending, receiving, meta_decimals, base_pool_decimals):
     underlying_decimals = [meta_decimals] + base_pool_decimals
     underlying_tokens = [underlying_tokens[0], *underlying_tokens[2:]]

@@ -121,72 +121,54 @@ def add_base_pool_liquidity(user, base_pool, base_pool_tokens, base_pool_decimal
 
 
 @pytest.fixture()
-def add_initial_liquidity_owner(
+def add_initial_liquidity_owner_basic(
     owner,
     approve_owner,
     mint_owner,
     deposit_amounts,
-    swap,
-    pool_type,
+    basic_swap,
     underlying_tokens,
     base_pool,
     base_pool_tokens,
     base_pool_decimals,
     base_pool_lp_token,
 ):
-    if pool_type == 0:
-        with boa.env.prank(owner):
-            swap.add_liquidity(deposit_amounts, 0)
-    else:
-        add_base_pool_liquidity(owner, base_pool, base_pool_tokens, base_pool_decimals)
-        with boa.env.prank(owner):
-            base_pool_lp_token.approve(swap.address, 2**256 - 1)
-            lp_token_bal = base_pool_lp_token.balanceOf(owner)
-            to_mint_token0 = lp_token_bal * 10 ** underlying_tokens[0].decimals() // 10 ** base_pool_lp_token.decimals()
-
-            mint_for_testing(owner, to_mint_token0, underlying_tokens[0], False)
-            underlying_tokens[0].approve(swap.address, 2**256 - 1)
-
-            swap.add_liquidity([to_mint_token0, lp_token_bal], 0)
+    with boa.env.prank(owner):
+        basic_swap.add_liquidity(deposit_amounts, 0)
 
 
 @pytest.fixture()
-def add_initial_liquidity_alice(
-    alice,
-    approve_alice,
-    mint_alice,
-    deposit_amounts,
-    swap,
-    pool_type,
+def add_initial_liquidity_owner_meta(
+    owner,
+    approve_owner,
+    mint_owner,
+    deposit_meta_amounts,
+    meta_swap,
+    metapool_token,
     base_pool,
     base_pool_tokens,
     base_pool_decimals,
     base_pool_lp_token,
 ):
-    if pool_type == 0:
-        with boa.env.prank(alice):
-            swap.add_liquidity(deposit_amounts, 0)
-    else:
-        add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
-        with boa.env.prank(alice):
-            base_pool_lp_token.approve(swap.address, 2**256 - 1)
-            swap.add_liquidity(deposit_amounts, 0)
+    add_base_pool_liquidity(owner, base_pool, base_pool_tokens, base_pool_decimals)
+    with boa.env.prank(owner):
+        base_pool_lp_token.approve(meta_swap.address, 2**256 - 1)
+        lp_token_bal = base_pool_lp_token.balanceOf(owner)
+        to_mint_token0 = lp_token_bal * 10 ** metapool_token.decimals() // 10 ** base_pool_lp_token.decimals()
+
+        mint_for_testing(owner, to_mint_token0, metapool_token, False)
+        metapool_token.approve(meta_swap.address, 2**256 - 1)
+
+        meta_swap.add_liquidity([to_mint_token0, lp_token_bal], 0)
 
 
 @pytest.fixture()
-def mint_meta_bob(
-    bob,
-    mint_bob,
-    base_pool,
-    base_pool_tokens,
-    base_pool_decimals,
-    underlying_tokens,
-    initial_amounts,
-    base_pool_lp_token,
-):
-    add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
-    mint_for_testing(bob, initial_amounts[0], underlying_tokens[0], False)
-    assert underlying_tokens[0].balanceOf(bob) == base_pool_lp_token.balanceOf(bob)
+def add_initial_liquidity_owner(pool_type, request):
+    fixture_name = {
+        POOL_TYPES["basic"]: "add_initial_liquidity_owner_basic",
+        POOL_TYPES["meta"]: "add_initial_liquidity_owner_meta",
+    }[pool_type]
+    return request.getfixturevalue(fixture_name)
 
 
 @pytest.fixture()
@@ -199,21 +181,21 @@ def approve_meta_bob(bob, underlying_tokens, swap):
 @pytest.fixture()
 def basic_setup(
     alice,
-    approve_alice,
     bob,
     mint_alice,
-    deposit_amounts,
+    deposit_basic_amounts,
     basic_swap,
     initial_balance,
     initial_amounts,
     pool_tokens,
     metapool_token_type,
 ):
+    approve_account(alice, pool_tokens, basic_swap)
     assert metapool_token_type is not None, "Fixture required downstream"
     mint_for_testing(bob, 1 * 10**18, None, True)
 
     with boa.env.prank(alice):
-        basic_swap.add_liquidity(deposit_amounts, 0)
+        basic_swap.add_liquidity(deposit_basic_amounts, 0)
 
     mint_account(bob, pool_tokens, initial_balance, initial_amounts)
     with boa.env.prank(bob):
@@ -225,17 +207,20 @@ def basic_setup(
 def meta_setup(
     alice,
     bob,
-    mint_alice,
-    approve_alice,
-    deposit_amounts,
+    deposit_meta_amounts,
     meta_swap,
     base_pool,
     base_pool_tokens,
     base_pool_decimals,
     base_pool_lp_token,
-    initial_amounts,
+    initial_balance,
+    meta_initial_amounts,
     underlying_tokens,
+    pool_tokens,
+    add_initial_liquidity_owner_meta,
 ):
+    approve_account(alice, pool_tokens, meta_swap)
+    mint_account(alice, pool_tokens, initial_balance, meta_initial_amounts)
     mint_for_testing(bob, 1 * 10**18, None, True)
 
     underlying_token = underlying_tokens[0]
@@ -251,10 +236,10 @@ def meta_setup(
     with boa.env.prank(alice):
         underlying_token.approve(meta_swap.address, 2**256 - 1)
         base_pool_lp_token.approve(meta_swap.address, 2**256 - 1)
-        meta_swap.add_liquidity(deposit_amounts, 0)
+        meta_swap.add_liquidity(deposit_meta_amounts, 0)
 
     add_base_pool_liquidity(bob, base_pool, base_pool_tokens, base_pool_decimals)
-    mint_for_testing(bob, initial_amounts[0], underlying_token, False)
+    mint_for_testing(bob, initial_balance, underlying_token, False)
     assert underlying_token.balanceOf(bob) == pytest.approx(base_pool_lp_token.balanceOf(bob))
 
     with boa.env.prank(bob):
@@ -263,11 +248,11 @@ def meta_setup(
 
 
 @pytest.fixture()
-def initial_setup(pool_type, request, metapool_token_type):
+def initial_setup(pool_type, request, metapool_token_type, pool_token_types, initial_decimals):
     """
     Set up the initial state for a pool test.
     Run either basic_setup or meta_setup depending on the pool_type.
     """
-    assert metapool_token_type is not None, "Fixture required downstream"
+    assert metapool_token_type is not None and pool_token_types and initial_decimals, "Fixtures required downstream"
     fixture_name = {POOL_TYPES["basic"]: "basic_setup", POOL_TYPES["meta"]: "meta_setup"}[pool_type]
     return request.getfixturevalue(fixture_name)

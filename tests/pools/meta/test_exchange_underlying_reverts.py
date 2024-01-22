@@ -3,7 +3,7 @@ import itertools
 import boa
 import pytest
 
-pytestmark = pytest.mark.usefixtures("initial_setup")
+pytestmark = pytest.mark.usefixtures("meta_setup")
 
 
 @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(4), 2))

@@ -44,8 +44,8 @@ def pool_tokens(pool_token_types, request, initial_decimals):
 
 # <---------------------   Metapool configuration   --------------------->
 @pytest.fixture()
-def metapool_token(metapool_token_type, request, initial_decimals):
-    assert initial_decimals, "Fixture required for requesting `decimals` downstream"
+def metapool_token(metapool_token_type, request, initial_decimals, pool_token_types):
+    assert initial_decimals and pool_token_types, "Fixtures required for requesting `decimals` downstream"
     fixture = {
         TOKEN_TYPES["plain"]: "plain_tokens",
         TOKEN_TYPES["oracle"]: "oracle_tokens",
