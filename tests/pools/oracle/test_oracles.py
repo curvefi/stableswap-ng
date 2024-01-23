@@ -24,7 +24,9 @@ def get_D(swap, math):
 def check_oracle(swap, dt):
     # amm prices:
     p_amm = []
-    for n in range(swap.N_COINS() - 1):
+    coins = swap.N_COINS() - 1
+    assert 0 < coins < 10
+    for n in range(coins):
         _p = swap.get_p(n)
 
         assert approx(swap.last_price(n), _p, 1e-5)
@@ -39,7 +41,7 @@ def check_oracle(swap, dt):
     w = exp(-dt / 866)
 
     # check:
-    for n in range(swap.N_COINS() - 1):
+    for n in range(coins):
         p1 = int(10**18 * w + p_amm[n] * (1 - w))
         assert approx(swap.price_oracle(n), p1, 1e-5)
 

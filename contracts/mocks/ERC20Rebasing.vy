@@ -1,4 +1,4 @@
-# @version ^0.3.9
+# pragma version 0.1
 
 """
 @notice Rebasing ERC20 mock with rebase by 1% on every transfer

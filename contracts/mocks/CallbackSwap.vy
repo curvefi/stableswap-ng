@@ -1,4 +1,4 @@
-# @version ^0.3.9
+# pragma version 0.1
 """
 @title CurveExchangeWithoutApproval
 @author fiddyresearch.eth

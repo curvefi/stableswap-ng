@@ -110,7 +110,7 @@ def test_permit(eth_acc, bob, swap):
 def test_permit_contract(eth_acc, bob, swap):
     # based on https://eips.ethereum.org/EIPS/eip-1271
     src = """
-        # @version ^0.3.9
+        # pragma version 0.1
         OWNER: public(immutable(address))
 
         @external
