@@ -20,20 +20,12 @@ pytest_plugins = [
 
 @pytest.fixture(autouse=True)
 def boa_setup():
-    import tracemalloc
-
-    tracemalloc.start()
-    snapshot = tracemalloc.take_snapshot()
-    # boa.env.enable_fast_mode()
+    boa.env.enable_fast_mode()
     yield
+    # force reset of the environment to prevent memory leaking between tests
     boa.env._contracts.clear()
     boa.env._code_registry.clear()
     boa.reset_env()
-    snapshot2 = tracemalloc.take_snapshot()
-    top_stats = snapshot2.compare_to(snapshot, "lineno")
-    print("[ Top 10 differences ]")
-    for stat in top_stats[:10]:
-        print(stat)
 
 
 def pytest_generate_tests(metafunc):

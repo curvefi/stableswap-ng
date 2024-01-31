@@ -50,12 +50,12 @@ def ng_base_pool(deployer, factory, ng_base_pool_tokens, zero_address, amm_deplo
     return amm_deployer.at(pool)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def ng_metapool_tokens(meta_token, ng_base_pool):
     return [meta_token, ng_base_pool]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def add_ng_base_pool(owner, factory, ng_base_pool, ng_base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
@@ -63,7 +63,7 @@ def add_ng_base_pool(owner, factory, ng_base_pool, ng_base_pool_tokens):
         )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def empty_swap(
     deployer,
     factory,
@@ -99,7 +99,7 @@ def empty_swap(
     return meta_deployer.at(pool)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def mint_and_approve_for_bob(meta_token, ng_base_pool_tokens, bob, empty_swap, ng_base_pool):
     for token in [meta_token] + ng_base_pool_tokens:
         mint_for_testing(bob, 10**25, token)
@@ -107,7 +107,7 @@ def mint_and_approve_for_bob(meta_token, ng_base_pool_tokens, bob, empty_swap, n
         token.approve(ng_base_pool, 2**256 - 1, sender=bob)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def deposit_amounts(
     meta_token, ng_base_pool, ng_base_pool_tokens, ng_base_pool_decimals, empty_swap, bob, mint_and_approve_for_bob
 ):
@@ -127,7 +127,7 @@ def deposit_amounts(
     return _deposit_amounts
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def swap(empty_swap, bob, deposit_amounts):
     empty_swap.add_liquidity(deposit_amounts, 0, bob, sender=bob)
     return empty_swap

@@ -5,30 +5,30 @@ from eth_utils import function_signature_to_4byte_selector
 from tests.utils.tokens import mint_for_testing
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def token_a(deployer, erc20oracle_deployer):
     with boa.env.prank(deployer):
         return erc20oracle_deployer.deploy("OTA", "OTA", 18, 1006470359024000000)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def token_b(deployer, erc20oracle_deployer):
     with boa.env.prank(deployer):
         return erc20oracle_deployer.deploy("OTB", "OTB", 18, 1000000000000000000)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def token_c(deployer, erc20_deployer):
     with boa.env.prank(deployer):
         return erc20_deployer.deploy("OTC", "OTC", 18)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def pool_tokens(token_a, token_b, token_c):
     return [token_a, token_b, token_c]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def asset_types(pool_tokens):
     _asset_types = []
     for token in pool_tokens:
@@ -41,7 +41,7 @@ def asset_types(pool_tokens):
     return _asset_types
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def empty_swap(deployer, factory, pool_tokens, zero_address, amm_deployer, asset_types, set_pool_implementations):
     pool_size = len(pool_tokens)
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
@@ -74,7 +74,7 @@ def empty_swap(deployer, factory, pool_tokens, zero_address, amm_deployer, asset
     return amm_deployer.at(pool)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def deposit_amounts(pool_tokens, bob):
     _deposit_amounts = []
     for i, token in enumerate(pool_tokens):
@@ -86,7 +86,7 @@ def deposit_amounts(pool_tokens, bob):
     return _deposit_amounts
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def swap(empty_swap, bob, deposit_amounts, pool_tokens):
     for token in pool_tokens:
         token.approve(empty_swap, 2**256 - 1, sender=bob)
