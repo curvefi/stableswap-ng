@@ -1,4 +1,4 @@
-# pragma version 0.1
+# pragma version 0.3.10
 """
 @title Curve LP Token
 @author Curve.Fi

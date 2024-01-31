@@ -1,4 +1,4 @@
-# pragma version 0.1
+# pragma version 0.3.10
 # From: https://github.com/fubuloubu/ERC4626/blob/main/contracts/VyperVault.vy
 from vyper.interfaces import ERC20
 from vyper.interfaces import ERC20Detailed
