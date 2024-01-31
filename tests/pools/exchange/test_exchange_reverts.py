@@ -17,8 +17,9 @@ def test_insufficient_balance(charlie, pool_tokens, underlying_tokens, swap, sen
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-@pytest.mark.contains_rebasing_tokens
-def test_zero_amount_swap(charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals):
+def test_zero_amount_swap(
+    charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals, contains_rebasing_tokens
+):
     with boa.reverts():
         swap.exchange(sending, receiving, 0, 0, sender=charlie)
 

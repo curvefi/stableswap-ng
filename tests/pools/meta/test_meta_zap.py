@@ -8,23 +8,23 @@ from tests.utils.tokens import mint_for_testing
 warnings.filterwarnings("ignore")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def meta_token(deployer, erc20_deployer):
     with boa.env.prank(deployer):
         return erc20_deployer.deploy("OTA", "OTA", 18)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def metapool_tokens(meta_token, base_pool):
     return [meta_token, base_pool]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def tokens_all(meta_token, base_pool_tokens):
     return [meta_token] + base_pool_tokens
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def add_base_pool(owner, factory, base_pool, base_pool_lp_token, base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
@@ -32,7 +32,7 @@ def add_base_pool(owner, factory, base_pool, base_pool_lp_token, base_pool_token
         )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def empty_swap(
     deployer, factory, zero_address, meta_token, base_pool, meta_deployer, add_base_pool, set_metapool_implementations
 ):
@@ -62,17 +62,17 @@ def empty_swap(
     return meta_deployer.at(pool)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def zap(base_pool, base_pool_tokens, base_pool_lp_token, zap_deployer):
     return zap_deployer.deploy(base_pool.address, base_pool_lp_token.address, [a.address for a in base_pool_tokens])
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def initial_amts():
     return [100 * 10**18] * 4
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def swap(zap, base_pool, empty_swap, charlie, tokens_all, initial_amts):
     for i in range(3):
         assert base_pool.balances(i) == 0

@@ -68,11 +68,7 @@ def test_above_n_coins(alice, swap, pool_size):
 
 
 @pytest.mark.parametrize("idx", range(2))
-def test_event(alice, bob, swap, idx, pool_type):
+def test_event(alice, bob, swap, idx):
     swap.transfer(bob, 10**18, sender=alice)
     _, events = call_returning_result_and_logs(swap, "remove_liquidity_one_coin", 10**18, idx, 0, sender=bob)
-
-    if pool_type == 0:
-        assert f"RemoveLiquidityOne(provider={bob}" in repr(events[2])
-    else:
-        assert f"RemoveLiquidityOne(provider={bob}" in repr(events[3])
+    assert f"RemoveLiquidityOne(provider={bob}" in repr(events[2])
