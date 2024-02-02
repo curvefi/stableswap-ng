@@ -62,6 +62,10 @@ py_version = 310
 known_first_party = "poetry"
 
 [tool.pytest.ini_options]
+markers = [
+  "only_plain_tokens", "only_oracle_tokens", "only_rebasing_tokens",
+  "skip_plain_tokens", "skip_oracle_tokens", "skip_rebasing_tokens",
+]
 filterwarnings = [
   "ignore:PytestUnknownMarkWarning"
 ]
