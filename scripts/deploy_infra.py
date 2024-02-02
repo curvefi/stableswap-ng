@@ -139,6 +139,7 @@ deployments = {
 
 
 def set_evm_version(contract_file, network) -> boa.vyper.contract.VyperDeployer:
+
     with open(contract_file, "r") as f:
         source = f.read()
 
@@ -158,6 +159,7 @@ def set_evm_version(contract_file, network) -> boa.vyper.contract.VyperDeployer:
 
 
 def check_and_deploy(contract_obj, contract_designation, network, blueprint: bool = False, args=[]):
+
     deployed_contract = deployments[network][contract_designation]
 
     if not deployed_contract:
@@ -178,6 +180,7 @@ def check_and_deploy(contract_obj, contract_designation, network, blueprint: boo
 
 
 def deploy_infra(network, url, account, fork=False):
+
     logger.log(f"Deploying on {network} ...")
 
     if fork:
@@ -189,7 +192,9 @@ def deploy_infra(network, url, account, fork=False):
         boa.set_env(NetworkEnv(url))
         boa.env.add_account(Account.from_key(os.environ[account]))
     for _network, data in deploy_utils.curve_dao_network_settings.items():
+
         if _network in network:
+
             owner = data.dao_ownership_contract
             fee_receiver = data.fee_receiver_address
 
@@ -247,7 +252,13 @@ def deploy_infra(network, url, account, fork=False):
 
 
 def main():
-    deploy_infra("ethereum:mainnet", os.environ["RPC_ETHEREUM"], "FIDDYDEPLOYER", fork=False)
+
+    deploy_infra(
+        "ethereum:mainnet",
+        os.environ["RPC_ETHEREUM"],
+        "FIDDYDEPLOYER",
+        fork=False,
+    )
 
 
 if __name__ == "__main__":

@@ -47,6 +47,7 @@ def prepare_evm_script(target: Dict, actions: List[Tuple]) -> str:
     evm_script = "0x00000001"
 
     for address, fn_name, *args in actions:
+
         contract = ape.Contract(address)
         fn = getattr(contract, fn_name)
         calldata = fn.as_transaction(*args, sender=agent.address, gas_price=0).data
