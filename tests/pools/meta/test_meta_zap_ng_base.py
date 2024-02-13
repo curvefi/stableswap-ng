@@ -203,3 +203,39 @@ def test_calc_amts_remove(zap, swap, charlie, tokens_all, meta_token, ng_base_po
 
     for i in range(len(tokens_all)):
         assert total_received_amount[i] == total_expected_received[i]
+
+
+def test_calc_amts_remove_one_meta_coin(zap, swap, charlie, tokens_all, meta_token, ng_base_pool, ng_base_pool_tokens):
+    charlie_bal_before = []
+    for _t in tokens_all:
+        charlie_bal_before.append(_t.balanceOf(charlie))
+
+    lp_to_remove = swap.balanceOf(charlie) // 10
+    calc_amt_removed = zap.calc_withdraw_one_coin(swap.address, lp_to_remove, 0, sender=charlie)
+    swap.approve(zap, 2**256 - 1, sender=charlie)
+
+    with boa.env.anchor():
+        amts_received_swap = swap.remove_liquidity_one_coin(lp_to_remove, 0, 0, sender=charlie)
+        assert calc_amt_removed == amts_received_swap
+
+    amts_received_zap = zap.remove_liquidity_one_coin(swap.address, lp_to_remove, 0, 0, sender=charlie)
+
+    assert amts_received_zap == amts_received_swap
+
+
+def test_calc_amts_remove_one_base_coin(zap, swap, charlie, tokens_all, meta_token, ng_base_pool, ng_base_pool_tokens):
+    charlie_bal_before = []
+    for _t in tokens_all:
+        charlie_bal_before.append(_t.balanceOf(charlie))
+
+    lp_to_remove = swap.balanceOf(charlie) // 10
+    calc_amt_removed = zap.calc_withdraw_one_coin(swap.address, lp_to_remove, 1, sender=charlie)
+    swap.approve(zap, 2**256 - 1, sender=charlie)
+
+    with boa.env.anchor():
+        amts_received_swap = swap.remove_liquidity_one_coin(lp_to_remove, 1, 0, sender=charlie)
+        amts_received_base = ng_base_pool.remove_liquidity_one_coin(amts_received_swap, 0, 0, sender=charlie)
+        assert calc_amt_removed == amts_received_base
+
+    amts_received_zap = zap.remove_liquidity_one_coin(swap.address, lp_to_remove, 1, 0, sender=charlie)
+    assert amts_received_zap == amts_received_base
