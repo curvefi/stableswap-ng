@@ -13,7 +13,6 @@ logger = RichConsole(file=sys.stdout)
 
 
 def deploy_proxy_admin(network, url, account, fork=False):
-
     logger.log(f"Deploying ProxyAdmin for {network} ...")
 
     if fork:
@@ -35,12 +34,7 @@ def deploy_proxy_admin(network, url, account, fork=False):
 
 
 def main():
-    deploy_proxy_admin(
-        ":mainnet",
-        os.environ["RPC_"],
-        "",
-        fork=False,
-    )
+    deploy_proxy_admin(":mainnet", os.environ["RPC_"], "", fork=False)
 
 
 if __name__ == "__main__":

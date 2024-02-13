@@ -1,0 +1,63 @@
+name: CI
+
+on: [push]
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python 3.10.4
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.4
+
+      - uses: pre-commit/action@v3.0.0
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        name:
+          - gauge
+          - pools/exchange
+          - pools/general
+          - pools/liquidity
+          - pools/meta
+          - pools/oracle
+          - factory
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Cache Compiler Installations
+        uses: actions/cache@v3
+        with:
+          path: ~/.vvm
+          key: compiler-cache
+
+      - name: Setup Python 3.10.4
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.10.4
+
+      - name: Install Requirements
+        run: |
+          pip install poetry==1.5.1
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction --without dev
+
+      - name: Run Tests
+        env:
+          WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
+        run: |
+          source .venv/bin/activate
+          pytest --numprocesses=auto tests/${{ matrix.name }}/

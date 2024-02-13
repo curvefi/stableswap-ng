@@ -5,47 +5,30 @@ from eth_utils import function_signature_to_4byte_selector
 from tests.utils.tokens import mint_for_testing
 
 
-@pytest.fixture(scope="module")
-def token_a(deployer):
+@pytest.fixture()
+def token_a(deployer, erc20oracle_deployer):
     with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/mocks/ERC20Oracle.vy",
-            "OTA",
-            "OTA",
-            18,
-            1006470359024000000,
-        )
+        return erc20oracle_deployer.deploy("OTA", "OTA", 18, 1006470359024000000)
 
 
-@pytest.fixture(scope="module")
-def token_b(deployer):
+@pytest.fixture()
+def token_b(deployer, erc20oracle_deployer):
     with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/mocks/ERC20Oracle.vy",
-            "OTB",
-            "OTB",
-            18,
-            1000000000000000000,
-        )
+        return erc20oracle_deployer.deploy("OTB", "OTB", 18, 1000000000000000000)
 
 
-@pytest.fixture(scope="module")
-def token_c(deployer):
+@pytest.fixture()
+def token_c(deployer, erc20_deployer):
     with boa.env.prank(deployer):
-        return boa.load(
-            "contracts/mocks/ERC20.vy",
-            "OTC",
-            "OTC",
-            18,
-        )
+        return erc20_deployer.deploy("OTC", "OTC", 18)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def pool_tokens(token_a, token_b, token_c):
     return [token_a, token_b, token_c]
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def asset_types(pool_tokens):
     _asset_types = []
     for token in pool_tokens:
@@ -58,16 +41,8 @@ def asset_types(pool_tokens):
     return _asset_types
 
 
-@pytest.fixture(scope="module")
-def empty_swap(
-    deployer,
-    factory,
-    pool_tokens,
-    zero_address,
-    amm_interface,
-    asset_types,
-    set_pool_implementations,
-):
+@pytest.fixture()
+def empty_swap(deployer, factory, pool_tokens, zero_address, amm_deployer, asset_types, set_pool_implementations):
     pool_size = len(pool_tokens)
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
     offpeg_fee_multiplier = 20000000000
@@ -77,7 +52,6 @@ def empty_swap(
     fee = 3000000
 
     for i in range(pool_size):
-
         if asset_types[i] == 1:
             method_ids[i] = oracle_method_id
             oracles[i] = pool_tokens[i].address
@@ -97,10 +71,10 @@ def empty_swap(
             oracles,
         )
 
-    return amm_interface.at(pool)
+    return amm_deployer.at(pool)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def deposit_amounts(pool_tokens, bob):
     _deposit_amounts = []
     for i, token in enumerate(pool_tokens):
@@ -112,9 +86,8 @@ def deposit_amounts(pool_tokens, bob):
     return _deposit_amounts
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def swap(empty_swap, bob, deposit_amounts, pool_tokens):
-
     for token in pool_tokens:
         token.approve(empty_swap, 2**256 - 1, sender=bob)
 
@@ -123,7 +96,6 @@ def swap(empty_swap, bob, deposit_amounts, pool_tokens):
 
 
 def test_swap(swap, charlie, pool_tokens):
-
     amount_in = 10**18
     i = 0
     j = 1
@@ -135,7 +107,6 @@ def test_swap(swap, charlie, pool_tokens):
 
 
 def test_rebase(swap, charlie, bob, pool_tokens):
-
     amount_rewards = 10**4 * 10**18
     i = 1
     if amount_rewards > pool_tokens[i].balanceOf(charlie):

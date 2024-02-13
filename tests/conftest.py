@@ -1,230 +1,106 @@
-import itertools
 import os
+from itertools import combinations_with_replacement
+from random import Random
 
 import boa
 import pytest
 
-from tests.utils import get_asset_types_in_pool
+from tests.constants import DECIMAL_PAIRS, POOL_TYPES, TOKEN_TYPES
 
 pytest_plugins = [
     "tests.fixtures.accounts",
     "tests.fixtures.constants",
+    "tests.fixtures.contracts",
     "tests.fixtures.factory",
     "tests.fixtures.mocks",
     "tests.fixtures.pools",
     "tests.fixtures.tokens",
 ]
 
-pool_types = {"basic": 0, "meta": 1}
-token_types = {"plain": 0, "oracle": 1, "rebasing": 2}
-return_types = {"revert": 0, "False": 1, "None": 2}
 
-
-def pytest_addoption(parser):
-    parser.addoption(
-        "--pool-size",
-        action="store",
-        default="2",
-        help="pool size to test against",
-    )
-    parser.addoption(
-        "--pool-types",
-        action="store",
-        default="basic,meta",
-        help="pool type to test against",
-    )
-    parser.addoption(
-        "--token-types",
-        action="store",
-        default="plain,oracle,rebasing",
-        help="comma-separated list of ERC20 token types to test against",
-    )
-    parser.addoption(
-        "--decimals",
-        action="store",
-        default="18,18",
-        help="comma-separated list of ERC20 token precisions to test against",
-    )
-    parser.addoption(
-        "--return-type",
-        action="store",
-        default="revert,False,None",
-        help="comma-separated list of ERC20 token return types to test against",
-    )
+@pytest.fixture(autouse=True)
+def boa_setup():
+    boa.env.enable_fast_mode()
+    yield
+    # force reset of the environment to prevent memory leaking between tests
+    boa.env._contracts.clear()
+    boa.env._code_registry.clear()
+    boa.reset_env()
 
 
 def pytest_generate_tests(metafunc):
-    pool_size = int(metafunc.config.getoption("pool_size"))
-
-    if "pool_size" in metafunc.fixturenames:
-        metafunc.parametrize(
-            "pool_size",
-            [pool_size],
-            indirect=True,
-            ids=[f"(PoolSize={pool_size})"],
-        )
-
     if "pool_type" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("pool_types").split(",")
+        pool_type_items = sorted(POOL_TYPES.items())
         metafunc.parametrize(
-            "pool_type",
-            [pool_types[pool_type] for pool_type in cli_options],
-            indirect=True,
-            ids=[f"(PoolType={pool_type})" for pool_type in cli_options],
+            "pool_type", [v for k, v in pool_type_items], ids=[f"(PoolType={k})" for k, v in pool_type_items]
         )
 
     if "pool_token_types" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("token_types").split(",")
-        if "eth" in cli_options:
-            cli_options.remove("eth")
-            cli_options = ["eth"] + cli_options
-
-        combinations = list(itertools.combinations_with_replacement(cli_options, pool_size))
-
+        pool_token_pairs = get_pool_token_pairs(metafunc)
         metafunc.parametrize(
             "pool_token_types",
-            [[token_types[idx] for idx in c] for c in combinations],
-            indirect=True,
-            ids=[f"(PoolTokenTypes={c})" for c in combinations],
+            [(v1, v2) for (k1, v1), (k2, v2) in pool_token_pairs],
+            ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in pool_token_pairs],
         )
 
     if "metapool_token_type" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("token_types").split(",")
-
         # for meta pool only 1st coin is selected
+        token_type_items = get_tokens_for_metafunc(metafunc)
         metafunc.parametrize(
             "metapool_token_type",
-            [token_types[c] for c in cli_options],
-            indirect=True,
-            ids=[f"(MetaTokenType={c})" for c in cli_options],
+            [number for name, number in token_type_items],
+            ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
         )
 
     if "initial_decimals" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("decimals")
-        metafunc.parametrize(
-            "initial_decimals",
-            [[int(i) for i in cli_options.split(",")]],
-            indirect=True,
-            ids=[f"(Decimals={cli_options})"],
-        )
-
-    if "return_type" in metafunc.fixturenames:
-        cli_options = metafunc.config.getoption("return_type").split(",")
-        return_type_ids = [return_types[v] for v in cli_options]
-
-        metafunc.parametrize(
-            "return_type",
-            return_type_ids,
-            indirect=True,
-            ids=[f"(ReturnType={i})" for i in cli_options],
-        )
+        # this is only used in the decimals fixture
+        metafunc.parametrize("initial_decimals", DECIMAL_PAIRS, ids=[f"(Decimals={i},{j})" for i, j in DECIMAL_PAIRS])
 
 
-@pytest.fixture(scope="session")
-def pool_size(request):
-    return request.param
+def get_pool_token_pairs(metafunc):
+    items = get_tokens_for_metafunc(metafunc)
+    # make all combinations possible
+    all_combinations = list(combinations_with_replacement(items, 2))
+
+    if len(all_combinations) < 2:
+        return all_combinations
+
+    # make sure we get the same result in each worker
+    random = Random(len(metafunc.fixturenames))
+    # take 2 combinations for smaller test set
+    return sorted(random.sample(all_combinations, k=2))
 
 
-@pytest.fixture(scope="session")
-def pool_type(request):
-    return request.param
+def get_tokens_for_metafunc(metafunc):
+    for name, number in TOKEN_TYPES.items():
+        if metafunc.definition.get_closest_marker(f"only_{name}_tokens"):
+            return [(name, number)]
 
-
-@pytest.fixture(scope="session")
-def pool_token_types(request):
-    return request.param
+    return [
+        (name, number)
+        for name, number in TOKEN_TYPES.items()
+        if not metafunc.definition.get_closest_marker(f"skip_{name}_tokens")
+    ]
 
 
 @pytest.fixture(scope="session")
-def metapool_token_type(request):
-    return request.param
+def pool_size():
+    return 2
 
 
-@pytest.fixture(scope="session")
-def return_type(request):
-    return request.param
-
-
-@pytest.fixture(scope="session")
-def initial_decimals(request):
-    return request.param
-
-
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def decimals(initial_decimals, pool_token_types):
+    return [
+        # oracle tokens are always 18 decimals
+        18 if token_type == 1 else decimals
+        for decimals, token_type in zip(initial_decimals, pool_token_types)
+    ]
+
+
+@pytest.fixture()
+def meta_decimals(metapool_token_type, decimals):
     # oracle tokens are always 18 decimals
-    return [d if t != 1 else 18 for d, t in zip(initial_decimals, pool_token_types)]
-
-
-@pytest.fixture(scope="session")
-def meta_decimals(initial_decimals, metapool_token_type, decimals):
-    # oracle tokens are always 18 decimals
-    return decimals[0] if metapool_token_type != 1 else 18
-
-
-# Usage
-# @pytest.mark.only_for_token_types(1,2)
-#
-# will not be skipped only if at least one of tokens in pool is eth or oracle
-# can be applied to classes
-#
-# @pytest.mark.only_for_token_types(2)
-# class TestPoolsWithOracleToken:
-@pytest.fixture(autouse=True)
-def skip_by_token_type(request, pool_tokens):
-    only_for_token_types = request.node.get_closest_marker("only_for_token_types")
-    if only_for_token_types:
-        asset_types = [tkn.asset_type() for tkn in pool_tokens]
-        if not any(asset_type in only_for_token_types.args for asset_type in asset_types):
-            pytest.skip("skipped because no tokens for these types")
-
-
-@pytest.fixture(autouse=True)
-def skip_rebasing(request, swap):
-    only_for_token_types = request.node.get_closest_marker("skip_rebasing_tokens")
-    if only_for_token_types:
-        if 2 in get_asset_types_in_pool(swap):
-            pytest.skip("skipped because test includes rebasing tokens")
-
-
-@pytest.fixture(autouse=True)
-def skip_oracle(request, pool_tokens):
-    only_for_token_types = request.node.get_closest_marker("skip_oracle_tokens")
-    if only_for_token_types:
-        asset_types = [tkn.asset_type() for tkn in pool_tokens]
-        asset_types_contains_oracle = 1 in asset_types
-        if asset_types_contains_oracle:
-            pytest.skip("skipped because test includes oraclised tokens")
-
-
-@pytest.fixture(autouse=True)
-def only_oracle(request, pool_tokens):
-    only_for_token_types = request.node.get_closest_marker("only_oracle_tokens")
-    if only_for_token_types:
-        asset_types = [tkn.asset_type() for tkn in pool_tokens]
-        asset_types_contains_rebasing = 1 in asset_types
-        if not asset_types_contains_rebasing:
-            pytest.skip("skipped because test excludes oraclised tokens")
-
-
-@pytest.fixture(autouse=True)
-def only_rebasing(request, swap):
-    marker = request.node.get_closest_marker("contains_rebasing_tokens")
-    if marker:
-        asset_types_contains_rebasing = 2 in get_asset_types_in_pool(swap)
-        if not asset_types_contains_rebasing:
-            pytest.skip("skipped because test excludes rebasing tokens")
-
-
-# Usage
-# @pytest.mark.only_for_pool_type(1)
-# class TestMetaPool...
-@pytest.fixture(autouse=True)
-def skip_by_pool_type(request, pool_type):
-    only_for_pool_type = request.node.get_closest_marker("only_for_pool_type")
-    if only_for_pool_type:
-        if pool_type not in only_for_pool_type.args:
-            pytest.skip("skipped because another pool type")
+    return 18 if metapool_token_type == 1 else decimals[0]
 
 
 @pytest.fixture(scope="module")

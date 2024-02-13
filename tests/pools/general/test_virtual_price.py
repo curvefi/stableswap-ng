@@ -53,19 +53,12 @@ def test_exchange(bob, swap, sending, receiving, decimals):
     virtual_price = swap.get_virtual_price()
 
     amount = 10_000 * 10 ** decimals[sending]
-    swap.exchange(
-        sending,
-        receiving,
-        amount,
-        0,
-        sender=bob,
-    )
+    swap.exchange(sending, receiving, amount, 0, sender=bob)
 
     assert swap.get_virtual_price() > virtual_price
 
 
 def test_donate_virtual_price(bob, swap, pool_tokens, initial_amounts, pool_size):
-
     # make a deposit
     for i, amount in enumerate(initial_amounts):
         amounts = [0] * pool_size

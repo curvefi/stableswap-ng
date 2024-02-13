@@ -1,7 +1,7 @@
 from math import log
 
 
-def approx(x1: int, x2: int, precision: int, abs_precision=None):
+def approx(x1: int, x2: int, precision: float, abs_precision=None):
     if precision >= 1:
         return True
     result = False
@@ -17,7 +17,6 @@ def approx(x1: int, x2: int, precision: int, abs_precision=None):
 
 
 def get_asset_types_in_pool(pool):
-
     if "asset_type" in pool._immutables.__dict__.keys():
         return [pool._immutables.asset_type]
     return pool._immutables.asset_types

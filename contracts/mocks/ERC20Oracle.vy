@@ -1,4 +1,4 @@
-# @version ^0.3.9
+# pragma version 0.3.10
 
 """
 @notice Mock ERC20 with oracle

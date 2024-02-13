@@ -1,4 +1,4 @@
-# @version 0.3.10
+# pragma version 0.3.10
 """
 @title "Zap" Depositer for permissionless USD metapools
 @author Curve.Fi
