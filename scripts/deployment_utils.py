@@ -97,6 +97,10 @@ curve_dao_network_settings = {
         dao_ownership_contract="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
         fee_receiver_address="0x98B4029CaBEf7Fd525A36B0BF8555EC1d42ec0B6",
     ),
+    "fraxtal:mainnet": CurveNetworkSettings(
+        dao_ownership_contract="0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",  # proxy
+        fee_receiver_address="0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+    ),
     "tron:mainnet": CurveNetworkSettings(dao_ownership_contract="", fee_receiver_address=""),
     "mantle:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xf3A431008396df8A8b2DF492C913706BDB0874ef",

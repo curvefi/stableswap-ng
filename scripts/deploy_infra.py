@@ -19,6 +19,7 @@ deployments = {
         "meta_amm": "0xede71F77d7c900dCA5892720E76316C6E575F0F7",
         "factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf",
         "gauge": "0x38D9BdA812da2C68dFC6aDE85A7F7a54E77F8325",
+        "zap": "",
     },
     "ethereum:sepolia": {
         "math": "0x2cad7b3e78e10bcbf2cc443ddd69ca8bcc09a758",
@@ -26,6 +27,7 @@ deployments = {
         "plain_amm": "0xE12374F193f91f71CE40D53E0db102eBaA9098D5",
         "meta_amm": "0xB00E89EaBD59cD3254c88E390103Cf17E914f678",
         "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
+        "zap": "",
     },
     # Layer 2
     "arbitrum:mainnet": {
@@ -34,6 +36,7 @@ deployments = {
         "plain_amm": "0xf6841C27fe35ED7069189aFD5b81513578AFD7FF",
         "meta_amm": "0xFf02cBD91F57A778Bab7218DA562594a680B8B61",
         "factory": "0x9AF14D26075f142eb3F292D5065EB3faa646167b",
+        "zap": "",
     },
     "optimism:mainnet": {
         "math": "0xa7b9d886A9a374A1C86DC52d2BA585c5CDFdac26",
@@ -41,6 +44,7 @@ deployments = {
         "plain_amm": "0x635742dCC8313DCf8c904206037d962c042EAfBd",
         "meta_amm": "0x5702BDB1Ec244704E3cBBaAE11a0275aE5b07499",
         "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "zap": "",
     },
     "base:mainnet": {
         "math": "0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3",
@@ -48,6 +52,7 @@ deployments = {
         "plain_amm": "0xf3A6aa40cf048a3960E9664847E9a7be025a390a",
         "meta_amm": "0x635742dCC8313DCf8c904206037d962c042EAfBd",
         "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
+        "zap": "",
     },
     "linea:mainnet": {
         "math": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
@@ -55,6 +60,7 @@ deployments = {
         "plain_amm": "0xa7b9d886a9a374a1c86dc52d2ba585c5cdfdac26",
         "meta_amm": "0xf3a6aa40cf048a3960e9664847e9a7be025a390a",
         "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "zap": "",
     },
     "scroll:mainnet": {
         "math": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
@@ -62,6 +68,7 @@ deployments = {
         "plain_amm": "0xa7b9d886A9a374A1C86DC52d2BA585c5CDFdac26",
         "meta_amm": "0xf3A6aa40cf048a3960E9664847E9a7be025a390a",
         "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "zap": "",
     },
     "pzkevm:mainnet": {
         "math": "0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3",
@@ -69,6 +76,7 @@ deployments = {
         "plain_amm": "0xf3A6aa40cf048a3960E9664847E9a7be025a390a",
         "meta_amm": "0x635742dCC8313DCf8c904206037d962c042EAfBd",
         "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
+        "zap": "",
     },
     # Layer 1
     "gnosis:mainnet": {
@@ -77,6 +85,7 @@ deployments = {
         "plain_amm": "0x3d6cb2f6dcf47cdd9c13e4e3beae9af041d8796a",
         "meta_amm": "0xC1b393EfEF38140662b91441C6710Aa704973228",
         "factory": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
+        "zap": "",
     },
     "polygon:mainnet": {
         "math": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
@@ -84,6 +93,7 @@ deployments = {
         "plain_amm": "0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3",
         "meta_amm": "0xa7b9d886A9a374A1C86DC52d2BA585c5CDFdac26",
         "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "zap": "",
     },
     "avax:mainnet": {
         "math": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
@@ -91,6 +101,7 @@ deployments = {
         "plain_amm": "0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3",
         "meta_amm": "0xa7b9d886A9a374A1C86DC52d2BA585c5CDFdac26",
         "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "zap": "",
     },
     "ftm:mainnet": {
         "math": "0xf3A6aa40cf048a3960E9664847E9a7be025a390a",
@@ -98,6 +109,7 @@ deployments = {
         "plain_amm": "0x5702BDB1Ec244704E3cBBaAE11a0275aE5b07499",
         "meta_amm": "0x046207cB759F527b6c10C2D61DBaca45513685CC",
         "factory": "0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b",
+        "zap": "",
     },
     "bsc:mainnet": {
         "math": "0x166c4084Ad2434E8F2425C64dabFE6875A0D45c5",
@@ -105,6 +117,7 @@ deployments = {
         "plain_amm": "0x505d666E4DD174DcDD7FA090ed95554486d2Be44",
         "meta_amm": "0x5a8C93EE12a8Df4455BA111647AdA41f29D5CfcC",
         "factory": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
+        "zap": "",
     },
     "celo:mainnet": {
         "math": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
@@ -112,6 +125,7 @@ deployments = {
         "plain_amm": "0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3",
         "meta_amm": "0xa7b9d886A9a374A1C86DC52d2BA585c5CDFdac26",
         "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "zap": "",
     },
     "kava:mainnet": {
         "math": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
@@ -119,6 +133,7 @@ deployments = {
         "plain_amm": "0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3",
         "meta_amm": "0xa7b9d886A9a374A1C86DC52d2BA585c5CDFdac26",
         "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "zap": "",
     },
     "aurora:mainnet": {
         "math": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
@@ -126,6 +141,15 @@ deployments = {
         "plain_amm": "0xa7b9d886A9a374A1C86DC52d2BA585c5CDFdac26",
         "meta_amm": "0xf3A6aa40cf048a3960E9664847E9a7be025a390a",
         "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "zap": "",
+    },
+    "fraxtal:mainnet": {
+        "math": "0x506F594ceb4E33F5161139bAe3Ee911014df9f7f",
+        "views": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "plain_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "meta_amm": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
+        "zap": "0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b",
     },
     "mantle:mainnet": {
         "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
@@ -133,6 +157,7 @@ deployments = {
         "plain_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
         "meta_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
         "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "zap": "",
         "factory_ctor": "000000000000000000000000f3a431008396df8a8b2df492c913706bdb0874ef0000000000000000000000002d12d0907a388811e3aa855a550f959501d303ee",  # noqa:E501
     },
 }
@@ -203,6 +228,7 @@ def deploy_infra(network, url, account, fork=False):
     views_contract_obj = set_evm_version("./contracts/main/CurveStableSwapNGViews.vy", network)
     plain_contract_obj = set_evm_version("./contracts/main/CurveStableSwapNG.vy", network)
     meta_contract_obj = set_evm_version("./contracts/main/CurveStableSwapMetaNG.vy", network)
+    zap_contract_obj = set_evm_version("./contracts/main/MetaZapNG.vy", network)
 
     # deploy non-blueprint contracts:
     math_contract = check_and_deploy(math_contract_obj, "math", network)
@@ -216,6 +242,9 @@ def deploy_infra(network, url, account, fork=False):
     factory_contract_obj = set_evm_version("./contracts/main/CurveStableSwapFactoryNG.vy", network)
     args = [fee_receiver, deploy_utils.FIDDYDEPLOYER]
     factory = check_and_deploy(factory_contract_obj, "factory", network, False, args)
+
+    # zap:
+    check_and_deploy(zap_contract_obj, "zap", network)
 
     # Set up AMM implementations:
     if not factory.views_implementation() == views_contract.address:
@@ -247,7 +276,7 @@ def deploy_infra(network, url, account, fork=False):
 
 
 def main():
-    deploy_infra("ethereum:mainnet", os.environ["RPC_ETHEREUM"], "FIDDYDEPLOYER", fork=False)
+    deploy_infra(":mainnet", os.environ["RPC_"], "", fork=False)
 
 
 if __name__ == "__main__":
