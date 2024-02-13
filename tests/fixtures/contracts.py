@@ -43,6 +43,11 @@ def zap_deployer():
 
 
 @pytest.fixture(scope="session")
+def meta_zap_ng_deployer():
+    return boa.load_partial("contracts/main/MetaZapNG.vy")
+
+
+@pytest.fixture(scope="session")
 def gauge_deployer():
     return boa.load_partial("contracts/main/LiquidityGauge.vy")
 

@@ -15,63 +15,27 @@ ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 deployments = {
     # Ethereum
-    "ethereum:sepolia": {
-        "factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81",
-    },
-    "ethereum:mainnet": {
-        "factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf",
-    },
+    "ethereum:sepolia": {"factory": "0xfb37b8D939FFa77114005e61CFc2e543d6F49A81"},
+    "ethereum:mainnet": {"factory": "0x6A8cbed756804B16E05E741eDaBd5cB544AE21bf"},
     # Layer 2
-    "arbitrum:mainnet": {
-        "factory": "0x9AF14D26075f142eb3F292D5065EB3faa646167b",
-    },
-    "optimism:mainnet": {
-        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
-    },
-    "base:mainnet": {
-        "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
-    },
-    "linea:mainnet": {
-        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
-    },
-    "scroll:mainnet": {
-        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
-    },
-    "zksync:mainnet": {
-        "factory": "",
-    },
-    "pzkevm:mainnet": {
-        "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
-    },
+    "arbitrum:mainnet": {"factory": "0x9AF14D26075f142eb3F292D5065EB3faa646167b"},
+    "optimism:mainnet": {"factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E"},
+    "base:mainnet": {"factory": "0xd2002373543Ce3527023C75e7518C274A51ce712"},
+    "linea:mainnet": {"factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E"},
+    "scroll:mainnet": {"factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E"},
+    "zksync:mainnet": {"factory": ""},
+    "pzkevm:mainnet": {"factory": "0xd2002373543Ce3527023C75e7518C274A51ce712"},
     "mantle:mainnet": {"factory": ""},
     # Layer 1
-    "gnosis:mainnet": {
-        "factory": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8",
-    },
-    "polygon:mainnet": {
-        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
-    },
-    "avax:mainnet": {
-        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
-    },
-    "ftm:mainnet": {
-        "factory": "0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b",
-    },
-    "bsc:mainnet": {
-        "factory": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
-    },
-    "celo:mainnet": {
-        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
-    },
-    "kava:mainnet": {
-        "factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
-    },
-    "aurora:mainnet": {
-        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
-    },
-    "tron:mainnet": {
-        "factory": "",
-    },
+    "gnosis:mainnet": {"factory": "0xbC0797015fcFc47d9C1856639CaE50D0e69FbEE8"},
+    "polygon:mainnet": {"factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585"},
+    "avax:mainnet": {"factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585"},
+    "ftm:mainnet": {"factory": "0xe61Fb97Ef6eBFBa12B36Ffd7be785c1F5A2DE66b"},
+    "bsc:mainnet": {"factory": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B"},
+    "celo:mainnet": {"factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585"},
+    "kava:mainnet": {"factory": "0x1764ee18e8B3ccA4787249Ceb249356192594585"},
+    "aurora:mainnet": {"factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E"},
+    "tron:mainnet": {"factory": ""},
 }
 
 
@@ -130,7 +94,6 @@ pool_settings = {
 
 
 def deploy_pool(network, url, account, pool_type, fork):
-
     logger.log(f"Deploying pool on {network} ...")
 
     if fork:
@@ -158,7 +121,6 @@ def deploy_pool(network, url, account, pool_type, fork):
 
 
 def deploy_gauge(network, url, account, pool_addr, fork):
-
     logger.log(f"Deploying gauge for pool {pool_addr} on {network} ...")
 
     if fork:
@@ -181,7 +143,6 @@ def deploy_gauge(network, url, account, pool_addr, fork):
 
 
 def deploy_pool_and_gauge(network, url, account, pool_type, fork):
-
     logger.log(f"Deploying pool on {network} ...")
 
     if fork:
@@ -211,7 +172,6 @@ def deploy_pool_and_gauge(network, url, account, pool_type, fork):
 
 
 def main():
-
     fork = False
     deploy_pool_and_gauge("ethereum:mainnet", os.environ["RPC_ETHEREUM"], "FIDDYDEPLOYER", "plain", fork)
     deploy_pool_and_gauge("ethereum:mainnet", "http://localhost:9090/", "FIDDYDEPLOYER", "meta", fork)
