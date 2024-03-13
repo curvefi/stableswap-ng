@@ -456,14 +456,15 @@ def _base_calc_token_amount(
     base_pool: address,
     is_deposit: bool
 ) -> uint256:
+    base_pool_is_ng: bool = raw_call(base_pool, method_id("D_ma_time()"), revert_on_failure=False, is_static_call=True)
 
-    if base_n_coins == 2:
+    if base_n_coins == 2 and not base_pool_is_ng:
 
         base_inputs: uint256[2] = empty(uint256[2])
         base_inputs[base_i] = dx
         return StableSwap2(base_pool).calc_token_amount(base_inputs, is_deposit)
 
-    elif base_n_coins == 3:
+    elif base_n_coins == 3 and not base_pool_is_ng:
 
         base_inputs: uint256[3] = empty(uint256[3])
         base_inputs[base_i] = dx
