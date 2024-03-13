@@ -100,7 +100,7 @@ def get_dx_underlying(
     N_COINS: uint256 = StableSwapNG(pool).N_COINS()
     base_pool_has_static_fee: bool = self._has_static_fee(BASE_POOL)
 
-    # CASE 1: Swap does not involve Metapool at all. In this case, we kindly as the user
+    # CASE 1: Swap does not involve Metapool at all. In this case, we kindly ask the user
     # to use the right pool for their swaps.
     if min(i, j) > 0:
         raise "Not a Metapool Swap. Use Base pool."
