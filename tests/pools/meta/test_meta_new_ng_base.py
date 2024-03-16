@@ -5,17 +5,19 @@ import pytest
 
 from tests.utils.tokens import mint_for_testing
 
-BASE_N_COINS = 5
+@pytest.fixture(params=[2, 3, 4, 5], scope="module")
+def base_n_coins(request):
+    return request.param
 
 
 @pytest.fixture(scope="module")
-def ng_base_pool_decimals():
-    return [18] * BASE_N_COINS
+def ng_base_pool_decimals(base_n_coins):
+    return [18] * base_n_coins
 
 
 @pytest.fixture()
-def ng_base_pool_tokens(ng_base_pool_decimals, erc20_deployer):
-    return [erc20_deployer.deploy(f"tkn{i}", f"tkn{i}", ng_base_pool_decimals[i]) for i in range(BASE_N_COINS)]
+def ng_base_pool_tokens(ng_base_pool_decimals, erc20_deployer, base_n_coins):
+    return [erc20_deployer.deploy(f"tkn{i}", f"tkn{i}", ng_base_pool_decimals[i]) for i in range(base_n_coins)]
 
 
 @pytest.fixture()
@@ -109,20 +111,20 @@ def mint_and_approve_for_bob(meta_token, ng_base_pool_tokens, bob, empty_swap, n
 
 @pytest.fixture()
 def deposit_amounts(
-    meta_token, ng_base_pool, ng_base_pool_tokens, ng_base_pool_decimals, empty_swap, bob, mint_and_approve_for_bob
+    meta_token, ng_base_pool, ng_base_pool_tokens, ng_base_pool_decimals, empty_swap, bob, mint_and_approve_for_bob, base_n_coins
 ):
     _deposit_amounts = []
-    INITIAL_AMOUNT = 1_000_000 * BASE_N_COINS
-    _deposit_amounts.append(INITIAL_AMOUNT // BASE_N_COINS * 10 ** meta_token.decimals())
+    INITIAL_AMOUNT = 1_000_000 * base_n_coins
+    _deposit_amounts.append(INITIAL_AMOUNT // base_n_coins * 10 ** meta_token.decimals())
 
     def add_base_pool_liquidity(user, base_pool, base_pool_tokens, base_pool_decimals):
-        amount = INITIAL_AMOUNT // BASE_N_COINS
+        amount = INITIAL_AMOUNT // base_n_coins
         with boa.env.prank(user):
             amounts = [amount * 10**d for d in base_pool_decimals]
             base_pool.add_liquidity(amounts, 0)
 
     add_base_pool_liquidity(bob, ng_base_pool, ng_base_pool_tokens, ng_base_pool_decimals)
-    _deposit_amounts.append(INITIAL_AMOUNT // BASE_N_COINS * 10 ** ng_base_pool.decimals())
+    _deposit_amounts.append(INITIAL_AMOUNT // base_n_coins * 10 ** ng_base_pool.decimals())
     ng_base_pool.approve(empty_swap, 2**256 - 1, sender=bob)
     return _deposit_amounts
 
@@ -140,3 +142,13 @@ def test_exchange_underlying_ng_base(swap, bob, sending, receiving):
     actual_out = swap.exchange_underlying(sending, receiving, amount, 0, sender=bob)
 
     assert expected_out == actual_out
+
+@pytest.fixture
+def coins_range(base_n_coins):
+    return range(1, base_n_coins)
+
+def test_exchange_underlying_preview(swap, bob, coins_range, base_n_coins):
+    receiving = 0
+    for sending in coins_range:
+        # these calls used to revert before the fix
+        swap.get_dy_underlying(sending, receiving, 10**19)
