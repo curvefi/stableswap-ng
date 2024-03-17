@@ -283,7 +283,7 @@ def calc_token_amount(
             else:
                 difference = new_balance - ideal_balance
 
-            xs = old_balances[i] + new_balance
+            xs = rates[i] * (old_balances[i] + new_balance) / PRECISION
             _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee, fee_multiplier)
             new_balances[i] -= _dynamic_fee_i * difference / FEE_DENOMINATOR
 
