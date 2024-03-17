@@ -145,3 +145,12 @@ def test_exchange_underlying_preview(swap, coins_range):
     for sending in coins_range:
         # these calls used to revert before the fix
         swap.get_dy_underlying(sending, receiving, 10**19)
+
+def test_broken_pool_is_fixed(forked_chain, meta_deployer, views_deployer):
+    BROKEN_SWAP = '0x9e10f9Fb6F0D32B350CEe2618662243d4f24C64a'
+    BROKEN_VIEW ='0xe0B15824862f3222fdFeD99FeBD0f7e0EC26E1FA'
+
+    # testing fix for the first instance of the error reported
+    metapool = meta_deployer.at(BROKEN_SWAP)
+    views_deployer.at(BROKEN_VIEW)
+    metapool.get_dy_underlying(1, 0, 50000000)
