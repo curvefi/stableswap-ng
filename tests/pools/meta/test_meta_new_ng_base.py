@@ -7,6 +7,7 @@ from tests.utils.tokens import mint_for_testing
 
 BASE_N_COINS = 5
 
+
 @pytest.fixture(scope="module")
 def ng_base_pool_decimals():
     return [18] * BASE_N_COINS

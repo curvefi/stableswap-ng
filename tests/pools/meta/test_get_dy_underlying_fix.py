@@ -1,10 +1,9 @@
 # =================== Test for issue #43 fix ===================
-import pytest
-
 import boa
 import pytest
 
 from tests.utils.tokens import mint_for_testing
+
 
 @pytest.fixture(params=[2, 3, 4, 5], scope="module")
 def base_n_coins(request):
@@ -112,7 +111,14 @@ def mint_and_approve_for_bob(meta_token, ng_base_pool_tokens, bob, empty_swap, n
 
 @pytest.fixture()
 def deposit_amounts(
-    meta_token, ng_base_pool, ng_base_pool_tokens, ng_base_pool_decimals, empty_swap, bob, mint_and_approve_for_bob, base_n_coins
+    meta_token,
+    ng_base_pool,
+    ng_base_pool_tokens,
+    ng_base_pool_decimals,
+    empty_swap,
+    bob,
+    mint_and_approve_for_bob,
+    base_n_coins,
 ):
     _deposit_amounts = []
     INITIAL_AMOUNT = 1_000_000 * base_n_coins
@@ -140,15 +146,17 @@ def swap(empty_swap, bob, deposit_amounts):
 def coins_range(base_n_coins):
     return range(1, base_n_coins)
 
+
 def test_exchange_underlying_preview(swap, coins_range):
     receiving = 0
     for sending in coins_range:
         # these calls used to revert before the fix
         swap.get_dy_underlying(sending, receiving, 10**19)
 
+
 def test_broken_pool_is_fixed(forked_chain, meta_deployer, views_deployer):
-    BROKEN_SWAP = '0x9e10f9Fb6F0D32B350CEe2618662243d4f24C64a'
-    BROKEN_VIEW ='0xe0B15824862f3222fdFeD99FeBD0f7e0EC26E1FA'
+    BROKEN_SWAP = "0x9e10f9Fb6F0D32B350CEe2618662243d4f24C64a"
+    BROKEN_VIEW = "0xe0B15824862f3222fdFeD99FeBD0f7e0EC26E1FA"
 
     # testing fix for the first instance of the error reported
     metapool = meta_deployer.at(BROKEN_SWAP)
