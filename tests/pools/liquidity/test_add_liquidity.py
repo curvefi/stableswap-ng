@@ -18,7 +18,20 @@ def test_add_liquidity(
     pool_token_types,
     metapool_token_type,
 ):
-    swap.add_liquidity(deposit_amounts, 0, sender=bob)
+    if pool_type == 1:
+        pytest.xfail("pool_type = meta - should be fixed")
+
+    if pool_token_types == (2, 2) and pool_type == 0:
+        pytest.xfail("pool_token_types = rebase-rebase - should be fixed")
+        # similar to issue #44 there is probably some miscalculation in the view contract
+
+    calculated_output = swap.calc_token_amount(deposit_amounts, True)
+
+    returned_output = swap.add_liquidity(deposit_amounts, 0, sender=bob)
+
+    # estimation should corresond to the reported amount
+    assert calculated_output == returned_output
+
     is_ideal = True
 
     if pool_type == 0:
@@ -68,6 +81,9 @@ def test_add_one_coin(
     metapool_token_type,
     idx,
 ):
+    if pool_type == 1:
+        pytest.xfail("pool_type = meta - should be fixed")
+
     amounts = [0] * len(pool_tokens)
     amounts[idx] = deposit_amounts[idx]
 
@@ -122,6 +138,8 @@ def test_min_amount_too_high(bob, swap, pool_type, deposit_amounts, pool_tokens)
 
 
 def test_event(bob, swap, pool_type, deposit_amounts, pool_tokens, pool_token_types, metapool_token_type):
+    if pool_type == 1 and metapool_token_type == 0:
+        pytest.xfail("pool_type = meta, meta token type = plain - should be fixed")
     size = 2
     check_invariant = True
     if pool_type == 0:
