@@ -1,5 +1,5 @@
 # pragma version 0.3.10
-# pragma evm-version shanghai
+# pragma evm-version paris
 """
 @title CurveStableSwapNGViews
 @author Curve.Fi
@@ -100,7 +100,7 @@ def get_dx_underlying(
     N_COINS: uint256 = StableSwapNG(pool).N_COINS()
     base_pool_has_static_fee: bool = self._has_static_fee(BASE_POOL)
 
-    # CASE 1: Swap does not involve Metapool at all. In this case, we kindly as the user
+    # CASE 1: Swap does not involve Metapool at all. In this case, we kindly ask the user
     # to use the right pool for their swaps.
     if min(i, j) > 0:
         raise "Not a Metapool Swap. Use Base pool."
@@ -283,7 +283,7 @@ def calc_token_amount(
             else:
                 difference = new_balance - ideal_balance
 
-            xs = old_balances[i] + new_balance
+            xs = rates[i] * (old_balances[i] + new_balance) / PRECISION
             _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee, fee_multiplier)
             new_balances[i] -= _dynamic_fee_i * difference / FEE_DENOMINATOR
 
@@ -456,14 +456,15 @@ def _base_calc_token_amount(
     base_pool: address,
     is_deposit: bool
 ) -> uint256:
+    base_pool_is_ng: bool = raw_call(base_pool, method_id("D_ma_time()"), revert_on_failure=False, is_static_call=True)
 
-    if base_n_coins == 2:
+    if base_n_coins == 2 and not base_pool_is_ng:
 
         base_inputs: uint256[2] = empty(uint256[2])
         base_inputs[base_i] = dx
         return StableSwap2(base_pool).calc_token_amount(base_inputs, is_deposit)
 
-    elif base_n_coins == 3:
+    elif base_n_coins == 3 and not base_pool_is_ng:
 
         base_inputs: uint256[3] = empty(uint256[3])
         base_inputs[base_i] = dx
