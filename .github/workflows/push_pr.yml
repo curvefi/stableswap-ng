@@ -20,8 +20,8 @@ jobs:
 
       - name: Create release file
         run: |
-          TITLE="${{ github.event.release.name }}"
-          NOTES="${{ github.event.release.body }}"
+          TITLE='${{ github.event.release.name }}'
+          NOTES='${{ github.event.release.body }}'
           DATE=$(date '+%d-%m-%Y')
           mkdir -p deployments
           echo $NOTES >> "deployments/release-$TITLE-$DATE.txt"
