@@ -34,7 +34,11 @@ def deploy_proxy_admin(network, url, account, fork=False):
 
 
 def main():
-    deploy_proxy_admin(":mainnet", os.environ["RPC_"], "", fork=False)
+    network = "xlayer"
+    rpc = "https://xlayerrpc.okx.com"
+    account = "FIDDYDEPLOYER"
+    fork = False
+    deploy_proxy_admin(network, rpc, account, fork)
 
 
 if __name__ == "__main__":

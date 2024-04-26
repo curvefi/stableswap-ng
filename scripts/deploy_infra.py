@@ -79,8 +79,7 @@ deployments = {
     },
     "pzkevm:mainnet": {
         "math": "0xe265FC390E9129b7E337Da23cD42E00C34Da2CE3",
-        # "views": "0xa7b9d886A9a374A1C86DC52d2BA585c5CDFdac26",
-        "views": "",
+        "views": "0x87DD13Dd25a1DBde0E1EdcF5B8Fa6cfff7eABCaD",
         "plain_amm": "0xf3A6aa40cf048a3960E9664847E9a7be025a390a",
         "meta_amm": "0x635742dCC8313DCf8c904206037d962c042EAfBd",
         "factory": "0xd2002373543Ce3527023C75e7518C274A51ce712",
@@ -178,6 +177,14 @@ deployments = {
         "zap": "",
         "factory_ctor": "000000000000000000000000f3a431008396df8a8b2df492c913706bdb0874ef0000000000000000000000002d12d0907a388811e3aa855a550f959501d303ee",  # noqa:E501
     },
+    "xlayer:mainnet": {
+        "math": "0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
+        "views": "0xd7E72f3615aa65b92A4DBdC211E296a35512988B",
+        "plain_amm": "0x87FE17697D0f14A222e8bEf386a0860eCffDD617",
+        "meta_amm": "0x1764ee18e8B3ccA4787249Ceb249356192594585",
+        "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
+        "zap": "0x604388Bb1159AFd21eB5191cE22b4DeCdEE2Ae22",
+    },
 }
 
 
@@ -261,8 +268,8 @@ def deploy_infra(network, url, account, fork=False):
     factory = check_and_deploy(factory_contract_obj, "factory", network, False, args)
 
     # zap:
-    # zap_contract_obj = set_evm_version("./contracts/main/MetaZapNG.vy", network)
-    # check_and_deploy(zap_contract_obj, "zap", network)
+    zap_contract_obj = set_evm_version("./contracts/main/MetaZapNG.vy", network)
+    check_and_deploy(zap_contract_obj, "zap", network)
 
     # Set up AMM implementations:÷
     current_views_impl = factory.views_implementation()
@@ -304,8 +311,8 @@ def deploy_infra(network, url, account, fork=False):
 def main():
     deployer = "FIDDYDEPLOYER"
     fork = False
-    network = "pzkevm"
-    rpc = f"https://lb.drpc.org/ogrpc?network=polygon-zkevm&dkey={os.environ['drpc_key']}"
+    network = "xlayer"
+    rpc = "https://xlayerrpc.okx.com"
     deploy_infra(f"{network}:mainnet", rpc, deployer, fork=fork)
 
 
