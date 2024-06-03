@@ -10,7 +10,7 @@ packages = []
 [tool.poetry.dependencies]
 python = "^3.10"
 poetry = "1.5.1"
-titanoboa = {git = "https://github.com/vyperlang/titanoboa.git", rev = "8343f16bd35829421c0953373aa854fc52b41170"}
+titanoboa = {git = "https://github.com/DanielSchiavini/titanoboa.git", rev = "zksync"}
 vyper = "0.3.10"
 pycryptodome = "^3.18.0"
 pre-commit = "^3.3.3"
@@ -23,8 +23,8 @@ mamushi = "^0.0.2a1"
 
 
 [tool.poetry.group.testing.dependencies]
-eip712 = "^0.2.1"
-eth-account = "~0.8.0"
+eip712 = {git = "https://github.com/DanielSchiavini/eip712.git", rev = "main"}
+eth-account = "~0.13.0"
 ipython = "^8.14.0"
 hypothesis = "^6.79.3"
 pytest = "^7.4.0"

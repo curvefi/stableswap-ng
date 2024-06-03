@@ -2,11 +2,14 @@ import os
 import sys
 
 import boa
+import boa_zksync
 import deployment_utils as deploy_utils
 from boa.network import NetworkEnv
 from eth_abi import encode
 from eth_account import Account
 from rich.console import Console as RichConsole
+
+ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 logger = RichConsole(file=sys.stdout)
 
@@ -185,10 +188,18 @@ deployments = {
         "factory": "0x5eeE3091f747E60a045a2E715a4c71e600e31F6E",
         "zap": "0x604388Bb1159AFd21eB5191cE22b4DeCdEE2Ae22",
     },
+    "zksync:mainnet": {
+        "math": "0xcf19236e85000901dE2Fad3199aA4A1F74a78B6C",
+        "views": "0xDD82bEe76CB4b161B44533e4B6Dfc2eee7e066D4",
+        "plain_amm": "",
+        "meta_amm": "",
+        "factory": "",
+        "zap": "",
+    },
 }
 
 
-def set_evm_version(contract_file, network) -> boa.vyper.contract.VyperDeployer:
+def set_contract_pragma(contract_file, network) -> boa.contracts.vyper.vyper_contract.VyperDeployer:
     with open(contract_file, "r") as f:
         source = f.read()
 
@@ -203,12 +214,24 @@ def set_evm_version(contract_file, network) -> boa.vyper.contract.VyperDeployer:
     else:  # all looks good ...
         new_source = source
 
-    contract_obj = boa.loads_partial(source_code=new_source)
+    is_zksync = "zksync" in network
+    if is_zksync:
+        logger.log("Cannot use compiler optimisations in zksync. Removing optimizer flags")
+        if "# pragma optimize gas" in new_source:
+            new_source = source.replace("# pragma optimize gas\n", "#\n")
+        if "# pragma optimize codesize" in new_source:
+            new_source = source.replace("# pragma optimize codesize\n", "#\n")
+
+    contract_obj = boa.loads_partial(source_code=new_source, filename=contract_file)
     return contract_obj
 
 
 def check_and_deploy(contract_obj, contract_designation, network, blueprint: bool = False, args=[]):
     deployed_contract = deployments[network][contract_designation]
+    try:
+        contract_name = os.path.basename(contract_obj.filename)
+    except AttributeError:
+        contract_name = os.path.basename(contract_obj._filename)
 
     if not deployed_contract:
         logger.log(f"Deploying {contract_designation} contract ...")
@@ -218,7 +241,49 @@ def check_and_deploy(contract_obj, contract_designation, network, blueprint: boo
                 constructor_args = encode(["address", "address"], args)
                 logger.log(f"Constructor arguments for {contract_designation}: {constructor_args.hex()}")
         else:
-            contract = contract_obj.deploy_as_blueprint()
+            if "zksync:mainnet" in network:
+                if "CurveStableSwapNG.vy" == contract_name:
+                    contract = contract_obj.deploy_as_blueprint(
+                        "blueprint",  # name
+                        "BLUEPRINT",  # symbol
+                        1500,  # A
+                        1000000,  # fee
+                        10000000000,  # offpeg_fee_multiplier
+                        865,  # ma_exp_time
+                        [
+                            "0x1d17CBcF0D6D143135aE902365D2E5e2A16538D4",  # native usdc
+                            "0x493257fD37EDB34451f62EDf8D2a0C418852bA4C",  # native usdt
+                        ],
+                        [10**18, 10**18],  # rate_multipliers
+                        [0, 0],  # asset_types
+                        [b"", b""],  # method_ids
+                        [ZERO_ADDRESS, ZERO_ADDRESS],  # oracles
+                    )
+
+                elif "CurveStableSwapMetaNG.vy" == contract_name:
+                    contract = contract_obj.deploy_as_blueprint(
+                        "blueprint",  # name
+                        "BLUEPRINT",  # symbol
+                        500,  # A
+                        1000000,  # fee
+                        50000000000,  # offpeg_fee_multiplier
+                        866,  # ma_exp_time
+                        ZERO_ADDRESS,  # math_implementation
+                        ZERO_ADDRESS,  # base_pool
+                        ["0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4"],  # coins (bridged usdc)
+                        [
+                            "0x1d17CBcF0D6D143135aE902365D2E5e2A16538D4",  # native usdc
+                            "0x493257fD37EDB34451f62EDf8D2a0C418852bA4C",  # native usdt
+                        ],  # base coins
+                        [10**18],  # rate_multipliers
+                        [0],  # asset_types
+                        [b""],  # method_ids
+                        [ZERO_ADDRESS],  # oracles
+                    )
+
+            else:
+                contract = contract_obj.deploy_as_blueprint()
+
         logger.log(f"Deployed! At: {contract.address}.")
     else:
         logger.log(f"Deployed {contract_designation} contract exists. Using {deployed_contract} ...")
@@ -230,14 +295,26 @@ def check_and_deploy(contract_obj, contract_designation, network, blueprint: boo
 def deploy_infra(network, url, account, fork=False):
     logger.log(f"Deploying on {network} ...")
 
-    if fork:
-        boa.env.fork(url)
-        logger.log("Forkmode ...")
-        boa.env.eoa = deploy_utils.FIDDYDEPLOYER  # set eoa address here
+    if network == "zksync:mainnet":
+        if not fork:
+            boa_zksync.set_zksync_env(url)
+            logger.log("Prodmode on zksync Era ...")
+            boa.env.add_account(Account.from_key(os.environ[account]))
+        else:
+            boa_zksync.set_zksync_fork(url)
+            logger.log("Forkmode on zksync Era ...")
+            boa.env.eoa = deploy_utils.FIDDYDEPLOYER  # set eoa address here
+
     else:
-        logger.log("Prodmode ...")
-        boa.set_env(NetworkEnv(url))
-        boa.env.add_account(Account.from_key(os.environ[account]))
+        if fork:
+            boa.env.fork(url)
+            logger.log("Forkmode ...")
+            boa.env.eoa = deploy_utils.FIDDYDEPLOYER  # set eoa address here
+        else:
+            logger.log("Prodmode ...")
+            boa.set_env(NetworkEnv(url))
+            boa.env.add_account(Account.from_key(os.environ[account]))
+
     for _network, data in deploy_utils.curve_dao_network_settings.items():
         if _network in network:
             owner = data.dao_ownership_contract
@@ -249,10 +326,10 @@ def deploy_infra(network, url, account, fork=False):
     # --------------------- Deploy math, views, blueprints ---------------------
 
     # get source and set evm_version
-    math_contract_obj = set_evm_version("./contracts/main/CurveStableSwapNGMath.vy", network)
-    views_contract_obj = set_evm_version("./contracts/main/CurveStableSwapNGViews.vy", network)
-    plain_contract_obj = set_evm_version("./contracts/main/CurveStableSwapNG.vy", network)
-    meta_contract_obj = set_evm_version("./contracts/main/CurveStableSwapMetaNG.vy", network)
+    math_contract_obj = set_contract_pragma("./contracts/main/CurveStableSwapNGMath.vy", network)
+    views_contract_obj = set_contract_pragma("./contracts/main/CurveStableSwapNGViews.vy", network)
+    plain_contract_obj = set_contract_pragma("./contracts/main/CurveStableSwapNG.vy", network)
+    meta_contract_obj = set_contract_pragma("./contracts/main/CurveStableSwapMetaNG.vy", network)
 
     # deploy non-blueprint contracts:
     math_contract = check_and_deploy(math_contract_obj, "math", network)
@@ -263,12 +340,12 @@ def deploy_infra(network, url, account, fork=False):
     meta_blueprint = check_and_deploy(meta_contract_obj, "meta_amm", network, blueprint=True)
 
     # Factory:
-    factory_contract_obj = set_evm_version("./contracts/main/CurveStableSwapFactoryNG.vy", network)
+    factory_contract_obj = set_contract_pragma("./contracts/main/CurveStableSwapFactoryNG.vy", network)
     args = [fee_receiver, deploy_utils.FIDDYDEPLOYER]
     factory = check_and_deploy(factory_contract_obj, "factory", network, False, args)
 
     # zap:
-    zap_contract_obj = set_evm_version("./contracts/main/MetaZapNG.vy", network)
+    zap_contract_obj = set_contract_pragma("./contracts/main/MetaZapNG.vy", network)
     check_and_deploy(zap_contract_obj, "zap", network)
 
     # Set up AMM implementations:÷
@@ -298,7 +375,7 @@ def deploy_infra(network, url, account, fork=False):
 
     if "ethereum" in network:  # Gauge contract only for Ethereum.
         logger.log("Deploying and setting up Gauge contracts ...")
-        gauge_contract_obj = set_evm_version("./contracts/main/LiquidityGauge.vy", network)
+        gauge_contract_obj = set_contract_pragma("./contracts/main/LiquidityGauge.vy", network)
         gauge_blueprint = check_and_deploy(gauge_contract_obj, "gauge", network, blueprint=True)
 
         if not factory.gauge_implementation() == gauge_blueprint.address:
@@ -310,9 +387,9 @@ def deploy_infra(network, url, account, fork=False):
 
 def main():
     deployer = "FIDDYDEPLOYER"
-    fork = False
-    network = "xlayer"
-    rpc = "https://xlayerrpc.okx.com"
+    fork = True
+    network = "zksync"
+    rpc = "https://mainnet.era.zksync.io"
     deploy_infra(f"{network}:mainnet", rpc, deployer, fork=fork)
 
 

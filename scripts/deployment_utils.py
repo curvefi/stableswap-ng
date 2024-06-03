@@ -58,7 +58,8 @@ curve_dao_network_settings = {
         fee_receiver_address="0xf3A431008396df8A8b2DF492C913706BDB0874ef",
     ),
     "zksync:mainnet": CurveNetworkSettings(
-        dao_ownership_contract="", fee_receiver_address="0x4920088D9a5e5De9c098FCA4960d0DA5f4caa4c1"
+        dao_ownership_contract="0xCb8799BFF48bb549F7B69Bb9BE60DbA7cd4F1BB7",
+        fee_receiver_address="0xCb8799BFF48bb549F7B69Bb9BE60DbA7cd4F1BB7",
     ),
     "pzkevm:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
