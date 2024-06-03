@@ -269,7 +269,7 @@ def check_and_deploy(contract_obj, contract_designation, network, blueprint: boo
                         50000000000,  # offpeg_fee_multiplier
                         866,  # ma_exp_time
                         ZERO_ADDRESS,  # math_implementation
-                        ZERO_ADDRESS,  # base_pool
+                        "0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4",  # base_pool (but we use bridged usdc)
                         ["0x3355df6D4c9C3035724Fd0e3914dE96A5a83aaf4"],  # coins (bridged usdc)
                         [
                             "0x1d17CBcF0D6D143135aE902365D2E5e2A16538D4",  # native usdc
@@ -299,11 +299,11 @@ def deploy_infra(network, url, account, fork=False):
         if not fork:
             boa_zksync.set_zksync_env(url)
             logger.log("Prodmode on zksync Era ...")
-            boa.env.add_account(Account.from_key(os.environ[account]))
         else:
             boa_zksync.set_zksync_fork(url)
             logger.log("Forkmode on zksync Era ...")
-            boa.env.eoa = deploy_utils.FIDDYDEPLOYER  # set eoa address here
+
+        boa.env.set_eoa(Account.from_key(os.environ[account]))
 
     else:
         if fork:
