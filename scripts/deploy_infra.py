@@ -193,8 +193,8 @@ deployments = {
         "views": "0xDD82bEe76CB4b161B44533e4B6Dfc2eee7e066D4",
         "plain_amm": "",
         "meta_amm": "",
-        "factory": "",
-        "zap": "",
+        "factory": "0x375444aeDEb6C3db897f293E1DBa85D7422A6859",
+        "zap": "0x4232Dcc6D31543A2431079BdE2082C69eA3A771E",
     },
 }
 
@@ -387,7 +387,7 @@ def deploy_infra(network, url, account, fork=False):
 
 def main():
     deployer = "FIDDYDEPLOYER"
-    fork = True
+    fork = False
     network = "zksync"
     rpc = "https://mainnet.era.zksync.io"
     deploy_infra(f"{network}:mainnet", rpc, deployer, fork=fork)
