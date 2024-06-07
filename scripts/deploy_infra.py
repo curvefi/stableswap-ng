@@ -191,8 +191,8 @@ deployments = {
     "zksync:mainnet": {
         "math": "0xcf19236e85000901dE2Fad3199aA4A1F74a78B6C",
         "views": "0xDD82bEe76CB4b161B44533e4B6Dfc2eee7e066D4",
-        "plain_amm": "",
-        "meta_amm": "",
+        "plain_amm": "0x3ce3009F8ad07161BA9d02d7A0173180d0281cA4",
+        "meta_amm": "0x1E9A82C2a3DF2E0793a2B828aA652Db192f3C8F3",
         "factory": "0x375444aeDEb6C3db897f293E1DBa85D7422A6859",
         "zap": "0x4232Dcc6D31543A2431079BdE2082C69eA3A771E",
     },
@@ -363,7 +363,7 @@ def deploy_infra(network, url, account, fork=False):
 
     current_pool_impl = factory.pool_implementations(0)
     if not current_pool_impl == plain_blueprint.address:
-        logger.log(f"Curent 'plain' pool impl at index 0: {current_pool_impl}")
+        logger.log(f"Current 'plain' pool impl at index 0: {current_pool_impl}")
         factory.set_pool_implementations(0, plain_blueprint.address)
         logger.log(f"Set plain amm implementation at index 0 to: {plain_blueprint.address}")
 
