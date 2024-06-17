@@ -38,7 +38,9 @@ interface VotingEscrow:
     def user_point_history__ts(addr: address, epoch: uint256) -> uint256: view
 
 interface VotingEscrowBoost:
+    def delegation() -> address: nonpayable
     def adjusted_balance_of(_account: address) -> uint256: view
+    def adjusted_balance_of_write(_account: address) -> uint256: nonpayable
 
 
 event Deposit:
@@ -90,7 +92,7 @@ MAX_REWARDS: constant(uint256) = 8
 TOKENLESS_PRODUCTION: constant(uint256) = 40
 WEEK: constant(uint256) = 604800
 
-VERSION: constant(String[8]) = "v6.1.0"  # <- updated from v6.0.0 (makes rewards semi-permissionless)
+VERSION: constant(String[8]) = "v6.2.0"  # <- updated from v6.1.0 (writes checkpoints to boost delegation)
 
 EIP712_TYPEHASH: constant(bytes32) = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)")
 EIP2612_TYPEHASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
@@ -357,7 +359,11 @@ def _update_liquidity_limit(addr: address, l: uint256, L: uint256):
     @param L Total amount of liquidity (LP tokens)
     """
     # To be called after totalSupply is updated
-    voting_balance: uint256 = VotingEscrowBoost(VEBOOST_PROXY).adjusted_balance_of(addr)
+    voting_balance: uint256 = 0
+    if VotingEscrowBoost(VEBOOST_PROXY).delegation() != empty(address):
+        voting_balance = VotingEscrowBoost(VEBOOST_PROXY).adjusted_balance_of_write(addr)
+    else:
+        voting_balance = VotingEscrowBoost(VEBOOST_PROXY).adjusted_balance_of(addr)
     voting_total: uint256 = ERC20(VOTING_ESCROW).totalSupply()
 
     lim: uint256 = l * TOKENLESS_PRODUCTION / 100
