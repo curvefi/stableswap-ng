@@ -8,6 +8,8 @@
         integrators
 """
 
+from vyper.interfaces import ERC20Detailed
+
 interface StableSwapNG:
     def N_COINS() -> uint256: view
     def BASE_POOL() -> address: view
@@ -21,6 +23,7 @@ interface StableSwapNG:
     def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256: view
     def totalSupply() -> uint256: view
     def offpeg_fee_multiplier() -> uint256: view
+    def coins(i: uint256) -> address: view
 
 A_PRECISION: constant(uint256) = 100
 MAX_COINS: constant(uint256) = 8
@@ -28,7 +31,9 @@ PRECISION: constant(uint256) = 10 ** 18
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 
 
-VERSION: public(constant(String[8])) = "1.1.0"
+VERSION: public(constant(String[8])) = "1.2.0"
+# first version was: 0xe0B15824862f3222fdFeD99FeBD0f7e0EC26E1FA (ethereum mainnet)
+# second version was: 0x13526206545e2DC7CcfBaF28dC88F440ce7AD3e0 (ethereum mainnet)
 
 
 # ------------------------------ Public Getters ------------------------------
@@ -148,6 +153,7 @@ def get_dy_underlying(
     N_COINS: uint256 = StableSwapNG(pool).N_COINS()
     MAX_COIN: int128 = convert(N_COINS, int128) - 1
     BASE_POOL: address = StableSwapNG(pool).BASE_POOL()
+    base_lp_token: address = StableSwapNG(pool).coins(1)
 
     rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     balances: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -178,7 +184,12 @@ def get_dy_underlying(
             # i is from BasePool
             base_n_coins: uint256 = StableSwapNG(pool).BASE_N_COINS()
             x = self._base_calc_token_amount(
-                dx, base_i, base_n_coins, BASE_POOL, True
+                dx,
+                base_i,
+                base_n_coins,
+                BASE_POOL,
+                base_lp_token,
+                True,
             ) * rates[1] / PRECISION
 
             # Adding number of pool tokens
@@ -382,35 +393,43 @@ def _dynamic_fee(xpi: uint256, xpj: uint256, _fee: uint256, _fee_multiplier: uin
 @internal
 @view
 def _calc_token_amount(
-    _amounts: uint256[MAX_COINS],
-    is_deposit: bool,
+    _amounts: DynArray[uint256, MAX_COINS],
+    _is_deposit: bool,
     pool: address,
     pool_lp_token: address,
     n_coins: uint256,
 ) -> uint256:
 
     amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
-    N_COINS: uint256 = StableSwapNG(pool).N_COINS()
 
     rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     old_balances: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
 
-    pool_is_ng: bool = raw_call(base_pool, method_id("D_ma_time()"), revert_on_failure=False, is_static_call=True)
+    pool_is_ng: bool = raw_call(
+        pool,
+        method_id("D_ma_time()"),
+        revert_on_failure=False,
+        is_static_call=True
+    )
+    use_dynamic_fees: bool = True
     if pool_is_ng:
-        rates, old_balances, xp = self._get_rates_balances_xp(pool, N_COINS)
+        rates, old_balances, xp = self._get_rates_balances_xp(pool, n_coins)
     else:
-        ... # TODO: accommodate if pool is not ng (but: cannot fully accommodate in a simple manner)
+        use_dynamic_fees = False
+        for i in range(n_coins, bound=MAX_COINS):
+            rates.append(
+                10 ** (36 - convert(ERC20Detailed(StableSwapNG(pool).coins(i)).decimals(), uint256))
+            )
+            old_balances.append(StableSwapNG(pool).balances(i))
+            xp.append(rates[i] * old_balances[i] / PRECISION)
 
     # Initial invariant
-    D0: uint256 = self.get_D(xp, amp, N_COINS)
+    D0: uint256 = self.get_D(xp, amp, n_coins)
 
-    total_supply: uint256 = StableSwapNG(pool).totalSupply()
+    total_supply: uint256 = StableSwapNG(pool_lp_token).totalSupply()
     new_balances: DynArray[uint256, MAX_COINS] = old_balances
-    for i in range(MAX_COINS):
-        if i == N_COINS:
-            break
-
+    for i in range(n_coins, bound=MAX_COINS):
         amount: uint256 = _amounts[i]
         if _is_deposit:
             new_balances[i] += amount
@@ -418,27 +437,26 @@ def _calc_token_amount(
             new_balances[i] -= amount
 
     # Invariant after change
-    for idx in range(MAX_COINS):
-        if idx == N_COINS:
-            break
+    for idx in range(n_coins, bound=MAX_COINS):
         xp[idx] = rates[idx] * new_balances[idx] / PRECISION
-    D1: uint256 = self.get_D(xp, amp, N_COINS)
+    D1: uint256 = self.get_D(xp, amp, n_coins)
 
     # We need to recalculate the invariant accounting for fees
     # to calculate fair user's share
     D2: uint256 = D1
+    fee_multiplier: uint256 = 0
+    _dynamic_fee_i: uint256 = 0
     if total_supply > 0:
 
         # Only account for fees if we are not the first to deposit
-        base_fee: uint256 = StableSwapNG(pool).fee() * N_COINS / (4 * (N_COINS - 1))
-        fee_multiplier: uint256 = StableSwapNG(pool).offpeg_fee_multiplier()
-        _dynamic_fee_i: uint256 = 0
-        xs: uint256 = 0
-        ys: uint256 = (D0 + D1) / N_COINS
+        base_fee: uint256 = StableSwapNG(pool).fee() * n_coins / (4 * (n_coins - 1))
+        if use_dynamic_fees:
+            fee_multiplier = StableSwapNG(pool).offpeg_fee_multiplier()
 
-        for i in range(MAX_COINS):
-            if i == N_COINS:
-                break
+        xs: uint256 = 0
+        ys: uint256 = (D0 + D1) / n_coins
+
+        for i in range(n_coins, bound=MAX_COINS):
 
             ideal_balance: uint256 = D1 * old_balances[i] / D0
             difference: uint256 = 0
@@ -449,15 +467,18 @@ def _calc_token_amount(
                 difference = new_balance - ideal_balance
 
             xs = rates[i] * (old_balances[i] + new_balance) / PRECISION
-            _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee, fee_multiplier)
-            new_balances[i] -= _dynamic_fee_i * difference / FEE_DENOMINATOR
 
-        for idx in range(MAX_COINS):
-            if idx == N_COINS:
-                break
+            # use dynamic fees only if pool is NG
+            if use_dynamic_fees:
+                _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee, fee_multiplier)
+                new_balances[i] -= _dynamic_fee_i * difference / FEE_DENOMINATOR
+            else:
+                new_balances[i] -= base_fee * difference / FEE_DENOMINATOR
+
+        for idx in range(n_coins, bound=MAX_COINS):
             xp[idx] = rates[idx] * new_balances[idx] / PRECISION
 
-        D2 = self.get_D(xp, amp, N_COINS)
+        D2 = self.get_D(xp, amp, n_coins)
     else:
         return D1  # Take the dust if there was any
 
@@ -480,8 +501,7 @@ def _base_calc_token_amount(
     is_deposit: bool,
 ) -> uint256:
 
-    base_pool_is_ng: bool = raw_call(base_pool, method_id("D_ma_time()"), revert_on_failure=False, is_static_call=True)
-    base_inputs: uint256[MAX_COINS] = empty(uint256[MAX_COINS])
+    base_inputs: DynArray[uint256, MAX_COINS] = [0, 0, 0, 0, 0, 0, 0, 0]
     base_inputs[base_i] = dx
 
     return self._calc_token_amount(
