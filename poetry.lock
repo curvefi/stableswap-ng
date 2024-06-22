@@ -3140,9 +3140,30 @@ forking-recommended = ["ujson"]
 
 [package.source]
 type = "git"
-url = "https://github.com/vyperlang/titanoboa.git"
-reference = "9757133904e2b8c2d79650d5713287749f269df0"
-resolved_reference = "9757133904e2b8c2d79650d5713287749f269df0"
+url = "https://github.com/vyperlang/titanoboa"
+reference = "master"
+resolved_reference = "ea18746a7405b237cea934b678c3ecffc83f951b"
+
+[[package]]
+name = "titanoboa-zksync"
+version = "0.0.1"
+description = "A Zksync plugin for the Titanoboa Vyper interpreter"
+optional = false
+python-versions = "*"
+files = []
+develop = false
+
+[package.dependencies]
+titanoboa = {git = "https://github.com/vyperlang/titanoboa", rev = "master"}
+
+[package.extras]
+forking-recommended = ["ujson"]
+
+[package.source]
+type = "git"
+url = "https://github.com/DanielSchiavini/titanoboa-zksync.git"
+reference = "HEAD"
+resolved_reference = "126b53f6b7872d6949e4d44d8e95514aa0fb44a2"
 
 [[package]]
 name = "tomli"
@@ -3453,4 +3474,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "ed178f29e080861b28abc40727265b8dcb4766be69d9dcca562d1ad37effe556"
+content-hash = "f8037e6bb9ee4524d8e1ca00d043746a682d20fac5743eaaf3b0f0d1d608d0ad"

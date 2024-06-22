@@ -61,7 +61,7 @@ curve_dao_network_settings = {
         dao_ownership_contract="0xCb8799BFF48bb549F7B69Bb9BE60DbA7cd4F1BB7",
         fee_receiver_address="0xCb8799BFF48bb549F7B69Bb9BE60DbA7cd4F1BB7",
     ),
-    "pzkevm:mainnet": CurveNetworkSettings(
+    "polygon-zkevm:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
         fee_receiver_address="0x8b3EFBEfa6eD222077455d6f0DCdA3bF4f3F57A6",
     ),
@@ -74,11 +74,11 @@ curve_dao_network_settings = {
         dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
         fee_receiver_address="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
     ),
-    "avax:mainnet": CurveNetworkSettings(
+    "avalanche:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
         fee_receiver_address="0x06534b0BF7Ff378F162d4F348390BDA53b15fA35",
     ),
-    "ftm:mainnet": CurveNetworkSettings(
+    "fantom:mainnet": CurveNetworkSettings(
         dao_ownership_contract="0xB055EbbAcc8Eefc166c169e9Ce2886D0406aB49b",  # proxy
         fee_receiver_address="0x2B039565B2b7a1A9192D4847fbd33B25b836B950",
     ),
