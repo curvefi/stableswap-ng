@@ -1481,8 +1481,8 @@ def exp(x: int256) -> uint256:
     """
     value: int256 = x
 
-    # If the result is `< 0.5`, we return zero. This happens when we have the following:
-    # "x <= floor(log(0.5e18) * 1e18) ~ -42e18".
+    # If the result is `< 1`, we return zero. This happens when we have the following:
+    # "x <= floor(log(1e18) * 1e18) ~ -4.15e19".
     if (x <= -41446531673892822313):
         return empty(uint256)
 
