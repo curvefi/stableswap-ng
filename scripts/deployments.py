@@ -192,12 +192,20 @@ deployments = {
         "zap": "0x604388Bb1159AFd21eB5191cE22b4DeCdEE2Ae22",
     },
     "zksync:mainnet": {
-        "math": "0xcf19236e85000901dE2Fad3199aA4A1F74a78B6C",
-        # "views_old_1": "0xDD82bEe76CB4b161B44533e4B6Dfc2eee7e066D4",
-        "views": "0xeF62cD5CBa8B040827B648dBc6a755ddeeb84E65",
-        "plain_amm": "0x3ce3009F8ad07161BA9d02d7A0173180d0281cA4",
-        "meta_amm": "0x1E9A82C2a3DF2E0793a2B828aA652Db192f3C8F3",
-        "factory": "0x375444aeDEb6C3db897f293E1DBa85D7422A6859",
-        "zap": "0x4232Dcc6D31543A2431079BdE2082C69eA3A771E",
+        # old zkvyper:
+        # "math": "0xcf19236e85000901dE2Fad3199aA4A1F74a78B6C",
+        # # "views_old_1": "0xDD82bEe76CB4b161B44533e4B6Dfc2eee7e066D4",
+        # "views": "0xeF62cD5CBa8B040827B648dBc6a755ddeeb84E65",
+        # "plain_amm": "0x3ce3009F8ad07161BA9d02d7A0173180d0281cA4",
+        # "meta_amm": "0x1E9A82C2a3DF2E0793a2B828aA652Db192f3C8F3",
+        # "factory": "0x375444aeDEb6C3db897f293E1DBa85D7422A6859",
+        # "zap": "0x4232Dcc6D31543A2431079BdE2082C69eA3A771E",
+        # new zkvyper:
+        "math": "0x29Fc22c7fEC8748a85852E2D36728D9194DDb854",
+        "views": "0x59557D68d46e8367Fb357F2E848D8506cBf371c9",
+        "plain_amm": "0x04D0095a1A4Ae881a078ae61F36945E85464e6d7",
+        "meta_amm": "0xC5d5402481aefec461Ab86b1051AC26dF05BeE3B",
+        "factory": "0xFcAb5d04e8e031334D5e8D2C166B08daB0BE6CaE",
+        "zap": "0x1F280a5CFd3220b95819674a635B0D12a32F0E6a",
     },
 }
