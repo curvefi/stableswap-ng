@@ -13,7 +13,7 @@ poetry = "1.5.1"
 vyper = "0.3.10"
 pycryptodome = "^3.18.0"
 pre-commit = "^3.3.3"
-titanoboa-zksync = {git = "https://github.com/DanielSchiavini/titanoboa-zksync.git"}
+titanoboa-zksync = {git = "https://github.com/DanielSchiavini/titanoboa-zksync.git", tag = "v0.1.2"} # inherits titanoboa 0.1.10
 
 [tool.poetry.group.dev.dependencies]
 black = "22.3.0"
