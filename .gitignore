@@ -159,3 +159,4 @@ set_env.py
 # test logs
 all_tests.log
 test_suite/test_reports/
+wip_diary.md
