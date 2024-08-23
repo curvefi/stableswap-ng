@@ -6,6 +6,8 @@ from tabulate import tabulate
 # Base directory for reports
 reports_base_dir = "test_suite/test_reports"
 
+# reports_base_dir += '/factory'
+
 # Individual regex patterns to match each possible status
 failed_pattern = re.compile(r"(\d+)\s+failed")
 passed_pattern = re.compile(r"(\d+)\s+passed")
@@ -86,15 +88,16 @@ def generate_report():
 
     # Convert list to DataFrame
     df = pd.DataFrame(data)
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.width', 120)  
-    print(df)
+    # pd.set_option('display.max_rows', None)
+    # pd.set_option('display.max_columns', None)
+    # pd.set_option('display.width', 120)  
+    # print(df)
+
     # Convert the 'Timestamp' to a datetime object for accurate comparison (if needed)
     df['Timestamp'] = pd.to_datetime(df['Timestamp'], format='%d%m%y_%H%M%S')
 
     # Group by 'Test' and then take the last N timestamps
-    N_ts = 3
+    N_ts = 1
     df_time_sorted = df.sort_values(by='Timestamp').groupby('Test').tail(N_ts)
 
     # Sort the DataFrame by 'Test' and 'Timestamp'
@@ -114,21 +117,6 @@ def generate_report():
     # Save the DataFrame to an ASCII table
     with open('test_suite/latest_report.txt', 'w') as f:
         f.write(tabulate(df_time_sorted, headers='keys', tablefmt='psql'))
-
-    # # Group by 'Path' and then find the row with the latest 'Timestamp' in each group
-    # latest_timestamps = df.loc[df.groupby('Test')['Timestamp'].idxmax()]
-
-
-    # # # Sort the DataFrame
-    # latest_tests = latest_tests.sort_values('TOTAL', ascending=False)
-    
-    # # # Display the resulting DataFrame with only the latest timestamp for each Path
-    # # print(latest_tests)
-    # print(latest_tests.to_string(index=False, justify='right'))
-
-    # # # Save the DataFrame to an ascii table
-    # with open('test_suite/latest_report.txt', 'w') as f:
-    #     f.write(tabulate(latest_tests, headers='keys', tablefmt='psql'))
 
 def main():
     # Run the report generation
