@@ -107,4 +107,8 @@ def meta_decimals(metapool_token_type, decimals):
 def forked_chain():
     rpc_url = os.getenv("WEB3_PROVIDER_URL")
     assert rpc_url is not None, "Provider url is not set, add WEB3_PROVIDER_URL param to env"
-    boa.env.fork(url=rpc_url)
+    env_forked = boa.Env()
+    with boa.swap_env(env_forked):
+        env_forked.fork(url=rpc_url, block_identifier="safe")
+        print(f'Forked the chain on block {boa.env.evm.vm.state.block_number}')
+        yield

@@ -6,7 +6,7 @@ from tabulate import tabulate
 # Base directory for reports
 reports_base_dir = "test_suite/test_reports"
 
-reports_base_dir += '/factory'
+# reports_base_dir += '/factory'
 
 # Individual regex patterns to match each possible status
 failed_pattern = re.compile(r"(\d+)\s+failed")
