@@ -6,7 +6,7 @@ from tabulate import tabulate
 # Base directory for reports
 reports_base_dir = "test_suite/test_reports"
 
-# reports_base_dir += '/factory'
+reports_base_dir += '/factory'
 
 # Individual regex patterns to match each possible status
 failed_pattern = re.compile(r"(\d+)\s+failed")
@@ -14,8 +14,8 @@ passed_pattern = re.compile(r"(\d+)\s+passed")
 skipped_pattern = re.compile(r"(\d+)\s+skipped")
 deselected_pattern = re.compile(r"(\d+)\s+deselected")
 xfailed_pattern = re.compile(r"(\d+)\s+xfailed")
-warnings_pattern = re.compile(r"(\d+)\s+warnings")
-errors_pattern = re.compile(r"(\d+)\s+errors")
+warnings_pattern = re.compile(r"(\d+)\s+warning")
+errors_pattern = re.compile(r"(\d+)\s+error")
 time_pattern = re.compile(r"in\s+([\d.]+)s")
 
 # keywords = ["failed", "passed", "skipped", "deselected", "xfailed", "warnings", "errors", "time"]

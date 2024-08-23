@@ -10,6 +10,8 @@ tests_base_dir = "tests"
 reports_base_dir = "test_suite/test_reports"
 skip_subfolders = ["__pycache__", "utils", "fixtures"]
 
+only_subfolders = ["factory"]
+
 tests_to_run = [
     'test_factory_add_pools'
 ]
@@ -22,9 +24,11 @@ def run_tests_and_save_output():
     for root, dirs, files in os.walk(tests_base_dir):
         # Skip __pycache__ directories
         dirs[:] = [d for d in dirs if d not in skip_subfolders]
+        if len(only_subfolders) > 0:
+            dirs[:] = [d for d in dirs if d in only_subfolders]
         for file in files:
             if file.startswith("test_") and file.endswith(".py"):
-                if len(tests_to_run) > 0:
+                if len(only_subfolders) == 0 and len(tests_to_run) > 0:
                     if file not in tests_to_run and file.strip('.py') not in tests_to_run:
                         continue
                 # Construct paths
