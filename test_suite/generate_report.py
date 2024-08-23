@@ -17,6 +17,7 @@ errors_pattern = re.compile(r"(\d+)\s+errors")
 time_pattern = re.compile(r"in\s+([\d.]+)s")
 
 # keywords = ["failed", "passed", "skipped", "deselected", "xfailed", "warnings", "errors", "time"]
+
 # Enforcing the line format with ===== symbols
 line_format_pattern = re.compile(r"={5,}")
 
@@ -88,27 +89,46 @@ def generate_report():
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', 120)  
-
-    # print(df)
+    print(df)
     # Convert the 'Timestamp' to a datetime object for accurate comparison (if needed)
     df['Timestamp'] = pd.to_datetime(df['Timestamp'], format='%d%m%y_%H%M%S')
 
-    # Group by 'Path' and then find the row with the latest 'Timestamp' in each group
-    latest_timestamps = df.loc[df.groupby('Test')['Timestamp'].idxmax()]
+    # Group by 'Test' and then take the last N timestamps
+    N_ts = 1
+    df_time_sorted = df.sort_values(by='Timestamp').groupby('Test').tail(N_ts)
+
+    # Sort the DataFrame by 'Test' and 'Timestamp'
+    df_time_sorted = df_time_sorted.sort_values(['Test', 'Timestamp'])
+
+    # Reset the index to flatten the DataFrame
+    df_time_sorted = df_time_sorted.reset_index(drop=True)
 
     # Exclude the 'Timestamp' column from the final DataFrame
-    latest_tests = latest_timestamps.drop('Timestamp', axis=1)
+    if N_ts == 1:
+        df_time_sorted = df_time_sorted.drop('Timestamp', axis=1)
+        df_time_sorted = df_time_sorted.sort_values('TOTAL', ascending=False)
+        
+    # Output the DataFrame
+    print(df_time_sorted.to_string(index=False, justify='center'))
 
-    # # Sort the DataFrame
-    latest_tests = latest_tests.sort_values('TOTAL', ascending=False)
-    
-    # # Display the resulting DataFrame with only the latest timestamp for each Path
-    # print(latest_tests)
-    print(latest_tests.to_string(index=False, justify='right'))
-
-    # # Save the DataFrame to an ascii table
+    # Save the DataFrame to an ASCII table
     with open('test_suite/latest_report.txt', 'w') as f:
-        f.write(tabulate(latest_tests, headers='keys', tablefmt='psql'))
+        f.write(tabulate(df_time_sorted, headers='keys', tablefmt='psql'))
+
+    # # Group by 'Path' and then find the row with the latest 'Timestamp' in each group
+    # latest_timestamps = df.loc[df.groupby('Test')['Timestamp'].idxmax()]
+
+
+    # # # Sort the DataFrame
+    # latest_tests = latest_tests.sort_values('TOTAL', ascending=False)
+    
+    # # # Display the resulting DataFrame with only the latest timestamp for each Path
+    # # print(latest_tests)
+    # print(latest_tests.to_string(index=False, justify='right'))
+
+    # # # Save the DataFrame to an ascii table
+    # with open('test_suite/latest_report.txt', 'w') as f:
+    #     f.write(tabulate(latest_tests, headers='keys', tablefmt='psql'))
 
 def main():
     # Run the report generation
