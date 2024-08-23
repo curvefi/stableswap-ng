@@ -94,7 +94,7 @@ def generate_report():
     df['Timestamp'] = pd.to_datetime(df['Timestamp'], format='%d%m%y_%H%M%S')
 
     # Group by 'Test' and then take the last N timestamps
-    N_ts = 1
+    N_ts = 3
     df_time_sorted = df.sort_values(by='Timestamp').groupby('Test').tail(N_ts)
 
     # Sort the DataFrame by 'Test' and 'Timestamp'
@@ -107,7 +107,7 @@ def generate_report():
     if N_ts == 1:
         df_time_sorted = df_time_sorted.drop('Timestamp', axis=1)
         df_time_sorted = df_time_sorted.sort_values('TOTAL', ascending=False)
-        
+
     # Output the DataFrame
     print(df_time_sorted.to_string(index=False, justify='center'))
 
@@ -135,4 +135,7 @@ def main():
     generate_report()
 
 if __name__ == "__main__":
+    if 'test_suite' in os.getcwd():
+        os.chdir('..')
+        print(f"Changed directory to {os.getcwd()}")
     main()

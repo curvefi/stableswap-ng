@@ -1,40 +1,77 @@
-+----+--------------------------------------------------+--------+--------+----------+--------+-----------+------------+---------+--------+
-|    | Test                                             |   PASS |   FAIL |   ERRORS |   SKIP |   XFAILED |   WARNINGS |   TOTAL |   TIME |
-|----+--------------------------------------------------+--------+--------+----------+--------+-----------+------------+---------+--------|
-| 23 | pools/meta/test_exchange_underlying_reverts      |    204 |      6 |        0 |      6 |         0 |         11 |     227 |   9.19 |
-| 31 | pools/oracle/test_oracles                        |     51 |     21 |        0 |      0 |         0 |        155 |     227 | 175.44 |
-| 21 | pools/liquidity/test_remove_liquidity_one_coin   |    188 |     28 |        0 |      0 |         0 |         11 |     227 |   8.71 |
-| 35 | token/test_token_transfer_from                   |    192 |     12 |        0 |      0 |         0 |         11 |     215 |   8.2  |
-|  9 | pools/exchange/test_exchange_reverts             |    183 |      7 |        0 |     14 |         0 |         11 |     215 |   8.14 |
-| 33 | token/test_token_approve                         |    144 |     24 |        0 |      0 |         0 |         11 |     179 |   6.51 |
-|  4 | factory/test_factory_meta                        |    162 |      0 |        0 |      0 |         0 |         11 |     173 |   5.04 |
-| 20 | pools/liquidity/test_remove_liquidity_imbalance  |     96 |     36 |        0 |      0 |         0 |         11 |     143 |   6.94 |
-| 34 | token/test_token_transfer                        |    108 |      0 |        0 |      0 |         0 |         11 |     119 |   6.11 |
-| 16 | pools/general/test_virtual_price                 |    108 |      0 |        0 |      0 |         0 |         11 |     119 |   6.45 |
-|  7 | pools/exchange/test_exchange_received            |     46 |      0 |        0 |     50 |         0 |         11 |     107 |   6.05 |
-| 13 | pools/general/test_ramp_A                        |     12 |     84 |        0 |      0 |         0 |         11 |     107 |   5.31 |
-| 17 | pools/liquidity/test_add_liquidity               |     61 |      0 |        0 |      0 |        23 |         11 |      95 |   5.97 |
-| 19 | pools/liquidity/test_remove_liquidity            |     60 |     24 |        0 |      0 |         0 |         11 |      95 |   6.15 |
-| 12 | pools/general/test_fees                          |     60 |     12 |        0 |      0 |         0 |         11 |      83 |   5.7  |
-| 25 | pools/meta/test_get_virtual_price_meta           |     72 |      0 |        0 |      0 |         0 |         11 |      83 |   5.6  |
-|  8 | pools/exchange/test_exchange_receiver            |     48 |     12 |        0 |      0 |         0 |         11 |      71 |   5.52 |
-|  6 | pools/exchange/test_exchange                     |     44 |      4 |        0 |      0 |         0 |         11 |      58 |   5.46 |
-|  5 | gauge/test_rewards                               |     10 |      0 |       36 |      0 |         0 |         11 |      57 |  47.27 |
-|  3 | factory/test_factory_general                     |     37 |      0 |        0 |      0 |         0 |         11 |      48 |   4.58 |
-|  1 | factory/test_factory_basic                       |     28 |      0 |        0 |      0 |         0 |         11 |      39 |   3.52 |
-| 18 | pools/liquidity/test_initial_liquidity           |     24 |      0 |        0 |      0 |         0 |         11 |      35 |   4.31 |
-| 15 | pools/general/test_swap_getters                  |     18 |      6 |        0 |      0 |         0 |         11 |      35 |  25.05 |
-| 22 | pools/meta/test_exchange_underlying              |     18 |      0 |        0 |      0 |         0 |         11 |      29 |   3.82 |
-| 11 | pools/general/test_erc4626_swaps                 |     13 |      0 |        0 |      0 |         0 |         11 |      24 |   3.54 |
-| 26 | pools/meta/test_meta_new_ng_base                 |     12 |      0 |        0 |      0 |         0 |         11 |      23 |   4.21 |
-| 29 | pools/meta/test_receiver_meta                    |      4 |      8 |        0 |      0 |         0 |         11 |      23 |   4.5  |
-| 30 | pools/oracle/test_oracle                         |      6 |      2 |        0 |      0 |         0 |         11 |      19 |   4.33 |
-| 24 | pools/meta/test_get_dy_underlying_fix            |      5 |      0 |        0 |      0 |         0 |         13 |      18 |   9.41 |
-| 10 | pools/general/test_donation_get_D                |      6 |      0 |        0 |      0 |         0 |         11 |      17 |   2.94 |
-|  0 | factory/test_factory_add_pools                   |      6 |      0 |        0 |      0 |         0 |         11 |      17 |   3.71 |
-| 28 | pools/meta/test_meta_zap_ng_base                 |      5 |      0 |        0 |      0 |         0 |         11 |      16 |   3.45 |
-| 27 | pools/meta/test_meta_zap                         |      3 |      0 |        0 |      0 |         0 |         11 |      14 |   3.21 |
-| 14 | pools/general/test_specific_liquidity_operations |      2 |      0 |        0 |      0 |         0 |         11 |      13 |   2.53 |
-| 32 | token/test_get_D                                 |      1 |      0 |        0 |      0 |         0 |         11 |      12 |   1.56 |
-|  2 | factory/test_factory_forked                      |      1 |      0 |        0 |      0 |         0 |         11 |      12 |   7.53 |
-+----+--------------------------------------------------+--------+--------+----------+--------+-----------+------------+---------+--------+
++----+--------------------------------------------------+---------------------+--------+--------+----------+--------+-----------+------------+---------+--------+
+|    | Test                                             | Timestamp           |   PASS |   FAIL |   ERRORS |   SKIP |   XFAILED |   WARNINGS |   TOTAL |   TIME |
+|----+--------------------------------------------------+---------------------+--------+--------+----------+--------+-----------+------------+---------+--------|
+|  0 | factory/test_factory_add_pools                   | 2024-08-23 11:34:39 |      6 |      0 |        0 |      0 |         0 |         11 |      17 |   3.65 |
+|  1 | factory/test_factory_add_pools                   | 2024-08-23 12:33:13 |      6 |      0 |        0 |      0 |         0 |         11 |      17 |   3.71 |
+|  2 | factory/test_factory_add_pools                   | 2024-08-23 17:06:44 |      6 |      0 |        0 |      0 |         0 |         11 |      17 |   3.82 |
+|  3 | factory/test_factory_basic                       | 2024-08-23 11:34:39 |     28 |      0 |        0 |      0 |         0 |         11 |      39 |   3.38 |
+|  4 | factory/test_factory_basic                       | 2024-08-23 12:33:13 |     28 |      0 |        0 |      0 |         0 |         11 |      39 |   3.52 |
+|  5 | factory/test_factory_forked                      | 2024-08-23 11:34:39 |      0 |      1 |        0 |      0 |         0 |         11 |      11 |   4.33 |
+|  6 | factory/test_factory_forked                      | 2024-08-23 12:33:13 |      1 |      0 |        0 |      0 |         0 |         11 |      12 |   7.53 |
+|  7 | factory/test_factory_general                     | 2024-08-23 11:34:39 |     37 |      0 |        0 |      0 |         0 |         11 |      48 |   4.51 |
+|  8 | factory/test_factory_general                     | 2024-08-23 12:33:13 |     37 |      0 |        0 |      0 |         0 |         11 |      48 |   4.58 |
+|  9 | factory/test_factory_meta                        | 2024-08-23 11:34:39 |    162 |      0 |        0 |      0 |         0 |         11 |     173 |   4.98 |
+| 10 | factory/test_factory_meta                        | 2024-08-23 12:33:13 |    162 |      0 |        0 |      0 |         0 |         11 |     173 |   5.04 |
+| 11 | gauge/test_rewards                               | 2024-08-23 11:34:39 |      0 |      0 |       46 |      0 |         0 |         11 |      57 |  13.5  |
+| 12 | gauge/test_rewards                               | 2024-08-23 12:33:13 |     10 |      0 |       36 |      0 |         0 |         11 |      57 |  47.27 |
+| 13 | pools/exchange/test_exchange                     | 2024-08-23 11:34:39 |     44 |      4 |        0 |      0 |         0 |         11 |      59 |   5.7  |
+| 14 | pools/exchange/test_exchange                     | 2024-08-23 12:33:13 |     44 |      4 |        0 |      0 |         0 |         11 |      58 |   5.46 |
+| 15 | pools/exchange/test_exchange_received            | 2024-08-23 11:34:39 |     46 |      0 |        0 |     50 |         0 |         11 |     107 |   6.42 |
+| 16 | pools/exchange/test_exchange_received            | 2024-08-23 12:33:13 |     46 |      0 |        0 |     50 |         0 |         11 |     107 |   6.05 |
+| 17 | pools/exchange/test_exchange_receiver            | 2024-08-23 11:34:39 |     48 |     12 |        0 |      0 |         0 |         11 |      71 |   6.8  |
+| 18 | pools/exchange/test_exchange_receiver            | 2024-08-23 12:33:13 |     48 |     12 |        0 |      0 |         0 |         11 |      71 |   5.52 |
+| 19 | pools/exchange/test_exchange_reverts             | 2024-08-23 11:34:39 |    183 |      7 |        0 |     14 |         0 |         11 |     215 |   8.4  |
+| 20 | pools/exchange/test_exchange_reverts             | 2024-08-23 12:33:13 |    183 |      7 |        0 |     14 |         0 |         11 |     215 |   8.14 |
+| 21 | pools/general/test_donation_get_D                | 2024-08-23 11:34:39 |      6 |      0 |        0 |      0 |         0 |         11 |      17 |   3.26 |
+| 22 | pools/general/test_donation_get_D                | 2024-08-23 12:33:13 |      6 |      0 |        0 |      0 |         0 |         11 |      17 |   2.94 |
+| 23 | pools/general/test_erc4626_swaps                 | 2024-08-23 11:34:39 |     13 |      0 |        0 |      0 |         0 |         11 |      24 |   3.88 |
+| 24 | pools/general/test_erc4626_swaps                 | 2024-08-23 12:33:13 |     13 |      0 |        0 |      0 |         0 |         11 |      24 |   3.54 |
+| 25 | pools/general/test_fees                          | 2024-08-23 11:34:39 |     60 |     12 |        0 |      0 |         0 |         11 |      83 |   5.91 |
+| 26 | pools/general/test_fees                          | 2024-08-23 12:33:13 |     60 |     12 |        0 |      0 |         0 |         11 |      83 |   5.7  |
+| 27 | pools/general/test_ramp_A                        | 2024-08-23 11:34:39 |     12 |     84 |        0 |      0 |         0 |         11 |     107 |   5.55 |
+| 28 | pools/general/test_ramp_A                        | 2024-08-23 12:33:13 |     12 |     84 |        0 |      0 |         0 |         11 |     107 |   5.31 |
+| 29 | pools/general/test_specific_liquidity_operations | 2024-08-23 11:34:39 |      2 |      0 |        0 |      0 |         0 |         11 |      13 |   2.57 |
+| 30 | pools/general/test_specific_liquidity_operations | 2024-08-23 12:33:13 |      2 |      0 |        0 |      0 |         0 |         11 |      13 |   2.53 |
+| 31 | pools/general/test_swap_getters                  | 2024-08-23 11:34:39 |     18 |      6 |        0 |      0 |         0 |         11 |      35 |  25.5  |
+| 32 | pools/general/test_swap_getters                  | 2024-08-23 12:33:13 |     18 |      6 |        0 |      0 |         0 |         11 |      35 |  25.05 |
+| 33 | pools/general/test_virtual_price                 | 2024-08-23 11:34:39 |    108 |      0 |        0 |      0 |         0 |         11 |     119 |   7.07 |
+| 34 | pools/general/test_virtual_price                 | 2024-08-23 12:33:13 |    108 |      0 |        0 |      0 |         0 |         11 |     119 |   6.45 |
+| 35 | pools/liquidity/test_add_liquidity               | 2024-08-23 11:34:39 |     61 |      0 |        0 |      0 |        23 |         11 |      95 |   5.81 |
+| 36 | pools/liquidity/test_add_liquidity               | 2024-08-23 12:33:13 |     61 |      0 |        0 |      0 |        23 |         11 |      95 |   5.97 |
+| 37 | pools/liquidity/test_initial_liquidity           | 2024-08-23 11:34:39 |     24 |      0 |        0 |      0 |         0 |         11 |      35 |   4.24 |
+| 38 | pools/liquidity/test_initial_liquidity           | 2024-08-23 12:33:13 |     24 |      0 |        0 |      0 |         0 |         11 |      35 |   4.31 |
+| 39 | pools/liquidity/test_remove_liquidity            | 2024-08-23 11:34:39 |     60 |     24 |        0 |      0 |         0 |         11 |      95 |   5.83 |
+| 40 | pools/liquidity/test_remove_liquidity            | 2024-08-23 12:33:13 |     60 |     24 |        0 |      0 |         0 |         11 |      95 |   6.15 |
+| 41 | pools/liquidity/test_remove_liquidity_imbalance  | 2024-08-23 11:34:39 |     96 |     36 |        0 |      0 |         0 |         11 |     143 |   6.95 |
+| 42 | pools/liquidity/test_remove_liquidity_imbalance  | 2024-08-23 12:33:13 |     96 |     36 |        0 |      0 |         0 |         11 |     143 |   6.94 |
+| 43 | pools/liquidity/test_remove_liquidity_one_coin   | 2024-08-23 11:34:39 |    188 |     28 |        0 |      0 |         0 |         11 |     227 |   8.65 |
+| 44 | pools/liquidity/test_remove_liquidity_one_coin   | 2024-08-23 12:33:13 |    188 |     28 |        0 |      0 |         0 |         11 |     227 |   8.71 |
+| 45 | pools/meta/test_exchange_underlying              | 2024-08-23 11:34:39 |     18 |      0 |        0 |      0 |         0 |         11 |      29 |   4.14 |
+| 46 | pools/meta/test_exchange_underlying              | 2024-08-23 12:33:13 |     18 |      0 |        0 |      0 |         0 |         11 |      29 |   3.82 |
+| 47 | pools/meta/test_exchange_underlying_reverts      | 2024-08-23 11:34:39 |    204 |      6 |        0 |      6 |         0 |         11 |     227 |   9.51 |
+| 48 | pools/meta/test_exchange_underlying_reverts      | 2024-08-23 12:33:13 |    204 |      6 |        0 |      6 |         0 |         11 |     227 |   9.19 |
+| 49 | pools/meta/test_get_dy_underlying_fix            | 2024-08-23 11:34:39 |      4 |      1 |        0 |      0 |         0 |         13 |      18 |   6.18 |
+| 50 | pools/meta/test_get_dy_underlying_fix            | 2024-08-23 12:33:13 |      5 |      0 |        0 |      0 |         0 |         13 |      18 |   9.41 |
+| 51 | pools/meta/test_get_virtual_price_meta           | 2024-08-23 11:34:39 |     72 |      0 |        0 |      0 |         0 |         11 |      83 |   6.24 |
+| 52 | pools/meta/test_get_virtual_price_meta           | 2024-08-23 12:33:13 |     72 |      0 |        0 |      0 |         0 |         11 |      83 |   5.6  |
+| 53 | pools/meta/test_meta_new_ng_base                 | 2024-08-23 11:34:39 |     12 |      0 |        0 |      0 |         0 |         11 |      23 |   4.35 |
+| 54 | pools/meta/test_meta_new_ng_base                 | 2024-08-23 12:33:13 |     12 |      0 |        0 |      0 |         0 |         11 |      23 |   4.21 |
+| 55 | pools/meta/test_meta_zap                         | 2024-08-23 11:34:39 |      3 |      0 |        0 |      0 |         0 |         11 |      14 |   3.42 |
+| 56 | pools/meta/test_meta_zap                         | 2024-08-23 12:33:13 |      3 |      0 |        0 |      0 |         0 |         11 |      14 |   3.21 |
+| 57 | pools/meta/test_meta_zap_ng_base                 | 2024-08-23 11:34:39 |      5 |      0 |        0 |      0 |         0 |         11 |      16 |   3.53 |
+| 58 | pools/meta/test_meta_zap_ng_base                 | 2024-08-23 12:33:13 |      5 |      0 |        0 |      0 |         0 |         11 |      16 |   3.45 |
+| 59 | pools/meta/test_receiver_meta                    | 2024-08-23 11:34:39 |      4 |      8 |        0 |      0 |         0 |         11 |      23 |   5.07 |
+| 60 | pools/meta/test_receiver_meta                    | 2024-08-23 12:33:13 |      4 |      8 |        0 |      0 |         0 |         11 |      23 |   4.5  |
+| 61 | pools/oracle/test_oracle                         | 2024-08-23 11:34:39 |      6 |      2 |        0 |      0 |         0 |         11 |      19 |   4.4  |
+| 62 | pools/oracle/test_oracle                         | 2024-08-23 12:33:13 |      6 |      2 |        0 |      0 |         0 |         11 |      19 |   4.33 |
+| 63 | pools/oracle/test_oracles                        | 2024-08-23 11:34:39 |     51 |     21 |        0 |      0 |         0 |        155 |     226 | 179.92 |
+| 64 | pools/oracle/test_oracles                        | 2024-08-23 12:33:13 |     51 |     21 |        0 |      0 |         0 |        155 |     227 | 175.44 |
+| 65 | token/test_get_D                                 | 2024-08-23 11:34:39 |      1 |      0 |        0 |      0 |         0 |         11 |      12 |   1.62 |
+| 66 | token/test_get_D                                 | 2024-08-23 12:33:13 |      1 |      0 |        0 |      0 |         0 |         11 |      12 |   1.56 |
+| 67 | token/test_token_approve                         | 2024-08-23 11:34:39 |    144 |     24 |        0 |      0 |         0 |         11 |     179 |   7.21 |
+| 68 | token/test_token_approve                         | 2024-08-23 12:33:13 |    144 |     24 |        0 |      0 |         0 |         11 |     179 |   6.51 |
+| 69 | token/test_token_transfer                        | 2024-08-23 11:34:39 |    108 |      0 |        0 |      0 |         0 |         11 |     119 |   6.14 |
+| 70 | token/test_token_transfer                        | 2024-08-23 12:33:13 |    108 |      0 |        0 |      0 |         0 |         11 |     119 |   6.11 |
+| 71 | token/test_token_transfer_from                   | 2024-08-23 11:34:39 |    192 |     12 |        0 |      0 |         0 |         11 |     215 |   8.54 |
+| 72 | token/test_token_transfer_from                   | 2024-08-23 12:33:13 |    192 |     12 |        0 |      0 |         0 |         11 |     215 |   8.2  |
++----+--------------------------------------------------+---------------------+--------+--------+----------+--------+-----------+------------+---------+--------+
