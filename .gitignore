@@ -57,7 +57,7 @@ coverage.xml
 *.pot
 
 # Django stuff:
-*.log
+*.log 
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
@@ -155,3 +155,7 @@ scripts/experiments/get_p.py
 todo.txt
 AuditorComments.md
 set_env.py
+
+# test logs
+all_tests.log
+test_suite/test_reports/
