@@ -8,8 +8,8 @@ import pytest
 from tests.constants import DECIMAL_PAIRS, POOL_TYPES, TOKEN_TYPES
 
 pytest_plugins = [
-    "tests.fixtures.accounts",
     "tests.fixtures.constants",
+    "tests.fixtures.accounts",
     "tests.fixtures.contracts",
     "tests.fixtures.factory",
     "tests.fixtures.mocks",

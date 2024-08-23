@@ -2,7 +2,7 @@
 |    | Test                   |   PASS |   FAIL |   ERRORS |   SKIP |   XFAILED |   WARNINGS |   TOTAL |   TIME |
 |----+------------------------+--------+--------+----------+--------+-----------+------------+---------+--------|
 |  4 | test_factory_meta      |    162 |      0 |        0 |      0 |         0 |         11 |     173 |   5.14 |
-|  2 | test_factory_forked    |      1 |      0 |        1 |      0 |         0 |        110 |     112 |   7.85 |
+|  2 | test_factory_forked    |      1 |      0 |        1 |      0 |         0 |         11 |     112 |   7.85 |
 |  3 | test_factory_general   |     37 |      0 |        0 |      0 |         0 |         11 |      48 |   4.61 |
 |  1 | test_factory_basic     |     28 |      0 |        0 |      0 |         0 |         11 |      39 |   3.48 |
 |  0 | test_factory_add_pools |      6 |      0 |        0 |      0 |         0 |         11 |      17 |   3.66 |

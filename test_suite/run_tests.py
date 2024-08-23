@@ -10,11 +10,13 @@ tests_base_dir = "tests"
 reports_base_dir = "test_suite/test_reports"
 skip_subfolders = ["__pycache__", "utils", "fixtures"]
 
-only_subfolders = ["factory"]
+only_subfolders = [
+    # "factory"
+    ]
 
 tests_to_run = [
     'test_factory_add_pools'
-]
+    ]
 
 # Function to run pytest for each file and save output to folder corresponding to the file
 def run_tests_and_save_output():
@@ -41,7 +43,9 @@ def run_tests_and_save_output():
                 
                 # Run pytest and save output
                 output_file = os.path.join(report_dir, timestamp+".log")
-                command = f"pytest {test_file_path} -n auto | tee {output_file}"
+                # command = f"pytest {test_file_path} -n 20 | tee {output_file}"
+                command = f"pytest {test_file_path}"
+
                 print(f"Running {test_file_path}")
                 subprocess.run(command, shell=True, check=True)
 
