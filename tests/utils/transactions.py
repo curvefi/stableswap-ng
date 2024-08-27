@@ -6,7 +6,7 @@ from typing import Any
 from boa.contracts.vyper.vyper_contract import VyperContract, VyperFunction
 from boa.contracts.vyper.event import Event
 
-def call_returning_result_and_logs(
+def call_returning_result_and_logs_old(
     contract: VyperContract, function_name: str, *args, value=0, gas=None, sender=None, **kwargs
 ) -> tuple[Any, list[Event]]:
     func: VyperFunction = getattr(contract, function_name)
@@ -29,5 +29,15 @@ def call_returning_result_and_logs(
         res = func.contract.marshal_to_python(computation, typ)
 
         events = contract.get_logs(computation)
+
+    return res, events
+
+
+def call_returning_result_and_logs(
+    contract: VyperContract, function_name: str, *args, value=0, gas=None, sender=None, **kwargs
+) -> tuple[Any, list[Event]]:
+    function_handle = getattr(contract, function_name)
+    res = function_handle(*args, value=value, gas=gas, sender=sender, **kwargs)
+    events = contract.get_logs()
 
     return res, events

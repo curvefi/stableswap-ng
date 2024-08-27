@@ -69,6 +69,8 @@ def get_pool_token_pairs(metafunc):
     random = Random(len(metafunc.fixturenames))
     # take 2 combinations for smaller test set
     return sorted(random.sample(all_combinations, k=2))
+    # Q: why sample only 2 when we have 6?
+    # todo - ideally we test all possible combinations
 
 
 def get_tokens_for_metafunc(metafunc):

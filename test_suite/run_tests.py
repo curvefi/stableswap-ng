@@ -13,7 +13,7 @@ skip_subfolders = ["__pycache__", "utils", "fixtures"]
 # if subfolders are specified, all tests will be run only in those subfolders
 # (disregarding tests_to_run)
 only_subfolders = [
-    # "factory"
+    "token"
     ]
 
 # if tests_to_run is specified, only those tests will be run (except if only_subfolders is specified)
@@ -21,7 +21,7 @@ tests_to_run = [
     # 'test_factory_forked'
     ]
 
-# Output files (0 for debugging when we don tneed to spam files)
+# Output files (0 for debugging when we dont need to spam files)
 SAVE_FILES = 1
 
 # Function to run pytest for each file and save output to folder corresponding to the file
