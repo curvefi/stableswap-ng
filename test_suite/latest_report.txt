@@ -1,8 +1,40 @@
-+----+--------------------------+--------+--------+----------+--------+-----------+------------+---------+--------+
-|    | Test                     |   PASS |   FAIL |   ERRORS |   SKIP |   XFAILED |   WARNINGS |   TOTAL |   TIME |
-|----+--------------------------+--------+--------+----------+--------+-----------+------------+---------+--------|
-|  0 | test_get_D               |      1 |      0 |        0 |      0 |         0 |          0 |       1 |   1.61 |
-|  1 | test_token_approve       |    168 |      0 |        0 |      0 |         0 |          0 |     168 |   6.42 |
-|  2 | test_token_transfer      |    108 |      0 |        0 |      0 |         0 |          0 |     108 |   6.12 |
-|  3 | test_token_transfer_from |    204 |      0 |        0 |      0 |         0 |          0 |     204 |   8    |
-+----+--------------------------+--------+--------+----------+--------+-----------+------------+---------+--------+
++----+--------------------------------------------------+--------+--------+----------+--------+-----------+------------+---------+--------+
+|    | Test                                             |   PASS |   FAIL |   ERRORS |   SKIP |   XFAILED |   WARNINGS |   TOTAL |   TIME |
+|----+--------------------------------------------------+--------+--------+----------+--------+-----------+------------+---------+--------|
+| 35 | token/test_token_transfer_from                   |    204 |      0 |        0 |      0 |         0 |          0 |     204 |   8.34 |
+| 34 | token/test_token_transfer                        |    108 |      0 |        0 |      0 |         0 |          0 |     108 |   6.52 |
+| 33 | token/test_token_approve                         |    168 |      0 |        0 |      0 |         0 |          0 |     168 |   6.58 |
+| 32 | token/test_get_D                                 |      1 |      0 |        0 |      0 |         0 |          0 |       1 |   1.69 |
+| 31 | pools/oracle/test_oracles                        |     49 |     23 |        0 |      0 |         0 |          0 |      72 | 221.96 |
+| 30 | pools/oracle/test_oracle                         |      6 |      2 |        0 |      0 |         0 |          0 |       8 |   4.28 |
+| 29 | pools/meta/test_receiver_meta                    |      4 |      8 |        0 |      0 |         0 |          0 |      11 |   4.65 |
+| 28 | pools/meta/test_meta_zap_ng_base                 |      5 |      0 |        0 |      0 |         0 |          5 |      10 |   4.72 |
+| 27 | pools/meta/test_meta_zap                         |      3 |      0 |        0 |      0 |         0 |          3 |       5 |   4.06 |
+| 26 | pools/meta/test_meta_new_ng_base                 |     12 |      0 |        0 |      0 |         0 |          0 |      12 |   4.06 |
+| 25 | pools/meta/test_get_virtual_price_meta           |     72 |      0 |        0 |      0 |         0 |          0 |      72 |   5.96 |
+| 24 | pools/meta/test_get_dy_underlying_fix            |      5 |      0 |        0 |      0 |         0 |          2 |       7 |  10.68 |
+| 23 | pools/meta/test_exchange_underlying_reverts      |    204 |      6 |        0 |      6 |         0 |          0 |     216 |   9.82 |
+| 22 | pools/meta/test_exchange_underlying              |     18 |      0 |        0 |      0 |         0 |          0 |      18 |   4.51 |
+| 21 | pools/liquidity/test_remove_liquidity_one_coin   |    188 |     28 |        0 |      0 |         0 |          0 |     216 |   8.71 |
+| 20 | pools/liquidity/test_remove_liquidity_imbalance  |     96 |     36 |        0 |      0 |         0 |          0 |     132 |   7.12 |
+| 19 | pools/liquidity/test_remove_liquidity            |     60 |     24 |        0 |      0 |         0 |          0 |      84 |   6.08 |
+| 18 | pools/liquidity/test_initial_liquidity           |     24 |      0 |        0 |      0 |         0 |          0 |      24 |   4.56 |
+| 17 | pools/liquidity/test_add_liquidity               |     61 |      0 |        0 |      0 |        23 |          0 |      84 |   6.19 |
+| 16 | pools/general/test_virtual_price                 |    108 |      0 |        0 |      0 |         0 |          0 |     108 |   6.66 |
+| 15 | pools/general/test_swap_getters                  |     18 |      6 |        0 |      0 |         0 |          0 |      24 |  28.4  |
+| 14 | pools/general/test_specific_liquidity_operations |      2 |      0 |        0 |      0 |         0 |          0 |       1 |   2.61 |
+| 13 | pools/general/test_ramp_A                        |     12 |     84 |        0 |      0 |         0 |          0 |      96 |   5.87 |
+| 12 | pools/general/test_fees                          |     60 |     12 |        0 |      0 |         0 |          0 |      72 |   6.25 |
+| 11 | pools/general/test_erc4626_swaps                 |     13 |      0 |        0 |      0 |         0 |          0 |      13 |   5.16 |
+| 10 | pools/general/test_donation_get_D                |      6 |      0 |        0 |      0 |         0 |          0 |       6 |   2.85 |
+|  9 | pools/exchange/test_exchange_reverts             |    183 |      7 |        0 |     14 |         0 |          0 |     204 |   8.42 |
+|  8 | pools/exchange/test_exchange_receiver            |     48 |     12 |        0 |      0 |         0 |          0 |      60 |   5.91 |
+|  7 | pools/exchange/test_exchange_received            |     46 |      0 |        0 |     50 |         0 |          0 |      96 |   6.52 |
+|  6 | pools/exchange/test_exchange                     |     44 |      4 |        0 |      0 |         0 |          0 |      48 |   5.59 |
+|  5 | gauge/test_rewards                               |     10 |      0 |       26 |      0 |         0 |          0 |      35 |  49.54 |
+|  4 | factory/test_factory_meta                        |    162 |      0 |        0 |      0 |         0 |          0 |     162 |   5.47 |
+|  3 | factory/test_factory_general                     |     37 |      0 |        0 |      0 |         0 |          0 |      37 |   4.75 |
+|  2 | factory/test_factory_forked                      |      1 |      0 |        0 |      0 |         0 |          0 |       1 |   8.49 |
+|  1 | factory/test_factory_basic                       |     28 |      0 |        0 |      0 |         0 |          0 |      28 |   3.33 |
+|  0 | factory/test_factory_add_pools                   |      6 |      0 |        0 |      0 |         0 |          0 |       6 |   6.23 |
++----+--------------------------------------------------+--------+--------+----------+--------+-----------+------------+---------+--------+

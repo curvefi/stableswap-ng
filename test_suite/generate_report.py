@@ -6,7 +6,7 @@ from tabulate import tabulate
 # Base directory for reports
 reports_base_dir = "test_suite/test_reports"
 
-reports_base_dir += '/token'
+# reports_base_dir += '/token'
 
 # Individual regex patterns to match each possible status
 failed_pattern = re.compile(r"(\d+)\s+failed")
@@ -109,7 +109,7 @@ def generate_report():
     # Exclude the 'Timestamp' column from the final DataFrame
     if N_ts == 1:
         df_time_sorted = df_time_sorted.drop('Timestamp', axis=1)
-        df_time_sorted = df_time_sorted.sort_values('FAIL', ascending=False)
+        df_time_sorted = df_time_sorted.sort_values('Test', ascending=False)
 
     # Output the DataFrame
     print(df_time_sorted.to_string(index=False, justify='center'))
