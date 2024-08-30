@@ -13,7 +13,7 @@ skip_subfolders = ["__pycache__", "utils", "fixtures"]
 # if subfolders are specified, all tests will be run only in those subfolders
 # (disregarding tests_to_run)
 only_subfolders = [
-    "gauge"
+    # "gauge"
     ]
 
 # if tests_to_run is specified, only those tests will be run (except if only_subfolders is specified)
@@ -52,14 +52,17 @@ def run_tests_and_save_output():
                     output_file = os.path.join(report_dir, timestamp+".log")
                     command = f"pytest {test_file_path} -n 10 | tee {output_file}"
                 else:
-                    command = f"pytest {test_file_path}"
+                    command = f"pytest {test_file_path} -n 10"
 
                 print(f"Running {test_file_path}")
-                subprocess.run(command, shell=True, check=True)
+                subprocess.run(command, shell=True, check=False)
 
 # Main function
 def main():
+    t_init = datetime.now()
     run_tests_and_save_output()
+    t_end = datetime.now()
+    print(f"Tests finished in {t_end - t_init}")
 
 if __name__ == "__main__":
     if 'test_suite' in os.getcwd():

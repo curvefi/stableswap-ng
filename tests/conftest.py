@@ -18,16 +18,6 @@ pytest_plugins = [
 ]
 
 
-@pytest.fixture(autouse=True)
-def boa_setup():
-    boa.env.enable_fast_mode()
-    yield
-    # force reset of the environment to prevent memory leaking between tests
-    boa.env._contracts.clear()
-    boa.env._code_registry.clear()
-    boa.reset_env()
-
-
 def pytest_generate_tests(metafunc):
     if "pool_type" in metafunc.fixturenames:
         pool_type_items = sorted(POOL_TYPES.items())
@@ -105,12 +95,27 @@ def meta_decimals(metapool_token_type, decimals):
     return 18 if metapool_token_type == 1 else decimals[0]
 
 
-@pytest.fixture(scope="module")
-def forked_chain():
+@pytest.fixture(scope="module", autouse=True)
+def boa_setup():
+    with boa.swap_env(boa.Env()):
+        # boa.env.enable_fast_mode()
+        yield
+
+
+@pytest.fixture(scope="session")
+def rpc_url():
     rpc_url = os.getenv("WEB3_PROVIDER_URL")
     assert rpc_url is not None, "Provider url is not set, add WEB3_PROVIDER_URL param to env"
-    env_forked = boa.Env()
-    with boa.swap_env(env_forked):
-        env_forked.fork(url=rpc_url, block_identifier="safe")
+    return rpc_url
+
+
+@pytest.fixture(scope="module")
+def forked_chain(rpc_url):
+    with boa.swap_env(boa.Env()):
+        boa.env.fork(url=rpc_url, block_identifier="safe")
         print(f'Forked the chain on block {boa.env.evm.vm.state.block_number}')
+        # boa.env.enable_fast_mode()
         yield
+
+# Tests finished in 0:10:54.478530 - with both fast modes enabled
+# Tests finished in 0:11:44.993321 - with fast mode disabled
