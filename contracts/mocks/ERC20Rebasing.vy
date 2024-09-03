@@ -123,6 +123,7 @@ def share_price() -> uint256:
 
 @internal
 def _rebase():
+    # print('Rebasing!!!')
     if IS_UP:
         self.totalCoin = self.totalCoin * 1000001 / 1000000
     else:

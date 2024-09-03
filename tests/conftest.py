@@ -20,7 +20,8 @@ pytest_plugins = [
 
 def pytest_generate_tests(metafunc):
     if "pool_type" in metafunc.fixturenames:
-        pool_type_items = sorted(POOL_TYPES.items())
+        # pool_type_items = sorted(POOL_TYPES.items())
+        pool_type_items = get_pool_types(metafunc)
         metafunc.parametrize(
             "pool_type", [v for k, v in pool_type_items], ids=[f"(PoolType={k})" for k, v in pool_type_items]
         )
@@ -41,6 +42,20 @@ def pytest_generate_tests(metafunc):
             [number for name, number in token_type_items],
             ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
         )
+    # # Conditional parametrization for metapool_token_type
+    # if "metapool_token_type" in metafunc.fixturenames:
+    #     # First, ensure that pool_type has already been parametrized
+    #     if "pool_type" in metafunc.fixturenames:
+    #         pool_type_items = get_pool_types(metafunc)
+    #         for _, pool_type_value in pool_type_items:
+    #             if pool_type_value == "meta":
+    #                 token_type_items = get_tokens_for_metafunc(metafunc)
+    #                 metafunc.parametrize(
+    #                     "metapool_token_type",
+    #                     [number for name, number in token_type_items],
+    #                     ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
+    #                 )
+    #                 break  # Only add this parametrization once
 
     if "initial_decimals" in metafunc.fixturenames:
         # this is only used in the decimals fixture
@@ -52,7 +67,7 @@ def get_pool_token_pairs(metafunc):
     # make all combinations possible
     all_combinations = list(combinations_with_replacement(items, 2))
 
-    if len(all_combinations) < 2:
+    if len(all_combinations) < 2 or metafunc.definition.get_closest_marker("extensive_token_pairs"):
         return all_combinations
 
     # make sure we get the same result in each worker
@@ -61,6 +76,7 @@ def get_pool_token_pairs(metafunc):
     return sorted(random.sample(all_combinations, k=2))
     # Q: why sample only 2 when we have 6?
     # todo - ideally we test all possible combinations
+    # dev: added extensive_token_pairs marker to test all combinations
 
 
 def get_tokens_for_metafunc(metafunc):
@@ -72,6 +88,18 @@ def get_tokens_for_metafunc(metafunc):
         (name, number)
         for name, number in TOKEN_TYPES.items()
         if not metafunc.definition.get_closest_marker(f"skip_{name}_tokens")
+    ]
+
+
+def get_pool_types(metafunc):
+    for name, number in POOL_TYPES.items():
+        if metafunc.definition.get_closest_marker(f"only_{name}_pool"):
+            return [(name, number)]
+
+    return [
+        (name, number)
+        for name, number in POOL_TYPES.items()
+        if not metafunc.definition.get_closest_marker(f"skip_{name}_pool")
     ]
 
 
@@ -98,7 +126,7 @@ def meta_decimals(metapool_token_type, decimals):
 @pytest.fixture(scope="module", autouse=True)
 def boa_setup():
     with boa.swap_env(boa.Env()):
-        # boa.env.enable_fast_mode()
+        boa.env.enable_fast_mode()
         yield
 
 
@@ -113,9 +141,10 @@ def rpc_url():
 def forked_chain(rpc_url):
     with boa.swap_env(boa.Env()):
         boa.env.fork(url=rpc_url, block_identifier="safe")
-        print(f'Forked the chain on block {boa.env.evm.vm.state.block_number}')
-        # boa.env.enable_fast_mode()
+        print(f"Forked the chain on block {boa.env.evm.vm.state.block_number}")
+        boa.env.enable_fast_mode()
         yield
+
 
 # Tests finished in 0:10:54.478530 - with both fast modes enabled
 # Tests finished in 0:11:44.993321 - with fast mode disabled

@@ -165,18 +165,22 @@ def basic_setup(
     pool_tokens,
     metapool_token_type,
 ):
-    mint_account(alice, pool_tokens, initial_balance, basic_initial_amounts)
-    approve_account(alice, pool_tokens, basic_swap)
     assert metapool_token_type is not None, "Fixture required downstream"
-    mint_for_testing(bob, 1 * 10**18, None, True)
+
+    for user in [alice, bob]:
+        mint_account(user, pool_tokens, initial_balance, basic_initial_amounts)
+        approve_account(user, pool_tokens, basic_swap)
 
     with boa.env.prank(alice):
         basic_swap.add_liquidity(deposit_basic_amounts, 0)
 
-    mint_account(bob, pool_tokens, initial_balance, basic_initial_amounts)
-    with boa.env.prank(bob):
-        for token in pool_tokens:
-            token.approve(basic_swap.address, 2**256 - 1)
+    # mint_account(bob, pool_tokens, initial_balance, basic_initial_amounts)
+    # approve_account(bob, pool_tokens, basic_swap)
+    # @dev small cleanup, code was not consistent
+    # mint_for_testing(bob, 1 * 10**18, None, True)
+    # with boa.env.prank(bob):
+    #     for token in pool_tokens:
+    #         token.approve(basic_swap.address, 2**256 - 1)
 
 
 @pytest.fixture()

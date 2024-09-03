@@ -18,7 +18,7 @@ only_subfolders = [
 
 # if tests_to_run is specified, only those tests will be run (except if only_subfolders is specified)
 tests_to_run = [
-    # 'test_factory_forked'
+    'test_exchange'
     ]
 
 # Output files (0 for debugging when we dont need to spam files)

@@ -65,6 +65,9 @@ known_first_party = "poetry"
 markers = [
   "only_plain_tokens", "only_oracle_tokens", "only_rebasing_tokens",
   "skip_plain_tokens", "skip_oracle_tokens", "skip_rebasing_tokens",
+  "extensive_token_pairs",
+  "only_basic_pool", "only_meta_pool",
+  "skip_basic_pool", "skip_meta_pool",
 ]
 filterwarnings = [
   "ignore:PytestUnknownMarkWarning"
