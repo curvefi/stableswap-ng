@@ -3,7 +3,7 @@ import pytest
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
-@pytest.mark.only_basic_pool
+# @pytest.mark.only_basic_pool
 @pytest.mark.extensive_token_pairs
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_min_dy(
@@ -36,6 +36,7 @@ def test_min_dy(
     pool_balance_token_in = pool_tokens[sending].balanceOf(swap.address)
 
     # swap.exchange(sending, receiving, amount, min_dy - 1, sender=bob)
+    # no slippage here, we test min_dy extensively later on
     swap.exchange(sending, receiving, amount, 0, sender=bob)
     if pool_type == 0:
         final_receiving = pool_tokens[receiving].balanceOf(bob)
@@ -43,9 +44,7 @@ def test_min_dy(
         final_receiving = underlying_tokens[receiving].balanceOf(bob)
 
     receiving_token_diff = final_receiving - initial_receiving
-    # if (pool_type == 0 and 2 in pool_token_types) or (pool_type == 1 and metapool_token_type == 2):
-    #     assert abs(receiving_token_diff - min_dy) == pytest.approx(1, abs=final_receiving // 1000000)
-    # else:
+
     if pool_type == 0 and pool_token_types[sending] == 2 and pool_token_types[receiving] != 2:
         # 1) token_in = rebasing, token_out = nonrebasing
         # because pool fixes dx honestly by comparing prev balance to balance after transfer_in,
@@ -53,9 +52,16 @@ def test_min_dy(
         # as a result, we receive slightly more dy than estimated min_dy
         # we correct for expected min_dy (inflate it) by value of pool balances after transfer_in
         # min_dy is thus roughly scaled by token_in (now rebased) held by pool
-        # approximate assert because of rounding errors, absolute error not larger than single rebasing delta
-        min_dy += (pool_balance_token_in) // 1000000  # that works because pool has equal balances more or less
-        assert abs(receiving_token_diff - min_dy) == pytest.approx(1, abs=final_receiving // 1000000)
+        # approximate assert because of how min_dy is approximated, in case of almost-balanced pool 5% tolerance
+        if pool_token_types[receiving] == 0:
+            # plain token_out, we may assume perfect pool balance
+            min_dy += (pool_balance_token_in) // 1000000  # that works because pool has equal balances more or less
+        elif pool_token_types[receiving] == 1:
+            # for oracle token_out pool isn't balanced because of exchange_rate, so we adjust testing proportionally
+            min_dy += (
+                pool_balance_token_in / (pool_tokens[receiving].exchange_rate() // pool_tokens[receiving].decimals())
+            ) // 1000000
+        assert abs(receiving_token_diff) == pytest.approx(min_dy, rel=5e-02)
     elif pool_type == 0 and pool_token_types[receiving] == 2 and pool_token_types[sending] != 2:
         # 2) token_in = nonrebasing, token_out = rebasing
         # because pool doesn't assume dy to be rebasing, estimated min_dy is slightly less than
@@ -65,7 +71,8 @@ def test_min_dy(
         # pass
     elif pool_type == 0 and pool_token_types[receiving] == pool_token_types[sending] == 2:
         # 3) token_in = rebasing, token_out = rebasing
-        # here get_dy acts on smaller dx, but dx is inflated upon transfer => more dy, and additionally dy is inflated upon transfer_out
+        # here get_dy acts on smaller dx, but dx is inflated upon transfer => more dy, and additionally dy
+        # is inflated upon transfer_out
         # thus effects are cumulative
         min_dy += (pool_balance_token_in) // 1000000
         assert abs(receiving_token_diff - min_dy) == pytest.approx(1, abs=final_receiving // 1000000)
