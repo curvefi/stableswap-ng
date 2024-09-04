@@ -52,7 +52,10 @@ def metapool_token(metapool_token_type, request, initial_decimals, pool_token_ty
         TOKEN_TYPES["oracle"]: "oracle_tokens",
         TOKEN_TYPES["rebasing"]: "rebasing_tokens",
     }
-    metapool_token, _ = request.getfixturevalue(fixture[metapool_token_type])
+    if metapool_token_type is not None:
+        metapool_token, _ = request.getfixturevalue(fixture[metapool_token_type])
+    else:
+        metapool_token = None
     return metapool_token
 
 

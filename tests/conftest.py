@@ -18,14 +18,79 @@ pytest_plugins = [
 ]
 
 
+# def pytest_generate_tests(metafunc):
+#     if "pool_type" in metafunc.fixturenames:
+#         # pool_type_items = sorted(POOL_TYPES.items())
+#         pool_type_items = get_pool_types(metafunc)
+#         metafunc.parametrize(
+#             "pool_type", [v for k, v in pool_type_items], ids=[f"(PoolType={k})" for k, v in pool_type_items]
+#         )
+
+#     if "pool_token_types" in metafunc.fixturenames:
+#         pool_token_pairs = get_pool_token_pairs(metafunc)
+#         metafunc.parametrize(
+#             "pool_token_types",
+#             [(v1, v2) for (k1, v1), (k2, v2) in pool_token_pairs],
+#             ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in pool_token_pairs],
+#         )
+
+#     if "metapool_token_type" in metafunc.fixturenames:
+#         # for meta pool only 1st coin is selected
+#         token_type_items = get_tokens_for_metafunc(metafunc)
+#         metafunc.parametrize(
+#             "metapool_token_type",
+#             [number for name, number in token_type_items],
+#             ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
+#         )
+
+#     if "initial_decimals" in metafunc.fixturenames:
+#         # this is only used in the decimals fixture
+#         metafunc.parametrize("initial_decimals", DECIMAL_PAIRS, ids=[f"(Decimals={i},{j})" for i, j in DECIMAL_PAIRS])
+
+
 def pytest_generate_tests(metafunc):
-    if "pool_type" in metafunc.fixturenames:
-        # pool_type_items = sorted(POOL_TYPES.items())
+    # Combined parametrization of pool_type and metapool_token_type (to avoid repeating tests in basic_pools for various metapool_token_types)
+    if "pool_type" in metafunc.fixturenames and "metapool_token_type" in metafunc.fixturenames:
+        pool_type_items = get_pool_types(metafunc)
+        token_type_items = get_tokens_for_metafunc(metafunc)
+
+        # Create combined parametrization based on pool_type
+        combined_params = []
+        combined_ids = []
+
+        for pool_name, pool_type_value in pool_type_items:
+            if pool_type_value == POOL_TYPES["meta"]:
+                # Parametrize metapool_token_type for meta pools
+                for token_name, token_type_value in token_type_items:
+                    combined_params.append((pool_type_value, token_type_value))
+                    combined_ids.append(f"(PoolType={pool_name}, MetaTokenType={token_name})")
+            else:
+                # Set metapool_token_type as None for basic pools
+                combined_params.append((pool_type_value, None))
+                combined_ids.append(f"(PoolType={pool_name})")
+
+        # Parametrize both pool_type and metapool_token_type together
+        metafunc.parametrize(
+            ("pool_type", "metapool_token_type"),
+            combined_params,
+            ids=combined_ids,
+        )
+    elif "pool_type" in metafunc.fixturenames:
+        # or parametrize pool_type only
         pool_type_items = get_pool_types(metafunc)
         metafunc.parametrize(
             "pool_type", [v for k, v in pool_type_items], ids=[f"(PoolType={k})" for k, v in pool_type_items]
         )
+    elif "metapool_token_type" in metafunc.fixturenames:
+        # or parametrize metapool_token_type only
+        token_type_items = get_tokens_for_metafunc(metafunc)
+        metafunc.parametrize(
+            "metapool_token_type",
+            [number for name, number in token_type_items],
+            ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
+        )
 
+    # Parametrize pool_token_types
     if "pool_token_types" in metafunc.fixturenames:
         pool_token_pairs = get_pool_token_pairs(metafunc)
         metafunc.parametrize(
@@ -34,31 +99,8 @@ def pytest_generate_tests(metafunc):
             ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in pool_token_pairs],
         )
 
-    if "metapool_token_type" in metafunc.fixturenames:
-        # for meta pool only 1st coin is selected
-        token_type_items = get_tokens_for_metafunc(metafunc)
-        metafunc.parametrize(
-            "metapool_token_type",
-            [number for name, number in token_type_items],
-            ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
-        )
-    # # Conditional parametrization for metapool_token_type
-    # if "metapool_token_type" in metafunc.fixturenames:
-    #     # First, ensure that pool_type has already been parametrized
-    #     if "pool_type" in metafunc.fixturenames:
-    #         pool_type_items = get_pool_types(metafunc)
-    #         for _, pool_type_value in pool_type_items:
-    #             if pool_type_value == "meta":
-    #                 token_type_items = get_tokens_for_metafunc(metafunc)
-    #                 metafunc.parametrize(
-    #                     "metapool_token_type",
-    #                     [number for name, number in token_type_items],
-    #                     ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
-    #                 )
-    #                 break  # Only add this parametrization once
-
+    # Parametrize initial_decimals
     if "initial_decimals" in metafunc.fixturenames:
-        # this is only used in the decimals fixture
         metafunc.parametrize("initial_decimals", DECIMAL_PAIRS, ids=[f"(Decimals={i},{j})" for i, j in DECIMAL_PAIRS])
 
 

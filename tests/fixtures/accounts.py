@@ -165,7 +165,7 @@ def basic_setup(
     pool_tokens,
     metapool_token_type,
 ):
-    assert metapool_token_type is not None, "Fixture required downstream"
+    # assert metapool_token_type is not None, "Fixture required downstream"
 
     for user in [alice, bob]:
         mint_account(user, pool_tokens, initial_balance, basic_initial_amounts)
@@ -231,6 +231,12 @@ def initial_setup(pool_type, request, metapool_token_type, pool_token_types, ini
     Set up the initial state for a pool test.
     Run either basic_setup or meta_setup depending on the pool_type.
     """
-    assert metapool_token_type is not None and pool_token_types and initial_decimals, "Fixtures required downstream"
+    if pool_type == POOL_TYPES["meta"]:
+        assert metapool_token_type is not None, "metapool_token_type is required for meta pools"
+    else:
+        # For basic pools, we don't care about metapool_token_type
+        metapool_token_type = None
+    # Continue with the general logic
+    assert all(fixture is not None for fixture in (initial_decimals, pool_token_types)), "Fixtures required downstream"
     fixture_name = {POOL_TYPES["basic"]: "basic_setup", POOL_TYPES["meta"]: "meta_setup"}[pool_type]
     return request.getfixturevalue(fixture_name)
