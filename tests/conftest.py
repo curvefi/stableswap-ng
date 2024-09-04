@@ -18,38 +18,9 @@ pytest_plugins = [
 ]
 
 
-# def pytest_generate_tests(metafunc):
-#     if "pool_type" in metafunc.fixturenames:
-#         # pool_type_items = sorted(POOL_TYPES.items())
-#         pool_type_items = get_pool_types(metafunc)
-#         metafunc.parametrize(
-#             "pool_type", [v for k, v in pool_type_items], ids=[f"(PoolType={k})" for k, v in pool_type_items]
-#         )
-
-#     if "pool_token_types" in metafunc.fixturenames:
-#         pool_token_pairs = get_pool_token_pairs(metafunc)
-#         metafunc.parametrize(
-#             "pool_token_types",
-#             [(v1, v2) for (k1, v1), (k2, v2) in pool_token_pairs],
-#             ids=[f"(PoolTokenTypes={k1}+{k2})" for (k1, v1), (k2, v2) in pool_token_pairs],
-#         )
-
-#     if "metapool_token_type" in metafunc.fixturenames:
-#         # for meta pool only 1st coin is selected
-#         token_type_items = get_tokens_for_metafunc(metafunc)
-#         metafunc.parametrize(
-#             "metapool_token_type",
-#             [number for name, number in token_type_items],
-#             ids=[f"(MetaTokenType={name})" for name, number in token_type_items],
-#         )
-
-#     if "initial_decimals" in metafunc.fixturenames:
-#         # this is only used in the decimals fixture
-#         metafunc.parametrize("initial_decimals", DECIMAL_PAIRS, ids=[f"(Decimals={i},{j})" for i, j in DECIMAL_PAIRS])
-
-
 def pytest_generate_tests(metafunc):
-    # Combined parametrization of pool_type and metapool_token_type (to avoid repeating tests in basic_pools for various metapool_token_types)
+    # Combined parametrization of pool_type and metapool_token_type (to avoid repeating tests in basic_pools
+    # for various metapool_token_types)
     if "pool_type" in metafunc.fixturenames and "metapool_token_type" in metafunc.fixturenames:
         pool_type_items = get_pool_types(metafunc)
         token_type_items = get_tokens_for_metafunc(metafunc)
