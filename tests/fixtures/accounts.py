@@ -4,10 +4,9 @@ import boa
 import pytest
 from eth_account.account import Account, LocalAccount
 
-from tests.utils.tokens import mint_for_testing
-
 from tests.constants import POOL_TYPES
 from tests.fixtures.constants import INITIAL_AMOUNT
+from tests.utils.tokens import mint_for_testing
 
 
 @pytest.fixture()
@@ -166,11 +165,11 @@ def basic_setup(
     metapool_token_type,
 ):
     # assert metapool_token_type is not None, "Fixture required downstream"
-
+    # bob and alice have tokens from pool
     for user in [alice, bob]:
         mint_account(user, pool_tokens, initial_balance, basic_initial_amounts)
         approve_account(user, pool_tokens, basic_swap)
-
+    # alice adds liquidity to the pool, bob holds tokens for tests
     with boa.env.prank(alice):
         basic_swap.add_liquidity(deposit_basic_amounts, 0)
 
@@ -197,7 +196,8 @@ def meta_setup(
     meta_initial_amounts,
     underlying_tokens,
     pool_tokens,
-    add_initial_liquidity_owner_meta,
+    # add_initial_liquidity_owner_meta, - this fixture leads to doubled liquidity in metapool,
+    # results in failing some tests
     metapool_token,
 ):
     approve_account(alice, pool_tokens, meta_swap)
