@@ -18,6 +18,11 @@ pytest_plugins = [
 ]
 
 
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        item.add_marker(pytest.mark.extensive_token_pairs)
+
+
 def pytest_generate_tests(metafunc):
     # Combined parametrization of pool_type and metapool_token_type (to avoid repeating tests in basic_pools
     # for various metapool_token_types)

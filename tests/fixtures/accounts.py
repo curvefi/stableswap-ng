@@ -196,7 +196,7 @@ def meta_setup(
     meta_initial_amounts,
     underlying_tokens,
     pool_tokens,
-    # add_initial_liquidity_owner_meta, - this fixture leads to doubled liquidity in metapool,
+    # add_initial_liquidity_owner_meta,  # - this fixture leads to doubled liquidity in metapool,
     # results in failing some tests
     metapool_token,
 ):
