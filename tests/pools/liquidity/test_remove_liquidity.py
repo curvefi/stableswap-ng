@@ -7,14 +7,51 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
 @pytest.mark.parametrize("min_amount", (0, 1))
-def test_remove_liquidity(alice, swap, pool_type, pool_tokens, underlying_tokens, min_amount, deposit_amounts):
-    swap.remove_liquidity(swap.balanceOf(alice), [i * min_amount for i in deposit_amounts], sender=alice)
-
+def test_remove_liquidity(
+    alice,
+    swap,
+    pool_type,
+    pool_token_types,
+    metapool_token_type,
+    pool_tokens,
+    underlying_tokens,
+    min_amount,
+    deposit_amounts,
+):
     coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
 
-    for coin, amount in zip(coins, deposit_amounts):
-        assert coin.balanceOf(alice) == pytest.approx(amount * 2, rel=1.5e-2)
-        assert coin.balanceOf(swap) == 0
+    amounts_before = [coin.balanceOf(alice) for coin in coins]
+
+    # if pool_token_types[0] == 2 or pool_token_types[1] == 2:
+    # swap.remove_liquidity(swap.balanceOf(alice), [0, 0], sender=alice)
+    # else:
+    if min_amount == 1 and (  # we specify specify min_amt_out
+        (pool_type == 0 and (pool_token_types[0] == 2 or pool_token_types[1] == 2))
+        or (pool_type == 1 and metapool_token_type == 2)  # and we have rebasing tokens
+    ):
+        swap.remove_liquidity(
+            swap.balanceOf(alice), [int(0.99 * i * min_amount) for i in deposit_amounts], sender=alice
+        )
+    else:
+        swap.remove_liquidity(swap.balanceOf(alice), [i * min_amount for i in deposit_amounts], sender=alice)
+
+    amounts_after = [coin.balanceOf(alice) for coin in coins]
+
+    for coin, coin_type, amount_before, amount_after in zip(coins, pool_token_types, amounts_before, amounts_after):
+        assert amount_after == pytest.approx(
+            amount_before * 2, rel=1.5e-2
+        )  # we deposit half of all balance value (approx for orcales, rebasing etc)
+
+        if (pool_type == 0 and coin_type == 2) or (pool_type == 1 and metapool_token_type == 2):
+            assert coin.balanceOf(swap) == pytest.approx(
+                0, abs=(amount_after - amount_before) * (1 - 1000000 / 1000001)  # approx for rebasing tokens
+            )
+        else:
+            assert coin.balanceOf(swap) == 0
+
+    # for coin, amount in zip(coins, deposit_amounts):
+    #     assert coin.balanceOf(alice) == pytest.approx(amount * 2, rel=1.5e-2)
+    #     assert coin.balanceOf(swap) == 0
 
     assert swap.balanceOf(alice) == 0
     assert swap.totalSupply() == 0
