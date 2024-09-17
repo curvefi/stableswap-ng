@@ -7,12 +7,20 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
 @pytest.mark.parametrize("idx", range(2))
-def test_amount_received(alice, swap, pool_type, pool_tokens, underlying_tokens, decimals, idx):
+def test_amount_received(
+    alice, swap, pool_type, pool_tokens, pool_token_types, metapool_token_type, underlying_tokens, decimals, idx
+):
     coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
     initial_amount = coins[idx].balanceOf(alice)
-
+    if pool_token_types[0] == pool_token_types[1] == 2:
+        pass
     swap.remove_liquidity_one_coin(10**18, idx, 0, sender=alice)
-    ideal = 10 ** decimals[idx]
+    if (pool_type == 0 and pool_token_types[idx] == 2) or (  # rebase token in base pool
+        pool_type == 1 and metapool_token_type == 2 and idx == 0  # rebase token in metapool
+    ):
+        ideal = 2.5 * 10 ** decimals[idx]  # rebasing tokens got inflated (2.5e18 for two transfers)
+    else:
+        ideal = 10 ** decimals[idx]
     assert ideal * 0.99 <= coins[idx].balanceOf(alice) - initial_amount <= ideal
 
 
@@ -32,14 +40,23 @@ def test_lp_token_balance(alice, swap, idx, divisor):
 
 
 @pytest.mark.parametrize("idx", range(2))
-def test_expected_vs_actual(alice, swap, pool_type, pool_tokens, underlying_tokens, idx):
+def test_expected_vs_actual(
+    alice, swap, pool_type, pool_tokens, pool_token_types, metapool_token_type, underlying_tokens, idx
+):
     coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
     initial_amount = coins[idx].balanceOf(alice)
     amount = swap.balanceOf(alice) // 10
 
     expected = swap.calc_withdraw_one_coin(amount, idx)
     swap.remove_liquidity_one_coin(amount, idx, 0, sender=alice)
-    assert coins[idx].balanceOf(alice) == expected + initial_amount
+    if (pool_type == 0 and pool_token_types[idx] == 2) or (  # rebase token in base pool
+        pool_type == 1 and metapool_token_type == 2 and idx == 0  # rebase token in metapool
+    ):
+        delta = 1.51 * 10**18  # single transfer rebasing (hardcoded for fixed amounts)
+    else:
+        delta = 0
+
+    assert coins[idx].balanceOf(alice) == pytest.approx(expected + initial_amount, abs=delta)
 
 
 @pytest.mark.parametrize("idx", range(2))

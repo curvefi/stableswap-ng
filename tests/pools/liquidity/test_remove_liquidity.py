@@ -22,9 +22,6 @@ def test_remove_liquidity(
 
     amounts_before = [coin.balanceOf(alice) for coin in coins]
 
-    # if pool_token_types[0] == 2 or pool_token_types[1] == 2:
-    # swap.remove_liquidity(swap.balanceOf(alice), [0, 0], sender=alice)
-    # else:
     if min_amount == 1 and (  # we specify specify min_amt_out
         (pool_type == 0 and (pool_token_types[0] == 2 or pool_token_types[1] == 2))
         or (pool_type == 1 and metapool_token_type == 2)  # and we have rebasing tokens
@@ -48,10 +45,6 @@ def test_remove_liquidity(
             )
         else:
             assert coin.balanceOf(swap) == 0
-
-    # for coin, amount in zip(coins, deposit_amounts):
-    #     assert coin.balanceOf(alice) == pytest.approx(amount * 2, rel=1.5e-2)
-    #     assert coin.balanceOf(swap) == 0
 
     assert swap.balanceOf(alice) == 0
     assert swap.totalSupply() == 0
