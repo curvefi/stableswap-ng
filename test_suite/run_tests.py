@@ -22,7 +22,7 @@ tests_to_run = [
 ]
 
 # Output files (0 for debugging when we dont need to spam files)
-SAVE_FILES = 0
+SAVE_FILES = 1
 
 
 # Function to run pytest for each file and save output to folder corresponding to the file

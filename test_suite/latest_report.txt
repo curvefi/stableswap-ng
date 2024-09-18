@@ -15,11 +15,11 @@
 | 24 | pools/meta/test_get_dy_underlying_fix            |      5 |      0 |        0 |      0 |         0 |          2 |       7 |  10.68 |
 | 23 | pools/meta/test_exchange_underlying_reverts      |    204 |      6 |        0 |      6 |         0 |          0 |     216 |  11.49 |
 | 22 | pools/meta/test_exchange_underlying              |     18 |      0 |        0 |      0 |         0 |          0 |      18 |   5.52 |
-| 21 | pools/liquidity/test_remove_liquidity_one_coin   |    136 |      8 |        0 |      0 |         0 |          0 |     144 |   9.14 |
-| 20 | pools/liquidity/test_remove_liquidity_imbalance  |     88 |      0 |        0 |      0 |         0 |          0 |      88 |   7.81 |
-| 19 | pools/liquidity/test_remove_liquidity            |     50 |      6 |        0 |      0 |         0 |          0 |      56 |   7.09 |
-| 18 | pools/liquidity/test_initial_liquidity           |     16 |      0 |        0 |      0 |         0 |          0 |      16 |   5.86 |
-| 17 | pools/liquidity/test_add_liquidity               |     35 |      0 |        0 |      0 |        21 |          0 |      56 |   7.18 |
+| 21 | pools/liquidity/test_remove_liquidity_one_coin   |    144 |      0 |        0 |      0 |         0 |          0 |     144 |   8.94 |
+| 20 | pools/liquidity/test_remove_liquidity_imbalance  |     88 |      0 |        0 |      0 |         0 |          0 |      88 |   7.47 |
+| 19 | pools/liquidity/test_remove_liquidity            |     56 |      0 |        0 |      0 |         0 |          0 |      56 |   6.72 |
+| 18 | pools/liquidity/test_initial_liquidity           |     16 |      0 |        0 |      0 |         0 |          0 |      16 |   5.59 |
+| 17 | pools/liquidity/test_add_liquidity               |    120 |      0 |        0 |      0 |         0 |          0 |     120 |   8.49 |
 | 16 | pools/general/test_virtual_price                 |     72 |      0 |        0 |      0 |         0 |          0 |      72 |   7.86 |
 | 15 | pools/general/test_swap_getters                  |     14 |      0 |        2 |      0 |         0 |          0 |      16 |   8.45 |
 | 14 | pools/general/test_specific_liquidity_operations |      2 |      0 |        0 |      0 |         0 |          0 |       2 |   3.32 |

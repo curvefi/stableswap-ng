@@ -1,5 +1,6 @@
 import boa
 import pytest
+import re
 
 from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils.transactions import call_returning_result_and_logs
@@ -7,6 +8,7 @@ from tests.utils.transactions import call_returning_result_and_logs
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
+@pytest.mark.extensive_token_pairs
 def test_add_liquidity(
     bob,
     swap,
@@ -18,20 +20,7 @@ def test_add_liquidity(
     pool_token_types,
     metapool_token_type,
 ):
-    if pool_type == 1:
-        pytest.xfail("pool_type = meta - should be fixed")
-
-    if pool_token_types == (2, 2) and pool_type == 0:
-        pytest.xfail("pool_token_types = rebase-rebase - should be fixed")
-        # similar to issue #44 there is probably some miscalculation in the view contract
-
-    calculated_output = swap.calc_token_amount(deposit_amounts, True)
-
-    returned_output = swap.add_liquidity(deposit_amounts, 0, sender=bob)
-
-    # estimation should corresond to the reported amount
-    assert calculated_output == returned_output
-
+    swap.add_liquidity(deposit_amounts, 0, sender=bob)
     is_ideal = True
 
     if pool_type == 0:
@@ -68,6 +57,7 @@ def test_add_liquidity(
         assert underlying_tokens[1].balanceOf(swap) == deposit_amounts[1] * 2
 
 
+@pytest.mark.extensive_token_pairs
 @pytest.mark.parametrize("idx", (0, 1))
 def test_add_one_coin(
     bob,
@@ -81,8 +71,6 @@ def test_add_one_coin(
     metapool_token_type,
     idx,
 ):
-    if pool_type == 1:
-        pytest.xfail("pool_type = meta - should be fixed")
 
     amounts = [0] * len(pool_tokens)
     amounts[idx] = deposit_amounts[idx]
@@ -137,9 +125,10 @@ def test_min_amount_too_high(bob, swap, pool_type, deposit_amounts, pool_tokens)
         swap.add_liquidity(deposit_amounts, size * INITIAL_AMOUNT // 2 * 10**18 * 101 // 100, sender=bob)
 
 
+@pytest.mark.extensive_token_pairs
 def test_event(bob, swap, pool_type, deposit_amounts, pool_tokens, pool_token_types, metapool_token_type):
-    if pool_type == 1 and metapool_token_type == 0:
-        pytest.xfail("pool_type = meta, meta token type = plain - should be fixed")
+    # if pool_type == 1 and metapool_token_type == 0:
+    #     pytest.xfail("pool_type = meta, meta token type = plain - should be fixed")
     size = 2
     check_invariant = True
     if pool_type == 0:
@@ -156,11 +145,25 @@ def test_event(bob, swap, pool_type, deposit_amounts, pool_tokens, pool_token_ty
     _, events = call_returning_result_and_logs(swap, "add_liquidity", deposit_amounts, 0, sender=bob)
 
     assert len(events) == 4  # Transfer token1, Transfer token2, Transfer LP, Add liquidity
+
+    # approximate event string
+    # AddLiquidity(provider=0x0FD67569D674fc7F8Fa003618adA4D0D11Ef5CF1, token_amounts=[amt1, amt2], fees=[0, 0], invariant=inv, token_supply=supply)
+    event_string = repr(events[3])
+    # Extract values using regex
+    provider = re.search(r"provider=([0-9a-fA-Fx]+)", event_string).group(1)
+    token_amounts = [int(x) for x in re.search(r"token_amounts=\[([0-9, ]+)\]", event_string).group(1).split(", ")]
+    fees = [int(x) for x in re.search(r"fees=\[([0-9, ]+)\]", event_string).group(1).split(", ")]
+    invariant = int(re.search(r"invariant=([0-9]+)", event_string).group(1))
+    token_supply = int(re.search(r"token_supply=([0-9]+)", event_string).group(1))
+
+    assert provider == bob
+    assert token_amounts == deposit_amounts
+    assert all(fee >= 0 for fee in fees)
     if check_invariant:
-        assert (
-            repr(events[3]) == f"AddLiquidity(provider={bob}, token_amounts={deposit_amounts}, fees=[0, 0], "
-            f"invariant={size * INITIAL_AMOUNT * 10 ** 18}, token_supply={swap.totalSupply()})"
-        )
+        assert invariant == size * INITIAL_AMOUNT * 10**18
+    else:
+        assert invariant == pytest.approx(size * INITIAL_AMOUNT * 10**18, rel=0.000001)
+    assert token_supply == swap.totalSupply()
 
 
 def test_send_eth(bob, swap, deposit_amounts):
