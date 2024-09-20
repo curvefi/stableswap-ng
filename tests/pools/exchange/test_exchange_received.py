@@ -17,9 +17,6 @@ def transfer_and_swap(
     underlying_tokens,
     pool_type,
     base_pool,
-    base_pool_lp_token,
-    base_pool_tokens,
-    base_pool_decimals,
 ):
     def _transfer_and_swap(pool, sending: int, receiving: int, underlying: bool):
         # get input and output tokens:
@@ -106,60 +103,64 @@ def transfer_and_swap(
     return _transfer_and_swap
 
 
-@pytest.mark.extensive_token_types
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_exchange_received_nonrebasing(
-    swap, sending, receiving, transfer_and_swap, pool_token_types, pool_type, meta_token_type
-):
-    if (
-        pool_type == 0
-        and pool_token_types[0] == pool_token_types[1] == 2
-        or pool_type == 1
-        and meta_token_type == 2
-    ):
-        pass
-    swap_data = transfer_and_swap(swap, sending, receiving, False)
+def test_exchange_received_nonrebasing(swap, sending, receiving, transfer_and_swap, check_rebasing):
+    if swap._immutables.pool_contains_rebasing_tokens:
+        # we are in case of rebasing tokens, they are not supported by this test
+        with (
+            boa.reverts()
+            # ideally revert with dev="exchange_received not supported if pool contains rebasing tokens",
+            # but boa has bug and gives some #comment line from callback_swap contract
+        ):
+            swap_data = None
+            swap_data = transfer_and_swap(swap, sending, receiving, False)
+            assert swap_data is None
+    else:
+        swap_data = transfer_and_swap(swap, sending, receiving, False)
+        assert (
+            swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1]
+            == swap_data["amount_in"]
+        )
+        assert (
+            swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0]
+            == swap_data["amount_out"]
+        )
 
-    assert (
-        swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1]
-        == swap_data["amount_in"]
-    )
-    assert (
-        swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0]
-        == swap_data["amount_out"]
-    )
-
-    assert (
-        swap_data["swap"]["sending_token"][1] - swap_data["swap"]["sending_token"][0]
-        == swap_data["amount_in"]
-    )
-    assert (
-        swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1]
-        == swap_data["amount_out"]
-    )
+        assert (
+            swap_data["swap"]["sending_token"][1] - swap_data["swap"]["sending_token"][0]
+            == swap_data["amount_in"]
+        )
+        assert (
+            swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1]
+            == swap_data["amount_out"]
+        )
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_exchange_not_received(bob, swap, pool_tokens, sending, receiving, skip_rebasing_tokens):
-    with boa.env.prank(bob), boa.reverts():
-        swap.exchange_received(sending, receiving, 1, 0, bob)
+def test_exchange_not_received(bob, swap, pool_tokens, sending, receiving):
+    if not swap._immutables.pool_contains_rebasing_tokens:
+        with boa.env.prank(bob), boa.reverts():
+            swap.exchange_received(sending, receiving, 1, 0, bob)
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_no_dos(
-    bob, charlie, swap, pool_tokens, sending, receiving, transfer_and_swap, skip_rebasing_tokens
+    bob, charlie, swap, pool_tokens, sending, receiving, transfer_and_swap
 ):
-    mint_for_testing(bob, 1, pool_tokens[sending], False)
-    pool_tokens[sending].transfer(swap, 1, sender=bob)
+    if not swap._immutables.pool_contains_rebasing_tokens:
+        mint_for_testing(bob, 1, pool_tokens[sending], False)
+        pool_tokens[sending].transfer(swap, 1, sender=bob)
 
-    mint_for_testing(charlie, 10**18, pool_tokens[sending], False)
-    transfer_and_swap(swap, sending, receiving, False)
+        mint_for_testing(charlie, 10**18, pool_tokens[sending], False)
+        transfer_and_swap(swap, sending, receiving, False)
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_rebasing_reverts(
     bob, swap, transfer_and_swap, pool_tokens, sending, receiving, contains_rebasing_tokens
 ):
-    if 2 in get_asset_types_in_pool(swap):
-        with boa.reverts():
-            transfer_and_swap(swap, sending, receiving, False)
+    if swap._immutables.pool_contains_rebasing_tokens:
+        with boa.reverts():  # must revert
+            result = None
+            result = transfer_and_swap(swap, sending, receiving, False)
+            assert result is None

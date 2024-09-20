@@ -20,8 +20,8 @@ def test_amount_received(
 ):
     coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
     initial_amount = coins[idx].balanceOf(alice)
-    if pool_token_types[0] == pool_token_types[1] == 2:
-        pass
+    # if pool_token_types[0] == pool_token_types[1] == 2:
+    #     pass
     swap.remove_liquidity_one_coin(10**18, idx, 0, sender=alice)
     if (pool_type == 0 and pool_token_types[idx] == 2) or (  # rebase token in base pool
         pool_type == 1 and metapool_token_type == 2 and idx == 0  # rebase token in metapool
