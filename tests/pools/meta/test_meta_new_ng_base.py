@@ -15,7 +15,10 @@ def ng_base_pool_decimals():
 
 @pytest.fixture()
 def ng_base_pool_tokens(ng_base_pool_decimals, erc20_deployer):
-    return [erc20_deployer.deploy(f"tkn{i}", f"tkn{i}", ng_base_pool_decimals[i]) for i in range(BASE_N_COINS)]
+    return [
+        erc20_deployer.deploy(f"tkn{i}", f"tkn{i}", ng_base_pool_decimals[i])
+        for i in range(BASE_N_COINS)
+    ]
 
 
 @pytest.fixture()
@@ -24,7 +27,9 @@ def meta_token(erc20_deployer):
 
 
 @pytest.fixture()
-def ng_base_pool(deployer, factory, ng_base_pool_tokens, zero_address, amm_deployer, set_pool_implementations):
+def ng_base_pool(
+    deployer, factory, ng_base_pool_tokens, zero_address, amm_deployer, set_pool_implementations
+):
     pool_size = len(ng_base_pool_tokens)
     offpeg_fee_multiplier = 20000000000
     method_ids = [bytes(b"")] * pool_size
@@ -59,7 +64,10 @@ def ng_metapool_tokens(meta_token, ng_base_pool):
 def add_ng_base_pool(owner, factory, ng_base_pool, ng_base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
-            ng_base_pool.address, ng_base_pool.address, [0] * len(ng_base_pool_tokens), len(ng_base_pool_tokens)
+            ng_base_pool.address,
+            ng_base_pool.address,
+            [0] * len(ng_base_pool_tokens),
+            len(ng_base_pool_tokens),
         )
 
 
@@ -109,7 +117,13 @@ def mint_and_approve_for_bob(meta_token, ng_base_pool_tokens, bob, empty_swap, n
 
 @pytest.fixture()
 def deposit_amounts(
-    meta_token, ng_base_pool, ng_base_pool_tokens, ng_base_pool_decimals, empty_swap, bob, mint_and_approve_for_bob
+    meta_token,
+    ng_base_pool,
+    ng_base_pool_tokens,
+    ng_base_pool_decimals,
+    empty_swap,
+    bob,
+    mint_and_approve_for_bob,
 ):
     _deposit_amounts = []
     INITIAL_AMOUNT = 1_000_000 * BASE_N_COINS

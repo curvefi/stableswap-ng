@@ -3,7 +3,9 @@ import pytest
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
-def test_exchange_underlying(bob, charlie, swap, underlying_tokens, meta_decimals, base_pool_decimals):
+def test_exchange_underlying(
+    bob, charlie, swap, underlying_tokens, meta_decimals, base_pool_decimals
+):
     initial_amount = underlying_tokens[0].balanceOf(bob)
 
     amount = 10 ** base_pool_decimals[0]

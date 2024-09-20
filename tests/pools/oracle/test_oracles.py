@@ -9,7 +9,11 @@ from hypothesis import HealthCheck, given, settings
 from tests.utils import approx
 from tests.utils.tokens import mint_for_testing
 
-SETTINGS = {"max_examples": 100, "deadline": None, "suppress_health_check": [HealthCheck.function_scoped_fixture]}
+SETTINGS = {
+    "max_examples": 100,
+    "deadline": None,
+    "suppress_health_check": [HealthCheck.function_scoped_fixture],
+}
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
@@ -165,7 +169,9 @@ def test_manipulate_ema(basic_swap, bob, pool_tokens, underlying_tokens, decimal
     dt=strategy("uint256", min_value=0, max_value=10**6),
 )
 @settings(**SETTINGS)
-def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt, math_implementation):
+def test_D_ema(
+    swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0, dt, math_implementation
+):
     i, j = random.sample(range(swap.N_COINS()), 2)
 
     # calc amount in:

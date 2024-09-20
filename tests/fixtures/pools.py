@@ -9,7 +9,9 @@ OFFPEG_FEE_MULTIPLIER = 20000000000
 
 
 @pytest.fixture()
-def basic_swap(deployer, factory, pool_size, pool_tokens, zero_address, amm_deployer, set_pool_implementations):
+def basic_swap(
+    deployer, factory, pool_size, pool_tokens, zero_address, amm_deployer, set_pool_implementations
+):
     A = 2000
     fee = 1000000
     method_ids = [b""] * pool_size
@@ -53,7 +55,13 @@ def basic_swap(deployer, factory, pool_size, pool_tokens, zero_address, amm_depl
 
 @pytest.fixture()
 def meta_swap(
-    factory, set_metapool_implementations, zero_address, metapool_token, base_pool, meta_deployer, add_base_pool
+    factory,
+    set_metapool_implementations,
+    zero_address,
+    metapool_token,
+    base_pool,
+    meta_deployer,
+    add_base_pool,
 ):
     A = 2000
     fee = 1000000
@@ -107,7 +115,9 @@ def swap(request, pool_type, pool_token_types, initial_decimals, metapool_token_
         metapool_token_type = None
 
     # Continue with the general logic
-    assert all(fixture is not None for fixture in (initial_decimals, pool_token_types)), "Fixtures required downstream"
+    assert all(
+        fixture is not None for fixture in (initial_decimals, pool_token_types)
+    ), "Fixtures required downstream"
 
     fixture_name = {POOL_TYPES["basic"]: "basic_swap", POOL_TYPES["meta"]: "meta_swap"}[pool_type]
     return request.getfixturevalue(fixture_name)
@@ -118,7 +128,12 @@ def swap(request, pool_type, pool_token_types, initial_decimals, metapool_token_
 def base_pool(deployer, owner, alice, base_pool_tokens, base_pool_lp_token, base_pool_deployer):
     with boa.env.prank(deployer):
         base_pool = base_pool_deployer.deploy(
-            owner, [t.address for t in base_pool_tokens], base_pool_lp_token.address, 200, 3000000, 5000000000
+            owner,
+            [t.address for t in base_pool_tokens],
+            base_pool_lp_token.address,
+            200,
+            3000000,
+            5000000000,
         )
         base_pool_lp_token.set_minter(base_pool.address)
     return base_pool

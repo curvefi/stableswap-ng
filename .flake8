@@ -1,5 +1,5 @@
 [flake8]
-max-line-length = 120
+max-line-length =100
 # codestyles - numpy, google, pep8
 # formatter - black
 # instead of flake and black use ruff - same written in rust

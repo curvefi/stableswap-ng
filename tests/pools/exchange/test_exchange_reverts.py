@@ -5,7 +5,9 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_insufficient_balance(charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals):
+def test_insufficient_balance(
+    charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals
+):
     amount = 10 ** decimals[sending]
 
     for token in pool_tokens + underlying_tokens:
@@ -18,7 +20,14 @@ def test_insufficient_balance(charlie, pool_tokens, underlying_tokens, swap, sen
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_zero_amount_swap(
-    charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals, contains_rebasing_tokens
+    charlie,
+    pool_tokens,
+    underlying_tokens,
+    swap,
+    sending,
+    receiving,
+    decimals,
+    contains_rebasing_tokens,
 ):
     with boa.reverts():
         swap.exchange(sending, receiving, 0, 0, sender=charlie)

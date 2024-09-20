@@ -4,7 +4,9 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_admin_balances(bob, swap, pool_type, pool_tokens, underlying_tokens, initial_amounts, sending, receiving):
+def test_admin_balances(
+    bob, swap, pool_type, pool_tokens, underlying_tokens, initial_amounts, sending, receiving
+):
     for send, recv in [(sending, receiving), (receiving, sending)]:
         swap.exchange(send, recv, initial_amounts[send], 0, sender=bob)
 
@@ -19,7 +21,16 @@ def test_admin_balances(bob, swap, pool_type, pool_tokens, underlying_tokens, in
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_withdraw_one_coin(
-    alice, bob, fee_receiver, swap, pool_type, pool_tokens, underlying_tokens, sending, receiving, initial_amounts
+    alice,
+    bob,
+    fee_receiver,
+    swap,
+    pool_type,
+    pool_tokens,
+    underlying_tokens,
+    sending,
+    receiving,
+    initial_amounts,
 ):
     swap.exchange(sending, receiving, initial_amounts[sending], 0, sender=bob)
 
@@ -30,7 +41,9 @@ def test_withdraw_one_coin(
 
     swap.withdraw_admin_fees(sender=alice)
     swap_balance = (
-        pool_tokens[receiving].balanceOf(swap) if pool_type == 0 else underlying_tokens[receiving].balanceOf(swap)
+        pool_tokens[receiving].balanceOf(swap)
+        if pool_type == 0
+        else underlying_tokens[receiving].balanceOf(swap)
     )
     assert swap.balances(receiving) == swap_balance
     expected_balance = (
@@ -53,7 +66,9 @@ def test_no_fees(bob, fee_receiver, swap, pool_type, pool_tokens, underlying_tok
             assert coin.balanceOf(fee_receiver) == 0
 
 
-def test_withdraw_admin_fees(bob, swap, pool_type, pool_tokens, underlying_tokens, fee_receiver, decimals):
+def test_withdraw_admin_fees(
+    bob, swap, pool_type, pool_tokens, underlying_tokens, fee_receiver, decimals
+):
     swap.exchange(1, 0, 10_000 * 10 ** decimals[1], 0, sender=bob)
 
     fees = []

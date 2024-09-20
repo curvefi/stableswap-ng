@@ -8,7 +8,14 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 
 @pytest.mark.parametrize("divisor", [2, 5, 10])
 def test_remove_balanced(
-    alice, swap, pool_type, pool_tokens, underlying_tokens, divisor, deposit_amounts, initial_amounts
+    alice,
+    swap,
+    pool_type,
+    pool_tokens,
+    underlying_tokens,
+    divisor,
+    deposit_amounts,
+    initial_amounts,
 ):
     initial_balance = swap.balanceOf(alice)
     amounts = [i // divisor for i in deposit_amounts]
@@ -17,7 +24,9 @@ def test_remove_balanced(
     coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
 
     for i, coin in enumerate(coins):
-        assert coin.balanceOf(alice) == pytest.approx(amounts[i] + initial_amounts[i] - deposit_amounts[i], rel=1.5e-2)
+        assert coin.balanceOf(alice) == pytest.approx(
+            amounts[i] + initial_amounts[i] - deposit_amounts[i], rel=1.5e-2
+        )
         assert coin.balanceOf(swap) == pytest.approx(deposit_amounts[i] - amounts[i], rel=1.5e-2)
 
     assert swap.balanceOf(alice) / initial_balance == pytest.approx(1 - 1 / divisor, rel=1.5e-2)
@@ -25,7 +34,15 @@ def test_remove_balanced(
 
 @pytest.mark.parametrize("idx", range(2))
 def test_remove_one(
-    alice, swap, pool_type, pool_tokens, underlying_tokens, pool_size, idx, deposit_amounts, initial_amounts
+    alice,
+    swap,
+    pool_type,
+    pool_tokens,
+    underlying_tokens,
+    pool_size,
+    idx,
+    deposit_amounts,
+    initial_amounts,
 ):
     amounts = [0] * pool_size
     amounts[idx] = deposit_amounts[idx] // 2
@@ -36,7 +53,9 @@ def test_remove_one(
     coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
 
     for i, coin in enumerate(coins):
-        assert coin.balanceOf(alice) == pytest.approx(amounts[i] + initial_amounts[i] - deposit_amounts[i], rel=1.5e-2)
+        assert coin.balanceOf(alice) == pytest.approx(
+            amounts[i] + initial_amounts[i] - deposit_amounts[i], rel=1.5e-2
+        )
         assert coin.balanceOf(swap) == pytest.approx(deposit_amounts[i] - amounts[i], rel=1.5e-2)
 
     actual_balance = swap.balanceOf(alice)
@@ -73,6 +92,8 @@ def test_event(alice, bob, swap, pool_size, deposit_amounts):
     amounts = [i // 5 for i in deposit_amounts]
     max_burn = pool_size * 1_000_000 * 10**18
 
-    _, events = call_returning_result_and_logs(swap, "remove_liquidity_imbalance", amounts, max_burn, sender=bob)
+    _, events = call_returning_result_and_logs(
+        swap, "remove_liquidity_imbalance", amounts, max_burn, sender=bob
+    )
 
     assert f"RemoveLiquidityImbalance(provider={bob}" in repr(events[3])

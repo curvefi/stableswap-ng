@@ -68,7 +68,16 @@ def generate_report():
                             summary = extract_summary(line)
 
                             if summary:
-                                failed, passed, skipped, deselected, xfailed, warnings, errors, time_taken = summary
+                                (
+                                    failed,
+                                    passed,
+                                    skipped,
+                                    deselected,
+                                    xfailed,
+                                    warnings,
+                                    errors,
+                                    time_taken,
+                                ) = summary
                                 total = int(sum(summary) - time_taken)
                                 # Extract folder, subfolder, filename, and timestamp
                                 relative_path = os.path.relpath(root, start=reports_base_dir)

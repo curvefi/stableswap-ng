@@ -136,7 +136,9 @@ def test_permit_contract(eth_acc, bob, swap):
     with boa.env.prank(eth_acc.address):
         mock_contract = boa.loads(src)
 
-    permit = permit_class(swap)(owner=mock_contract.address, spender=bob, value=2**256 - 1, nonce=0)
+    permit = permit_class(swap)(
+        owner=mock_contract.address, spender=bob, value=2**256 - 1, nonce=0
+    )
     sig = eth_acc.sign_message(permit.signable_message)
 
     res, events = call_returning_result_and_logs(

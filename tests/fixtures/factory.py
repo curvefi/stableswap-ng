@@ -34,7 +34,13 @@ def math_implementation(deployer, math_deployer):
 
 @pytest.fixture()
 def factory(
-    deployer, fee_receiver, owner, gauge_implementation, views_implementation, math_implementation, factory_deployer
+    deployer,
+    fee_receiver,
+    owner,
+    gauge_implementation,
+    views_implementation,
+    math_implementation,
+    factory_deployer,
 ):
     with boa.env.prank(deployer):
         factory = factory_deployer.deploy(fee_receiver, owner)
@@ -64,7 +70,10 @@ def set_metapool_implementations(owner, factory, amm_implementation_meta):
 def add_base_pool(owner, factory, base_pool, base_pool_lp_token, base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
-            base_pool.address, base_pool_lp_token.address, [0] * len(base_pool_tokens), len(base_pool_tokens)
+            base_pool.address,
+            base_pool_lp_token.address,
+            [0] * len(base_pool_tokens),
+            len(base_pool_tokens),
         )
 
 

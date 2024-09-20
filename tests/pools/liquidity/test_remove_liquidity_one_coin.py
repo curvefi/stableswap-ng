@@ -8,7 +8,15 @@ pytestmark = pytest.mark.usefixtures("initial_setup")
 
 @pytest.mark.parametrize("idx", range(2))
 def test_amount_received(
-    alice, swap, pool_type, pool_tokens, pool_token_types, metapool_token_type, underlying_tokens, decimals, idx
+    alice,
+    swap,
+    pool_type,
+    pool_tokens,
+    pool_token_types,
+    metapool_token_type,
+    underlying_tokens,
+    decimals,
+    idx,
 ):
     coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
     initial_amount = coins[idx].balanceOf(alice)
@@ -41,7 +49,14 @@ def test_lp_token_balance(alice, swap, idx, divisor):
 
 @pytest.mark.parametrize("idx", range(2))
 def test_expected_vs_actual(
-    alice, swap, pool_type, pool_tokens, pool_token_types, metapool_token_type, underlying_tokens, idx
+    alice,
+    swap,
+    pool_type,
+    pool_tokens,
+    pool_token_types,
+    metapool_token_type,
+    underlying_tokens,
+    idx,
 ):
     coins = pool_tokens if pool_type == 0 else underlying_tokens[:2]
     initial_amount = coins[idx].balanceOf(alice)
@@ -87,5 +102,7 @@ def test_above_n_coins(alice, swap, pool_size):
 @pytest.mark.parametrize("idx", range(2))
 def test_event(alice, bob, swap, idx):
     swap.transfer(bob, 10**18, sender=alice)
-    _, events = call_returning_result_and_logs(swap, "remove_liquidity_one_coin", 10**18, idx, 0, sender=bob)
+    _, events = call_returning_result_and_logs(
+        swap, "remove_liquidity_one_coin", 10**18, idx, 0, sender=bob
+    )
     assert f"RemoveLiquidityOne(provider={bob}" in repr(events[2])

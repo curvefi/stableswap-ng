@@ -10,7 +10,7 @@ def main():
     # Pytest arguments
     pytest_args = [
         "-s",  # Do not capture output, allowing you to see print statements and debug info
-        "tests/pools/liquidity/test_add_liquidity.py::test_event",  # Specific test to run
+        "tests/pools/exchange/test_exchange_received.py::test_exchange_received_nonrebasing",  # Specific test to run
         # '--maxfail=1',  # Stop after the firstD failure
         "--tb=short",  # Shorter traceback for easier reading
         "-rA",  # Show extra test summary info

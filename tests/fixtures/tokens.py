@@ -8,7 +8,9 @@ from tests.fixtures.accounts import mint_account
 @pytest.fixture()
 def plain_tokens(erc20_deployer, deployer, decimals):
     with boa.env.prank(deployer):
-        return [erc20_deployer.deploy(f"TKN{i}", f"TKN{i}", decimals[i]) for i, d in enumerate(decimals)]
+        return [
+            erc20_deployer.deploy(f"TKN{i}", f"TKN{i}", decimals[i]) for i, d in enumerate(decimals)
+        ]
 
 
 @pytest.fixture()
@@ -46,7 +48,9 @@ def pool_tokens(pool_token_types, request, initial_decimals):
 # <---------------------   Metapool configuration   --------------------->
 @pytest.fixture()
 def metapool_token(metapool_token_type, request, initial_decimals, pool_token_types):
-    assert initial_decimals and pool_token_types, "Fixtures required for requesting `decimals` downstream"
+    assert (
+        initial_decimals and pool_token_types
+    ), "Fixtures required for requesting `decimals` downstream"
     fixture = {
         TOKEN_TYPES["plain"]: "plain_tokens",
         TOKEN_TYPES["oracle"]: "oracle_tokens",
@@ -67,7 +71,10 @@ def base_pool_decimals():
 @pytest.fixture()
 def base_pool_tokens(erc20_deployer, deployer, base_pool_decimals):
     with boa.env.prank(deployer):
-        return [erc20_deployer.deploy(c, c, base_pool_decimals[i]) for i, c in enumerate(("DAI", "USDC", "USDT"))]
+        return [
+            erc20_deployer.deploy(c, c, base_pool_decimals[i])
+            for i, c in enumerate(("DAI", "USDC", "USDT"))
+        ]
 
 
 @pytest.fixture()
@@ -78,7 +85,10 @@ def base_pool_lp_token(deployer, curve_token_v3_deployer):
 
 @pytest.fixture()
 def underlying_tokens(metapool_token, base_pool_tokens, base_pool_lp_token):
-    return [metapool_token, base_pool_lp_token, *base_pool_tokens]
+    if metapool_token is not None:
+        return [metapool_token, base_pool_lp_token, *base_pool_tokens]
+    else:
+        return []
 
 
 # <---------------------   Gauge rewards  --------------------->

@@ -30,7 +30,9 @@ def mint_tokens(charlie, pool_erc20_tokens, pool_tokens, swap, i):
             mint_for_testing(charlie, amount_erc20_in, pool_erc20_tokens[i], False)
             amount_in = pool_erc20_tokens[i].balanceOf(charlie) - bal_before
         else:
-            amount_in = mint_vault_tokens(amount_erc20_in, pool_erc20_tokens[0], pool_tokens[0], charlie)
+            amount_in = mint_vault_tokens(
+                amount_erc20_in, pool_erc20_tokens[0], pool_tokens[0], charlie
+            )
 
     pool_tokens[i].approve(swap, 2**256 - 1, sender=charlie)
 
@@ -87,7 +89,15 @@ def asset_types(pool_tokens):
 
 
 @pytest.fixture()
-def empty_swap(deployer, factory, pool_tokens, zero_address, amm_deployer, asset_types, set_pool_implementations):
+def empty_swap(
+    deployer,
+    factory,
+    pool_tokens,
+    zero_address,
+    amm_deployer,
+    asset_types,
+    set_pool_implementations,
+):
     pool_size = len(pool_tokens)
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
     offpeg_fee_multiplier = 20000000000

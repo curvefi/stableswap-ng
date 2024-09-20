@@ -6,10 +6,17 @@ from typing import Any
 from boa.contracts.vyper.vyper_contract import VyperContract, VyperFunction
 from boa.contracts.vyper.event import Event
 
+
 def call_returning_result_and_logs_old(
     # previous function, commits by Oleg 14 months ago
     # I assume it was copied from legacy stableswap, when boa fucntionality was not there yet
-    contract: VyperContract, function_name: str, *args, value=0, gas=None, sender=None, **kwargs
+    contract: VyperContract,
+    function_name: str,
+    *args,
+    value=0,
+    gas=None,
+    sender=None,
+    **kwargs,
 ) -> tuple[Any, list[Event]]:
     func: VyperFunction = getattr(contract, function_name)
     calldata_bytes = func.prepare_calldata(*args, **kwargs)
@@ -38,7 +45,13 @@ def call_returning_result_and_logs_old(
 def call_returning_result_and_logs(
     # rewrite for boa 0.1.10, where _computation is preserved after function call,
     # allowing access to events
-    contract: VyperContract, function_name: str, *args, value=0, gas=None, sender=None, **kwargs
+    contract: VyperContract,
+    function_name: str,
+    *args,
+    value=0,
+    gas=None,
+    sender=None,
+    **kwargs,
 ) -> tuple[Any, list[Event]]:
     function_handle = getattr(contract, function_name)
     res = function_handle(*args, value=value, gas=gas, sender=sender, **kwargs)

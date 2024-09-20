@@ -12,7 +12,14 @@ permutations = list(itertools.permutations(range(4), 2))  # 0,1...3,2
 
 @pytest.mark.parametrize("sending,receiving", permutations)
 def test_min_dy_too_high(
-    bob, meta_swap, underlying_tokens, meta_decimals, base_pool_decimals, sending, receiving, metapool_token_type
+    bob,
+    meta_swap,
+    underlying_tokens,
+    meta_decimals,
+    base_pool_decimals,
+    sending,
+    receiving,
+    metapool_token_type,
 ):
     if sending == 0 and metapool_token_type == TOKEN_TYPES["rebasing"]:
         return pytest.skip("This test does not revert sending rebasing tokens")  # TODO
@@ -29,13 +36,22 @@ def test_min_dy_too_high(
 
 @pytest.mark.parametrize("sending,receiving", permutations)
 def test_insufficient_balance(
-    bob, meta_swap, underlying_tokens, meta_decimals, base_pool_decimals, sending, receiving, zero_address
+    bob,
+    meta_swap,
+    underlying_tokens,
+    meta_decimals,
+    base_pool_decimals,
+    sending,
+    receiving,
+    zero_address,
 ):
     underlying_decimals = [meta_decimals] + base_pool_decimals
     underlying_tokens = [underlying_tokens[0], *underlying_tokens[2:]]
     amount = 10 ** underlying_decimals[sending]
     underlying_tokens[sending]._mint_for_testing(bob, amount, sender=bob)
-    underlying_tokens[sending].transfer(zero_address, underlying_tokens[sending].balanceOf(bob), sender=bob)
+    underlying_tokens[sending].transfer(
+        zero_address, underlying_tokens[sending].balanceOf(bob), sender=bob
+    )
 
     underlying_tokens[sending]._mint_for_testing(bob, amount, sender=bob)
     with boa.reverts():

@@ -65,7 +65,9 @@ def transfer_and_swap(
 
         # swap
         with boa.env.prank(bob):
-            amount_out = callback_contract.transfer_and_swap(sending, receiving, input_coin, amount_in, 0, underlying)
+            amount_out = callback_contract.transfer_and_swap(
+                sending, receiving, input_coin, amount_in, 0, underlying
+            )
             assert amount_out > 0
 
         # record balances after
@@ -90,25 +92,51 @@ def transfer_and_swap(
                 "receiving_token": [pool_receiving_balance_before, pool_receiving_balance_after],
             },
             "base_pool": {
-                "sending_token": [base_pool_sending_balance_before, base_pool_sending_balance_after],
-                "receiving_token": [base_pool_receiving_balance_before, base_pool_receiving_balance_after],
+                "sending_token": [
+                    base_pool_sending_balance_before,
+                    base_pool_sending_balance_after,
+                ],
+                "receiving_token": [
+                    base_pool_receiving_balance_before,
+                    base_pool_receiving_balance_after,
+                ],
             },
         }
 
     return _transfer_and_swap
 
 
+@pytest.mark.extensive_token_types
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_nonrebasing(
-    bob, swap, pool_tokens, sending, receiving, transfer_and_swap, skip_rebasing_tokens
+    swap, sending, receiving, transfer_and_swap, pool_token_types, pool_type, meta_token_type
 ):
+    if (
+        pool_type == 0
+        and pool_token_types[0] == pool_token_types[1] == 2
+        or pool_type == 1
+        and meta_token_type == 2
+    ):
+        pass
     swap_data = transfer_and_swap(swap, sending, receiving, False)
 
-    assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
-    assert swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0] == swap_data["amount_out"]
+    assert (
+        swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1]
+        == swap_data["amount_in"]
+    )
+    assert (
+        swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0]
+        == swap_data["amount_out"]
+    )
 
-    assert swap_data["swap"]["sending_token"][1] - swap_data["swap"]["sending_token"][0] == swap_data["amount_in"]
-    assert swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1] == swap_data["amount_out"]
+    assert (
+        swap_data["swap"]["sending_token"][1] - swap_data["swap"]["sending_token"][0]
+        == swap_data["amount_in"]
+    )
+    assert (
+        swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1]
+        == swap_data["amount_out"]
+    )
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
