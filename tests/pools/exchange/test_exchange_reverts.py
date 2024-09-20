@@ -29,6 +29,12 @@ def test_insufficient_balance(
         # makes it think it has more tokens than before => no revert and user gets
         # some rebase tokens for free. See if anything like that is ever possible in prod,
         # or it's just bad mock
+        # some more investigations - current mock triggers rebase on transfer
+        # so rebase can be triggered in the middle of the exchange
+        # however in prod rebase is triggered by oracles, so exchange_received must be used
+        # and it does not work with rebasing tokens
+        # so - even if user can trigger token-wide rebase - he must do so during transfer of tokens,
+        # otherwise pool is safu.
         pytest.skip("Rebasing token problem")
     for token in pool_tokens + underlying_tokens:
         assert token.balanceOf(charlie) == 0
