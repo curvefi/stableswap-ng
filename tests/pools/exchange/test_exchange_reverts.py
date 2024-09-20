@@ -23,17 +23,16 @@ def test_insufficient_balance(
     if (pool_type == 0 and pool_token_types[sending] == 2) or (
         pool_type == 1 and metapool_token_type == 2 and sending == 0
     ):
-        # interesting case, we transfer 0 shares of rebasing token because
+        # Interesting case: we transfer 0 shares of rebasing token because
         # _shares = min(self.shares[_from], _shares) in rebasing mock sets shares_to_send to 0
-        # and triggers rebase, so pool gets 0 transfer in, but rebase
-        # makes it think it has more tokens than before => no revert and user gets
-        # some rebase tokens for free. See if anything like that is ever possible in prod,
-        # or it's just bad mock
-        # some more investigations - current mock triggers rebase on transfer
-        # so rebase can be triggered in the middle of the exchange
-        # however in prod rebase is triggered by oracles, so exchange_received must be used
-        # and it does not work with rebasing tokens
-        # so - even if user can trigger token-wide rebase - he must do so during transfer of tokens,
+        # and triggers rebase. So pool gets 0 transfer in, but rebase makes it think it has more
+        # tokens than before => no revert and user gets some rebase tokens for free.
+        # See if anything like that is ever possible in prod, or it's just bad mock.
+        # Some more investigations - current mock triggers rebase on transfer,
+        # so rebase can be triggered in the middle of the exchange.
+        # However, in prod rebase is triggered by oracles, so exchange_received must be used
+        # and it does not work with rebasing tokens.
+        # So - even if user can trigger token-wide rebase - he must do so during transfer of tokens,
         # otherwise pool is safu.
         pytest.skip("Rebasing token problem")
     for token in pool_tokens + underlying_tokens:
