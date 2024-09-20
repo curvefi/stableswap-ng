@@ -2,7 +2,6 @@ import boa
 import pytest
 
 from tests.fixtures.constants import INITIAL_AMOUNT
-from tests.utils import get_asset_types_in_pool
 from tests.utils.tokens import mint_for_testing
 
 SWAP_AMOUNT = INITIAL_AMOUNT // 1000
@@ -17,6 +16,9 @@ def transfer_and_swap(
     underlying_tokens,
     pool_type,
     base_pool,
+    base_pool_lp_token,
+    base_pool_tokens,
+    base_pool_decimals,
 ):
     def _transfer_and_swap(pool, sending: int, receiving: int, underlying: bool):
         # get input and output tokens:
@@ -109,7 +111,8 @@ def test_exchange_received_nonrebasing(swap, sending, receiving, transfer_and_sw
         # we are in case of rebasing tokens, they are not supported by this test
         with (
             boa.reverts()
-            # ideally revert with dev="exchange_received not supported if pool contains rebasing tokens",
+            # ideally revert with
+            # dev="exchange_received not supported if pool contains rebasing tokens",
             # but boa has bug and gives some #comment line from callback_swap contract
         ):
             swap_data = None

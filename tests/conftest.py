@@ -7,6 +7,8 @@ import pytest
 
 from tests.constants import DECIMAL_PAIRS, POOL_TYPES, TOKEN_TYPES
 
+ALL_TOKEN_PAIRS = True
+
 pytest_plugins = [
     "tests.fixtures.constants",
     "tests.fixtures.accounts",
@@ -18,14 +20,13 @@ pytest_plugins = [
 ]
 
 
-def pytest_collection_modifyitems(config, items):
-    for item in items:
-        item.add_marker(pytest.mark.extensive_token_pairs)
-
-
 def pytest_generate_tests(metafunc):
     # Combined parametrization of pool_type and metapool_token_type (to avoid repeating tests in basic_pools
     # for various metapool_token_types)
+
+    if ALL_TOKEN_PAIRS:
+        metafunc.definition.add_marker(pytest.mark.extensive_token_pairs)
+
     if "pool_type" in metafunc.fixturenames and "metapool_token_type" in metafunc.fixturenames:
         pool_type_items = get_pool_types(metafunc)
         token_type_items = get_tokens_for_metafunc(metafunc)

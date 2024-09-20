@@ -4,6 +4,7 @@ import pytest
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
+# @pytest.mark.extensive_token_pairs
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_insufficient_balance(
     charlie, pool_tokens, underlying_tokens, swap, sending, receiving, decimals

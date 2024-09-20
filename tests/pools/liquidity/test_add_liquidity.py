@@ -8,7 +8,6 @@ from tests.utils.transactions import call_returning_result_and_logs
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
-@pytest.mark.extensive_token_pairs
 def test_add_liquidity(
     bob,
     swap,
@@ -57,7 +56,6 @@ def test_add_liquidity(
         assert underlying_tokens[1].balanceOf(swap) == deposit_amounts[1] * 2
 
 
-@pytest.mark.extensive_token_pairs
 @pytest.mark.parametrize("idx", (0, 1))
 def test_add_one_coin(
     bob,
@@ -129,7 +127,6 @@ def test_min_amount_too_high(bob, swap, pool_type, deposit_amounts, pool_tokens)
         )
 
 
-@pytest.mark.extensive_token_pairs
 def test_event(
     bob, swap, pool_type, deposit_amounts, pool_tokens, pool_token_types, metapool_token_type
 ):

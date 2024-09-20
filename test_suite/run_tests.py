@@ -12,7 +12,7 @@ skip_subfolders = ["__pycache__", "utils", "fixtures"]
 
 # if subfolders are specified, all tests will be run only in those subfolders
 # (disregarding tests_to_run)
-only_subfolders = ["pools", "liquidity"]
+only_subfolders = ["pools", "exchange"]
 
 # if tests_to_run is specified, only those tests will be run (except if only_subfolders is specified)
 tests_to_run = [
@@ -20,7 +20,7 @@ tests_to_run = [
 ]
 
 # Output files (0 for debugging when we dont need to spam files)
-SAVE_FILES = 1
+SAVE_FILES = 0
 
 
 # Function to run pytest for each file and save output to folder corresponding to the file
