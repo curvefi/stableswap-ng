@@ -12,12 +12,10 @@ skip_subfolders = ["__pycache__", "utils", "fixtures"]
 
 # if subfolders are specified, all tests will be run only in those subfolders
 # (disregarding tests_to_run)
-only_subfolders = ["pools", "meta"]
+only_subfolders = []  # ["pools", "meta"]
 
 # if tests_to_run is specified, only those tests will be run (except if only_subfolders is specified)
-tests_to_run = [
-    # "test_exchange"
-]
+tests_to_run = ["test_get_dy_underlying_fix"]
 
 # Output files (0 for debugging when we dont need to spam files)
 SAVE_FILES = 1

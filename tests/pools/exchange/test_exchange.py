@@ -3,7 +3,7 @@ import pytest
 pytestmark = pytest.mark.usefixtures("initial_setup")
 
 
-@pytest.mark.extensive_token_pairs
+@pytest.mark.all_token_pairs
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 # todo - rename into test_get_dy - because that's the main test goal
 def test_min_dy(
@@ -94,7 +94,7 @@ def test_min_dy(
 
 
 # @pytest.mark.only_meta_pool
-@pytest.mark.extensive_token_pairs
+@pytest.mark.all_token_pairs
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_min_dy_imbalanced(
     bob,

@@ -36,7 +36,7 @@ def test_get_dx(i, j, amount_in, swap, factory, initial_setup):
     j=strategy("uint", min_value=0, max_value=4),
 )
 @settings(**SETTINGS)
-def test_get_dx_underlying(i, j, amount_in, meta_swap, factory, initial_setup):
+def test_get_dx_underlying(i, j, amount_in, meta_swap, factory, meta_setup):
     base_n_coins = meta_swap.BASE_N_COINS()
 
     if i == j:
