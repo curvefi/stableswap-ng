@@ -44,7 +44,12 @@ def test_insufficient_balance(
     sending,
     receiving,
     zero_address,
+    metapool_token_type,
 ):
+    if metapool_token_type == 2 and sending == 0:
+        # situation where we are sending the metapool token (see explanation in
+        # pools/exchange/test_exchange_reverts.py::test_insufficient_balance)
+        return pytest.skip("This test does not revert sending rebasing tokens")
     underlying_decimals = [meta_decimals] + base_pool_decimals
     underlying_tokens = [underlying_tokens[0], *underlying_tokens[2:]]
     amount = 10 ** underlying_decimals[sending]
