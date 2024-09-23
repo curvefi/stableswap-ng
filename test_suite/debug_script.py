@@ -10,7 +10,7 @@ def main():
     # Pytest arguments
     pytest_args = [
         "-s",  # Do not capture output, allowing you to see print statements and debug info
-        "tests/pools/meta/test_exchange_underlying_reverts.py::test_insufficient_balance",  # Specific test to run
+        "tests/pools/meta/test_receiver_meta.py",  # Specific test to run
         # '--maxfail=1',  # Stop after the firstD failure
         "--tb=long",  # Shorter traceback for easier reading
         "-rA",  # Show extra test summary info
