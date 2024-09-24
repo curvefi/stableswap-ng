@@ -5,14 +5,14 @@
 | 34 | token/test_token_transfer                        |    324 |      0 |        0 |      0 |         0 |          0 |     324 |  14.72 |
 | 33 | token/test_token_approve                         |    504 |      0 |        0 |      0 |         0 |          0 |     504 |  15.24 |
 | 32 | token/test_get_D                                 |      1 |      0 |        0 |      0 |         0 |          0 |       1 |   1.61 |
-| 31 | pools/oracle/test_oracles                        |    138 |     78 |        0 |      0 |         0 |        432 |     648 | 984.25 |
-| 30 | pools/oracle/test_oracle                         |      6 |      1 |        1 |      0 |         0 |          0 |       8 |   5.07 |
+| 31 | pools/oracle/test_oracles                        |    181 |      0 |        0 |     35 |         0 |        432 |     648 |  82.94 |
+| 30 | pools/oracle/test_oracle                         |      6 |      0 |        0 |      0 |         0 |          0 |       6 |   6.49 |
 | 29 | pools/meta/test_receiver_meta                    |     27 |      0 |        0 |      0 |         0 |          0 |      27 |   5.38 |
 | 28 | pools/meta/test_meta_zap_ng_base                 |      5 |      0 |        0 |      0 |         0 |          0 |       4 |   4.31 |
 | 27 | pools/meta/test_meta_zap                         |      3 |      0 |        0 |      0 |         0 |          0 |       3 |   3.97 |
 | 26 | pools/meta/test_meta_new_ng_base                 |     12 |      0 |        0 |      0 |         0 |          0 |      12 |   5.22 |
 | 25 | pools/meta/test_get_virtual_price_meta           |    324 |      0 |        0 |      0 |         0 |          0 |     324 |  14.89 |
-| 24 | pools/meta/test_get_dy_underlying_fix            |      5 |      0 |        0 |      0 |         0 |          2 |       7 |  11.21 |
+| 24 | pools/meta/test_get_dy_underlying_fix            |      5 |      0 |        0 |      0 |         0 |          2 |       7 |  10.07 |
 | 23 | pools/meta/test_exchange_underlying_reverts      |    918 |      0 |        0 |     54 |         0 |          0 |     972 |  61.81 |
 | 22 | pools/meta/test_exchange_underlying              |     18 |      0 |        0 |      0 |         0 |          0 |      18 |   4.72 |
 | 21 | pools/liquidity/test_remove_liquidity_one_coin   |    648 |      0 |        0 |      0 |         0 |          0 |     648 |  30.72 |

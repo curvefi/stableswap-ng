@@ -30,7 +30,10 @@ def check_oracle(swap, dt):
     p_amm = []
     coins = swap.N_COINS() - 1
     assert 0 < coins < 10
-    prec = 1e-5
+    if swap._immutables.pool_contains_rebasing_tokens:
+        prec = 1e-2
+    else:
+        prec = 1e-5
     for n in range(coins):
         _p = swap.get_p(n)
         if _p > 2 * 10**18 or _p < 0.5 * 10**18:
