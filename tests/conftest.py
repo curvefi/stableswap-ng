@@ -22,6 +22,23 @@ pytest_plugins = [
 
 
 def pytest_generate_tests(metafunc):
+
+    # some targeted debug
+    if metafunc.function.__name__ == "test_insufficient_balance":
+        print("Debugging test_insufficient_balance")
+        metafunc.parametrize("pool_type", [0])
+        # metafunc.parametrize("pool_token_types", [(2, 0), (2, 2)])
+        # metafunc.parametrize("sending,receiving", [(0, 1)])
+        metafunc.parametrize(
+            "sending, receiving, pool_token_types",
+            [
+                (0, 1, (2, 0)),  # Case 1: sending=0, receiving=1, token types=(2, 0)
+                (1, 0, (0, 2)),  # Case 2: sending=1, receiving=0, token types=(0, 2)
+            ],
+        )
+        metafunc.parametrize("metapool_token_type", [None])
+        metafunc.parametrize("initial_decimals", [(18, 18)])
+        return
     # Combined parametrization of pool_type and metapool_token_type (to avoid repeating tests in basic_pools
     # for various metapool_token_types)
 

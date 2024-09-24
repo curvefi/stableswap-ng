@@ -18,7 +18,7 @@ def main():
 
     if not is_debug_mode():
         pass
-        pytest_args.append("-n=auto")  # Automatically determine the number of workers
+        # pytest_args.append("-n=auto")  # Automatically determine the number of workers
 
     # Run pytest with the specified arguments
     pytest.main(pytest_args)
