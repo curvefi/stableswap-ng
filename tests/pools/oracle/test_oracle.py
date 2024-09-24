@@ -23,7 +23,7 @@ def initial_setup_alice(pool_type, request):
 @pytest.fixture()
 def basic_setup_alice(
     alice,
-    initial_amounts,
+    basic_initial_amounts,
     initial_balance,
     oracle_tokens,
     basic_swap,
@@ -33,7 +33,7 @@ def basic_setup_alice(
     underlying_tokens,
 ):
     mint_for_testing(alice, amount=1 * 10**18, token_contract=None, mint_eth=True)
-    mint_account(alice, oracle_tokens, initial_balance, initial_amounts)
+    mint_account(alice, oracle_tokens, initial_balance, basic_initial_amounts)
     with boa.env.prank(alice):
         for token in oracle_tokens:
             token.approve(basic_swap.address, 2**256 - 1)
@@ -45,13 +45,13 @@ def meta_setup_alice(
     base_pool_tokens,
     base_pool,
     base_pool_decimals,
-    initial_amounts,
+    meta_initial_amounts,
     meta_swap,
     underlying_tokens,
 ):
     mint_for_testing(alice, amount=1 * 10**18, token_contract=None, mint_eth=True)
     add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
-    mint_for_testing(alice, initial_amounts[0], underlying_tokens[0], False)
+    mint_for_testing(alice, meta_initial_amounts[0], underlying_tokens[0], False)
     with boa.env.prank(alice):
         for token in underlying_tokens:
             token.approve(meta_swap.address, 2**256 - 1)
@@ -71,9 +71,11 @@ def test_initial_liquidity(
 ):
     if pool_type == 0:
         amounts = [
-            DEPOSIT_AMOUNT * 10 ** decimals[i] * 10**18 // oracle_tokens[i].exchangeRate()
-            if t == TOKEN_TYPES["oracle"]
-            else DEPOSIT_AMOUNT * 10 ** decimals[i]
+            (
+                DEPOSIT_AMOUNT * 10 ** decimals[i] * 10**18 // oracle_tokens[i].exchangeRate()
+                if t == TOKEN_TYPES["oracle"]
+                else DEPOSIT_AMOUNT * 10 ** decimals[i]
+            )
             for i, t in enumerate(pool_token_types)
         ]
     else:
@@ -102,7 +104,7 @@ def test_oracles(alice, swap, pool_size, pool_type):
 
 def test_get_dy_basic(
     alice,
-    initial_setup_alice,
+    basic_setup_alice,
     basic_swap,
     pool_token_types,
     decimals,
@@ -111,9 +113,11 @@ def test_get_dy_basic(
     metapool_token,
 ):
     amounts = [
-        DEPOSIT_AMOUNT * 10 ** decimals[i] * 10**18 // oracle_tokens[i].exchangeRate()
-        if t == 1
-        else DEPOSIT_AMOUNT * 10 ** decimals[i]
+        (
+            DEPOSIT_AMOUNT * 10 ** decimals[i] * 10**18 // oracle_tokens[i].exchangeRate()
+            if t == 1
+            else DEPOSIT_AMOUNT * 10 ** decimals[i]
+        )
         for i, t in enumerate(pool_token_types)
     ]
 
@@ -127,7 +131,7 @@ def test_get_dy_basic(
 
 def test_get_dy_meta(
     alice,
-    initial_setup_alice,
+    meta_setup_alice,
     meta_swap,
     metapool_token_type,
     decimals,
