@@ -27,6 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         name:
+          - token
           - gauge
           - pools/exchange
           - pools/general
@@ -51,7 +52,7 @@ jobs:
 
       - name: Install Requirements
         run: |
-          pip install poetry==1.5.1
+          pip install poetry==1.8.3
           poetry config virtualenvs.in-project true
           poetry install --no-interaction --without dev
 
@@ -60,4 +61,8 @@ jobs:
           WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
         run: |
           source .venv/bin/activate
-          pytest --numprocesses=auto tests/${{ matrix.name }}/
+          if [[ ${{ matrix.name }} == "pools/oracle" ]]; then
+            pytest --numprocesses=auto --dist=loadscope tests/${{ matrix.name }}/
+          else
+            pytest --numprocesses=auto tests/${{ matrix.name }}/
+          fi

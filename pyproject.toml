@@ -10,7 +10,7 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
-poetry = "1.5.1"
+poetry = "1.8.3"
 vyper = "0.3.10"
 pycryptodome = "^3.18.0"
 pre-commit = "^3.3.3"
