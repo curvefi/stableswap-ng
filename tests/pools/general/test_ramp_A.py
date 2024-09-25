@@ -35,9 +35,7 @@ def test_ramp_A_value_up(owner, swap):
 
     while boa.env.evm.patch.timestamp < future_time:
         boa.env.time_travel(100000)
-        expected = int(
-            initial_A + ((boa.env.evm.patch.timestamp - initial_timestamp) / duration) * initial_A
-        )
+        expected = int(initial_A + ((boa.env.evm.patch.timestamp - initial_timestamp) / duration) * initial_A)
         assert 0.999 < expected / swap.A() <= 1
 
 
@@ -52,8 +50,7 @@ def test_ramp_A_value_down(owner, swap):
     while boa.env.evm.patch.timestamp < future_time:
         boa.env.time_travel(100000)
         expected = int(
-            initial_A
-            - ((boa.env.evm.patch.timestamp - initial_timestamp) / duration) * (initial_A // 10 * 9)
+            initial_A - ((boa.env.evm.patch.timestamp - initial_timestamp) / duration) * (initial_A // 10 * 9)
         )
         if expected == 0:
             assert swap.A() == initial_A // 10

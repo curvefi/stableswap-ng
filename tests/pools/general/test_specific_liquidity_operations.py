@@ -42,15 +42,7 @@ def asset_types(pool_tokens):
 
 
 @pytest.fixture()
-def empty_swap(
-    deployer,
-    factory,
-    pool_tokens,
-    zero_address,
-    amm_deployer,
-    asset_types,
-    set_pool_implementations,
-):
+def empty_swap(deployer, factory, pool_tokens, zero_address, amm_deployer, asset_types, set_pool_implementations):
     pool_size = len(pool_tokens)
     oracle_method_id = function_signature_to_4byte_selector("exchangeRate()")
     offpeg_fee_multiplier = 20000000000

@@ -29,9 +29,7 @@ def test_min_dy(
     amount = 1_000 * 10 ** decimals[sending]
 
     initial_receiving = (
-        pool_tokens[receiving].balanceOf(bob)
-        if pool_type == 0
-        else underlying_tokens[receiving].balanceOf(bob)
+        pool_tokens[receiving].balanceOf(bob) if pool_type == 0 else underlying_tokens[receiving].balanceOf(bob)
     )
 
     min_dy = swap.get_dy(sending, receiving, amount)
@@ -55,9 +53,7 @@ def test_min_dy(
         # we correct for expected min_dy (inflate it) by value of pool balances after transfer_in
         # min_dy is thus roughly inflated by token_in (now rebased) held by pool
         # approximate assert because of how min_dy is approximated
-        min_dy += (
-            pool_balance_token_in
-        ) // 1000000  # that works because pool has equal balances more or less
+        min_dy += (pool_balance_token_in) // 1000000  # that works because pool has equal balances more or less
         assert receiving_token_diff == pytest.approx(min_dy, rel=0.01 / 100)  # 0.01% relative error
 
     elif pool_type == 0 and pool_token_types[receiving] == 2 and pool_token_types[sending] != 2:
@@ -80,9 +76,7 @@ def test_min_dy(
         # in metapools LP tokens are always basic and always on idx 1, so idx 0 is rebasing here
         if sending == 0:  # user sends rebasing token
             # if sending = 0 and receiving = 1, we have: token_in = rebasing, token_out = nonrebasing [case 1a)]
-            min_dy += (
-                pool_balance_token_in
-            ) // 1000000  # that works because pool has equal balances more or less
+            min_dy += (pool_balance_token_in) // 1000000  # that works because pool has equal balances more or less
             # 1% relative error - we are in metapool, and not perfectly balanced
             assert receiving_token_diff == pytest.approx(min_dy, rel=0.01 / 100)
         else:

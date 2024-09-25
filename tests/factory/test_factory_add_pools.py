@@ -30,9 +30,7 @@ def empty_factory_with_implementations(
     return empty_factory
 
 
-def test_add_base_pool_already_exists(
-    owner, factory, add_base_pool, base_pool, base_pool_lp_token, base_pool_tokens
-):
+def test_add_base_pool_already_exists(owner, factory, add_base_pool, base_pool, base_pool_lp_token, base_pool_tokens):
     with boa.reverts():
         factory.add_base_pool(
             base_pool.address,
@@ -54,9 +52,7 @@ def test_add_base_pool_only_admin(factory, bob, base_pool, base_pool_lp_token, b
         )
 
 
-def test_deploy_plain_pool(
-    empty_factory_with_implementations, amm_deployer, plain_tokens, pool_size, zero_address
-):
+def test_deploy_plain_pool(empty_factory_with_implementations, amm_deployer, plain_tokens, pool_size, zero_address):
     swap_address = empty_factory_with_implementations.deploy_plain_pool(
         "test",
         "test",
@@ -81,9 +77,7 @@ def test_deploy_plain_pool(
 
     assert empty_factory_with_implementations.pool_count() == 1
     assert empty_factory_with_implementations.pool_list(0) == swap.address
-    assert empty_factory_with_implementations.get_decimals(swap) == [
-        t.decimals() for t in (plain_tokens)
-    ]
+    assert empty_factory_with_implementations.get_decimals(swap) == [t.decimals() for t in (plain_tokens)]
 
 
 def test_pool_count(

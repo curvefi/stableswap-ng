@@ -28,23 +28,13 @@ def tokens_all(meta_token, base_pool_tokens):
 def add_base_pool(owner, factory, base_pool, base_pool_lp_token, base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
-            base_pool.address,
-            base_pool_lp_token.address,
-            [0] * len(base_pool_tokens),
-            len(base_pool_tokens),
+            base_pool.address, base_pool_lp_token.address, [0] * len(base_pool_tokens), len(base_pool_tokens)
         )
 
 
 @pytest.fixture()
 def empty_swap(
-    deployer,
-    factory,
-    zero_address,
-    meta_token,
-    base_pool,
-    meta_deployer,
-    add_base_pool,
-    set_metapool_implementations,
+    deployer, factory, zero_address, meta_token, base_pool, meta_deployer, add_base_pool, set_metapool_implementations
 ):
     method_id = bytes(b"")
     oracle = zero_address
@@ -74,9 +64,7 @@ def empty_swap(
 
 @pytest.fixture()
 def zap(base_pool, base_pool_tokens, base_pool_lp_token, zap_deployer):
-    return zap_deployer.deploy(
-        base_pool.address, base_pool_lp_token.address, [a.address for a in base_pool_tokens]
-    )
+    return zap_deployer.deploy(base_pool.address, base_pool_lp_token.address, [a.address for a in base_pool_tokens])
 
 
 @pytest.fixture()
@@ -117,15 +105,7 @@ def test_calc_amts_add(zap, swap, charlie, tokens_all):
 
 
 def test_calc_amts_remove_imbalance(
-    zap,
-    swap,
-    meta_token,
-    base_pool_tokens,
-    base_pool_lp_token,
-    base_pool,
-    charlie,
-    tokens_all,
-    initial_amts,
+    zap, swap, meta_token, base_pool_tokens, base_pool_lp_token, base_pool, charlie, tokens_all, initial_amts
 ):
     amounts = [i // 4 for i in initial_amts]
     initial_balance = swap.balanceOf(charlie)
@@ -157,14 +137,10 @@ def test_calc_amts_remove(zap, swap, charlie, tokens_all, meta_token, base_pool,
         base_amts_received = base_pool.remove_liquidity(amts_received[1], [0, 0, 0], sender=charlie)
         total_expected_received = [amts_received[0]] + base_amts_received
 
-    total_token_balances = [meta_token.balanceOf(swap)] + [
-        _t.balanceOf(base_pool) for _t in base_pool_tokens
-    ]
+    total_token_balances = [meta_token.balanceOf(swap)] + [_t.balanceOf(base_pool) for _t in base_pool_tokens]
 
     swap.approve(zap, 2**256 - 1, sender=charlie)
-    total_received_amount = zap.remove_liquidity(
-        swap.address, charlie_lp_bal_before, [0] * 4, sender=charlie
-    )
+    total_received_amount = zap.remove_liquidity(swap.address, charlie_lp_bal_before, [0] * 4, sender=charlie)
 
     # tokens owned by zap:
     zap_balances = []

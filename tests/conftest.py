@@ -58,16 +58,12 @@ def pytest_generate_tests(metafunc):
                 combined_ids.append(f"(PoolType={pool_name})")
 
         # Parametrize both pool_type and metapool_token_type together
-        metafunc.parametrize(
-            ("pool_type", "metapool_token_type"), combined_params, ids=combined_ids
-        )
+        metafunc.parametrize(("pool_type", "metapool_token_type"), combined_params, ids=combined_ids)
     elif "pool_type" in metafunc.fixturenames:
         # or parametrize pool_type only
         pool_type_items = get_pool_types(metafunc)
         metafunc.parametrize(
-            "pool_type",
-            [v for k, v in pool_type_items],
-            ids=[f"(PoolType={k})" for k, v in pool_type_items],
+            "pool_type", [v for k, v in pool_type_items], ids=[f"(PoolType={k})" for k, v in pool_type_items]
         )
     elif "metapool_token_type" in metafunc.fixturenames:
         # or parametrize metapool_token_type only
@@ -89,9 +85,7 @@ def pytest_generate_tests(metafunc):
 
     # Parametrize initial_decimals
     if "initial_decimals" in metafunc.fixturenames:
-        metafunc.parametrize(
-            "initial_decimals", DECIMAL_PAIRS, ids=[f"(Decimals={i},{j})" for i, j in DECIMAL_PAIRS]
-        )
+        metafunc.parametrize("initial_decimals", DECIMAL_PAIRS, ids=[f"(Decimals={i},{j})" for i, j in DECIMAL_PAIRS])
 
 
 def get_pool_token_pairs(metafunc):

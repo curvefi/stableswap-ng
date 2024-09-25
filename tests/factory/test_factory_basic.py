@@ -5,8 +5,7 @@ import pytest
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_find_pool_for_coins(factory, basic_swap, pool_tokens, sending, receiving):
     assert (
-        factory.find_pool_for_coins(pool_tokens[sending].address, pool_tokens[receiving].address)
-        == basic_swap.address
+        factory.find_pool_for_coins(pool_tokens[sending].address, pool_tokens[receiving].address) == basic_swap.address
     )
 
 
@@ -23,9 +22,7 @@ def test_get_decimals(factory, basic_swap, decimals):
 
 
 def test_get_balances(factory, basic_swap, pool_size):
-    assert factory.get_balances(basic_swap.address) == [
-        basic_swap.balances(i) for i in range(pool_size)
-    ]
+    assert factory.get_balances(basic_swap.address) == [basic_swap.balances(i) for i in range(pool_size)]
 
 
 def test_get_underlying_balances(factory, basic_swap):

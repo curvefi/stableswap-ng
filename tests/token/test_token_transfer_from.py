@@ -166,9 +166,7 @@ def test_transfer_event_fires(alice, bob, charlie, swap):
 
     swap.approve(bob, amount, sender=alice)
 
-    _, events = call_returning_result_and_logs(
-        swap, "transferFrom", alice, charlie, amount, sender=bob
-    )
+    _, events = call_returning_result_and_logs(swap, "transferFrom", alice, charlie, amount, sender=bob)
 
     assert len(events) == 2  #
     assert repr(events[0]) == f"Transfer(sender={alice}, receiver={charlie}, value={amount})"

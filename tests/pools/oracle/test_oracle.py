@@ -41,13 +41,7 @@ def basic_setup_alice(
 
 @pytest.fixture()
 def meta_setup_alice(
-    alice,
-    base_pool_tokens,
-    base_pool,
-    base_pool_decimals,
-    meta_initial_amounts,
-    meta_swap,
-    underlying_tokens,
+    alice, base_pool_tokens, base_pool, base_pool_decimals, meta_initial_amounts, meta_swap, underlying_tokens
 ):
     mint_for_testing(alice, amount=1 * 10**18, token_contract=None, mint_eth=True)
     add_base_pool_liquidity(alice, base_pool, base_pool_tokens, base_pool_decimals)
@@ -103,14 +97,7 @@ def test_oracles(alice, swap, pool_size, pool_type):
 
 
 def test_get_dy_basic(
-    alice,
-    basic_setup_alice,
-    basic_swap,
-    pool_token_types,
-    decimals,
-    meta_decimals,
-    oracle_tokens,
-    metapool_token,
+    alice, basic_setup_alice, basic_swap, pool_token_types, decimals, meta_decimals, oracle_tokens, metapool_token
 ):
     amounts = [
         (
@@ -130,20 +117,10 @@ def test_get_dy_basic(
 
 
 def test_get_dy_meta(
-    alice,
-    meta_setup_alice,
-    meta_swap,
-    metapool_token_type,
-    decimals,
-    meta_decimals,
-    oracle_tokens,
-    metapool_token,
+    alice, meta_setup_alice, meta_swap, metapool_token_type, decimals, meta_decimals, oracle_tokens, metapool_token
 ):
     amounts = (
-        [
-            DEPOSIT_AMOUNT * 10**meta_decimals * 10**18 // metapool_token.exchangeRate(),
-            DEPOSIT_AMOUNT * 10**18,
-        ]
+        [DEPOSIT_AMOUNT * 10**meta_decimals * 10**18 // metapool_token.exchangeRate(), DEPOSIT_AMOUNT * 10**18]
         if metapool_token_type == 1
         else [DEPOSIT_AMOUNT * 10**meta_decimals, DEPOSIT_AMOUNT * 10**18]
     )

@@ -29,14 +29,10 @@ def set_contract_pragma(contract_file, network) -> boa.contracts.vyper.vyper_con
 
     if is_shanghai_chain and "# pragma evm-version paris" in source:
         logger.log("Replacing EVM version to Shanghai ...")
-        new_source = source.replace(
-            "# pragma evm-version paris\n", "# pragma evm-version shanghai\n"
-        )
+        new_source = source.replace("# pragma evm-version paris\n", "# pragma evm-version shanghai\n")
     elif not is_shanghai_chain and "# pragma evm-version shanghai" in source:
         logger.log("Replacing EVM version to Paris ...")
-        new_source = source.replace(
-            "# pragma evm-version shanghai\n", "# pragma evm-version paris\n"
-        )
+        new_source = source.replace("# pragma evm-version shanghai\n", "# pragma evm-version paris\n")
     else:  # all looks good ...
         new_source = source
 
@@ -65,9 +61,7 @@ def check_and_deploy(contract_obj, contract_designation, network, blueprint: boo
             contract = contract_obj.deploy(*args)
             if args:
                 constructor_args = encode(["address", "address"], args)
-                logger.log(
-                    f"Constructor arguments for {contract_designation}: {constructor_args.hex()}"
-                )
+                logger.log(f"Constructor arguments for {contract_designation}: {constructor_args.hex()}")
         else:
             if "zksync:mainnet" in network:
                 if "CurveStableSwapNG.vy" == contract_name:
@@ -114,9 +108,7 @@ def check_and_deploy(contract_obj, contract_designation, network, blueprint: boo
 
         logger.log(f"Deployed! At: {contract.address}.")
     else:
-        logger.log(
-            f"Deployed {contract_designation} contract exists. Using {deployed_contract} ..."
-        )
+        logger.log(f"Deployed {contract_designation} contract exists. Using {deployed_contract} ...")
         contract = contract_obj.at(deployed_contract)
 
     return contract
@@ -170,9 +162,7 @@ def deploy_infra(network, url, account, fork=False):
     meta_blueprint = check_and_deploy(meta_contract_obj, "meta_amm", network, blueprint=True)
 
     # Factory:
-    factory_contract_obj = set_contract_pragma(
-        "./contracts/main/CurveStableSwapFactoryNG.vy", network
-    )
+    factory_contract_obj = set_contract_pragma("./contracts/main/CurveStableSwapFactoryNG.vy", network)
     args = [fee_receiver, deploy_utils.FIDDYDEPLOYER]
     factory = check_and_deploy(factory_contract_obj, "factory", network, False, args)
 

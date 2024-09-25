@@ -2,11 +2,7 @@ import pytest
 from boa.test import strategy
 from hypothesis import HealthCheck, given, settings
 
-SETTINGS = {
-    "max_examples": 100,
-    "deadline": None,
-    "suppress_health_check": [HealthCheck.function_scoped_fixture],
-}
+SETTINGS = {"max_examples": 100, "deadline": None, "suppress_health_check": [HealthCheck.function_scoped_fixture]}
 
 
 @given(

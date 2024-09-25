@@ -4,13 +4,7 @@ pytestmark = pytest.mark.usefixtures("meta_setup")
 
 
 def test_exchange_underlying(
-    bob,
-    charlie,
-    meta_swap,
-    underlying_tokens,
-    meta_decimals,
-    base_pool_decimals,
-    metapool_token_type,
+    bob, charlie, meta_swap, underlying_tokens, meta_decimals, base_pool_decimals, metapool_token_type
 ):
     initial_amount = underlying_tokens[0].balanceOf(bob)
 

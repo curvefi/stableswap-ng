@@ -129,9 +129,7 @@ def add_initial_liquidity_owner_meta(
     with boa.env.prank(owner):
         base_pool_lp_token.approve(meta_swap.address, 2**256 - 1)
         lp_token_bal = base_pool_lp_token.balanceOf(owner)
-        to_mint_token0 = (
-            lp_token_bal * 10 ** metapool_token.decimals() // 10 ** base_pool_lp_token.decimals()
-        )
+        to_mint_token0 = lp_token_bal * 10 ** metapool_token.decimals() // 10 ** base_pool_lp_token.decimals()
 
         mint_for_testing(owner, to_mint_token0, metapool_token, False)
         metapool_token.approve(meta_swap.address, 2**256 - 1)
@@ -211,11 +209,7 @@ def meta_setup(
     alice_mp_balance_norm = metapool_token.balanceOf(alice) / 10 ** metapool_token.decimals()
 
     if alice_mp_balance_norm < alice_bp_balance_norm:
-        mint_for_testing(
-            alice,
-            int(math.ceil(alice_bp_balance_norm) * 10 ** metapool_token.decimals()),
-            metapool_token,
-        )
+        mint_for_testing(alice, int(math.ceil(alice_bp_balance_norm) * 10 ** metapool_token.decimals()), metapool_token)
 
     with boa.env.prank(alice):
         metapool_token.approve(meta_swap.address, 2**256 - 1)
@@ -243,8 +237,6 @@ def initial_setup(pool_type, request, metapool_token_type, pool_token_types, ini
         # For basic pools, we don't care about metapool_token_type
         metapool_token_type = None
     # Continue with the general logic
-    assert all(
-        fixture is not None for fixture in (initial_decimals, pool_token_types)
-    ), "Fixtures required downstream"
+    assert all(fixture is not None for fixture in (initial_decimals, pool_token_types)), "Fixtures required downstream"
     fixture_name = {POOL_TYPES["basic"]: "basic_setup", POOL_TYPES["meta"]: "meta_setup"}[pool_type]
     return request.getfixturevalue(fixture_name)

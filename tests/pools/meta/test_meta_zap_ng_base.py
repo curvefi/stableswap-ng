@@ -18,10 +18,7 @@ def ng_base_pool_decimals():
 
 @pytest.fixture()
 def ng_base_pool_tokens(ng_base_pool_decimals, erc20_deployer):
-    return [
-        erc20_deployer.deploy(f"tkn{i}", f"tkn{i}", ng_base_pool_decimals[i])
-        for i in range(BASE_N_COINS)
-    ]
+    return [erc20_deployer.deploy(f"tkn{i}", f"tkn{i}", ng_base_pool_decimals[i]) for i in range(BASE_N_COINS)]
 
 
 @pytest.fixture()
@@ -35,15 +32,7 @@ def tokens_all(meta_token, ng_base_pool_tokens):
 
 
 @pytest.fixture()
-def ng_base_pool(
-    deployer,
-    factory,
-    ng_base_pool_tokens,
-    zero_address,
-    amm_deployer,
-    set_pool_implementations,
-    alice,
-):
+def ng_base_pool(deployer, factory, ng_base_pool_tokens, zero_address, amm_deployer, set_pool_implementations, alice):
     pool_size = len(ng_base_pool_tokens)
     offpeg_fee_multiplier = 20000000000
     method_ids = [bytes(b"")] * pool_size
@@ -74,9 +63,7 @@ def ng_base_pool(
         mint_for_testing(alice, amt_to_deposit, token, False)
         token.approve(base_pool.address, 2**256 - 1, sender=alice)
 
-    out_amount = base_pool.add_liquidity(
-        [amt_to_deposit] * len(ng_base_pool_tokens), 0, sender=alice
-    )
+    out_amount = base_pool.add_liquidity([amt_to_deposit] * len(ng_base_pool_tokens), 0, sender=alice)
     assert base_pool.totalSupply() == out_amount
     return base_pool
 
@@ -90,10 +77,7 @@ def ng_metapool_tokens(meta_token, ng_base_pool):
 def add_ng_base_pool(owner, factory, ng_base_pool, ng_base_pool_tokens):
     with boa.env.prank(owner):
         factory.add_base_pool(
-            ng_base_pool.address,
-            ng_base_pool.address,
-            [0] * len(ng_base_pool_tokens),
-            len(ng_base_pool_tokens),
+            ng_base_pool.address, ng_base_pool.address, [0] * len(ng_base_pool_tokens), len(ng_base_pool_tokens)
         )
 
 
@@ -147,9 +131,7 @@ def swap(zap, empty_swap, charlie, tokens_all):
         mint_for_testing(charlie, to_deposit, token, False)
         token.approve(zap.address, 2**256 - 1, sender=charlie)
 
-    out_amount = zap.add_liquidity(
-        empty_swap.address, [to_deposit] * len(tokens_all), 0, sender=charlie
-    )
+    out_amount = zap.add_liquidity(empty_swap.address, [to_deposit] * len(tokens_all), 0, sender=charlie)
     assert out_amount > 0
     assert 0 not in empty_swap.get_balances()
     assert empty_swap.totalSupply() > 0
@@ -171,9 +153,7 @@ def test_calc_amts_add(zap, swap, charlie, tokens_all, ng_base_pool):
     assert calc_amt_zap == out_amount
 
 
-def test_calc_amts_remove_imbalance(
-    zap, swap, meta_token, ng_base_pool_tokens, ng_base_pool, charlie, tokens_all
-):
+def test_calc_amts_remove_imbalance(zap, swap, meta_token, ng_base_pool_tokens, ng_base_pool, charlie, tokens_all):
     initial_balance = swap.balanceOf(charlie)
     amounts_to_remove = [initial_balance // len(tokens_all)] * len(tokens_all)
 
@@ -193,9 +173,7 @@ def test_calc_amts_remove_imbalance(
     assert swap.balanceOf(charlie) == swap.totalSupply()
 
 
-def test_calc_amts_remove(
-    zap, swap, charlie, tokens_all, meta_token, ng_base_pool, ng_base_pool_tokens
-):
+def test_calc_amts_remove(zap, swap, charlie, tokens_all, meta_token, ng_base_pool, ng_base_pool_tokens):
     charlie_bal_before = []
     for _t in tokens_all:
         charlie_bal_before.append(_t.balanceOf(charlie))
@@ -227,9 +205,7 @@ def test_calc_amts_remove(
         assert total_received_amount[i] == total_expected_received[i]
 
 
-def test_calc_amts_remove_one_meta_coin(
-    zap, swap, charlie, tokens_all, meta_token, ng_base_pool, ng_base_pool_tokens
-):
+def test_calc_amts_remove_one_meta_coin(zap, swap, charlie, tokens_all, meta_token, ng_base_pool, ng_base_pool_tokens):
     charlie_bal_before = []
     for _t in tokens_all:
         charlie_bal_before.append(_t.balanceOf(charlie))
@@ -242,16 +218,12 @@ def test_calc_amts_remove_one_meta_coin(
         amts_received_swap = swap.remove_liquidity_one_coin(lp_to_remove, 0, 0, sender=charlie)
         assert calc_amt_removed == amts_received_swap
 
-    amts_received_zap = zap.remove_liquidity_one_coin(
-        swap.address, lp_to_remove, 0, 0, sender=charlie
-    )
+    amts_received_zap = zap.remove_liquidity_one_coin(swap.address, lp_to_remove, 0, 0, sender=charlie)
 
     assert amts_received_zap == amts_received_swap
 
 
-def test_calc_amts_remove_one_base_coin(
-    zap, swap, charlie, tokens_all, meta_token, ng_base_pool, ng_base_pool_tokens
-):
+def test_calc_amts_remove_one_base_coin(zap, swap, charlie, tokens_all, meta_token, ng_base_pool, ng_base_pool_tokens):
     charlie_bal_before = []
     for _t in tokens_all:
         charlie_bal_before.append(_t.balanceOf(charlie))
@@ -262,12 +234,8 @@ def test_calc_amts_remove_one_base_coin(
 
     with boa.env.anchor():
         amts_received_swap = swap.remove_liquidity_one_coin(lp_to_remove, 1, 0, sender=charlie)
-        amts_received_base = ng_base_pool.remove_liquidity_one_coin(
-            amts_received_swap, 0, 0, sender=charlie
-        )
+        amts_received_base = ng_base_pool.remove_liquidity_one_coin(amts_received_swap, 0, 0, sender=charlie)
         assert calc_amt_removed == amts_received_base
 
-    amts_received_zap = zap.remove_liquidity_one_coin(
-        swap.address, lp_to_remove, 1, 0, sender=charlie
-    )
+    amts_received_zap = zap.remove_liquidity_one_coin(swap.address, lp_to_remove, 1, 0, sender=charlie)
     assert amts_received_zap == amts_received_base
