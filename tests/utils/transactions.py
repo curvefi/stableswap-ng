@@ -1,10 +1,10 @@
 from typing import Any
 
+from boa.contracts.vyper.event import Event
+from boa.contracts.vyper.vyper_contract import VyperContract, VyperFunction
+
 # from boa.vyper.contract import VyperContract, VyperFunction
 # from boa.vyper.event import Event
-
-from boa.contracts.vyper.vyper_contract import VyperContract, VyperFunction
-from boa.contracts.vyper.event import Event
 
 
 def call_returning_result_and_logs_old(

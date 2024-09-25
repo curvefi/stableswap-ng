@@ -1,5 +1,6 @@
-import pytest
 import sys
+
+import pytest
 
 
 def is_debug_mode():

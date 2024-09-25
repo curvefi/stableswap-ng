@@ -75,14 +75,20 @@ base_pool_list = {
         BasePoolSettings(  # 2pool
             pool="0x7f90122BF0700F9E7e1F688fe926940E8839F353",
             lp_token="0x7f90122BF0700F9E7e1F688fe926940E8839F353",
-            coins=["0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8", "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"],
+            coins=[
+                "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+                "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9",
+            ],
             asset_types=[0, 0],
             n_coins=2,
         ),
         BasePoolSettings(  # fraxbp
             pool="0xC9B8a3FDECB9D5b218d02555a8Baf332E5B740d5",
             lp_token="0xC9B8a3FDECB9D5b218d02555a8Baf332E5B740d5",
-            coins=["0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F", "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"],
+            coins=[
+                "0x17FC002b466eEc40DaE837Fc4bE5c67993ddBd6F",
+                "0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8",
+            ],
             asset_types=[0, 0],
             n_coins=2,
         ),
@@ -102,7 +108,10 @@ base_pool_list = {
         BasePoolSettings(  # fraxbp
             pool="0x29A3d66B30Bc4AD674A4FDAF27578B64f6afbFe7",
             lp_token="0x29A3d66B30Bc4AD674A4FDAF27578B64f6afbFe7",
-            coins=["0x2E3D870790dC77A83DD1d18184Acc7439A53f475", "0x7F5c764cBc14f9669B88837ca1490cCa17c31607"],
+            coins=[
+                "0x2E3D870790dC77A83DD1d18184Acc7439A53f475",
+                "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
+            ],
             asset_types=[0, 0],
             n_coins=2,
         ),
@@ -147,7 +156,9 @@ def set_up_base_pools(network, url, account, fork: bool = False):
                 factory.add_base_pool(data.pool, data.lp_token, data.asset_types, data.n_coins)
                 logger.log(f"Added {data.pool} to factory {factory_address} on {network}.")
             else:
-                logger.log(f"{data.pool} is already configured as a base pool in factory {factory_address}.")
+                logger.log(
+                    f"{data.pool} is already configured as a base pool in factory {factory_address}."
+                )
 
             assert factory.base_pool_data(data.pool)[0] == data.lp_token
 

@@ -1,6 +1,7 @@
+import re
+
 import boa
 import pytest
-import re
 
 from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils.transactions import call_returning_result_and_logs
@@ -69,7 +70,6 @@ def test_add_one_coin(
     metapool_token_type,
     idx,
 ):
-
     amounts = [0] * len(pool_tokens)
     amounts[idx] = deposit_amounts[idx]
 

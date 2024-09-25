@@ -50,7 +50,9 @@ def prepare_evm_script(target: Dict, actions: List[Tuple]) -> str:
         contract = ape.Contract(address)
         fn = getattr(contract, fn_name)
         calldata = fn.as_transaction(*args, sender=agent.address, gas_price=0).data
-        agent_calldata = agent.execute.as_transaction(address, 0, calldata, sender=voting, gas_price=0).data
+        agent_calldata = agent.execute.as_transaction(
+            address, 0, calldata, sender=voting, gas_price=0
+        ).data
         length = hex(len(agent_calldata.hex()) // 2)[2:].zfill(8)
         evm_script = f"{evm_script}{agent.address[2:]}{length}{agent_calldata.hex()}"
 

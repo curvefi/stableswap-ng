@@ -76,7 +76,7 @@ def transfer(_to: address, _value: uint256) -> bool:
 def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
     _shares: uint256 = self._get_shares_by_coins(_value)
     _shares = min(self.shares[_from], _shares)
-    
+
     if _shares > 0:
         # only rebase on nonzero transfers
         self._rebase()

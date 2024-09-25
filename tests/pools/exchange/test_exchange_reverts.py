@@ -1,6 +1,7 @@
+import time
+
 import boa
 import pytest
-import time
 
 pytestmark = pytest.mark.usefixtures("initial_setup")
 

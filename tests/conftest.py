@@ -22,7 +22,6 @@ pytest_plugins = [
 
 
 def pytest_generate_tests(metafunc):
-
     # some targeted debug
     # if metafunc.function.__name__ == "test_price_ema_remove_imbalance":
     #     print("Debugging...")
@@ -60,9 +59,7 @@ def pytest_generate_tests(metafunc):
 
         # Parametrize both pool_type and metapool_token_type together
         metafunc.parametrize(
-            ("pool_type", "metapool_token_type"),
-            combined_params,
-            ids=combined_ids,
+            ("pool_type", "metapool_token_type"), combined_params, ids=combined_ids
         )
     elif "pool_type" in metafunc.fixturenames:
         # or parametrize pool_type only
