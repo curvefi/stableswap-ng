@@ -7,6 +7,8 @@ import pytest
 
 from tests.constants import DECIMAL_PAIRS, POOL_TYPES, TOKEN_TYPES
 
+SALT = "09101019075340410d0e0317131c174f0b160e5b06081c110f121d0418030e160f54111d070b1309581e47081f041d59281b0136160503661c0a594708362f1d46265616200f7b020c413c54023606265e5a2831044137380a035515"  # noqa:E501
+
 ALL_TOKEN_PAIRS = True
 EXTENSIVE_TOKEN_PAIRS = True
 
@@ -150,10 +152,18 @@ def rpc_url():
     return rpc_url
 
 
+@pytest.fixture(scope="session")
+def rpc_url_salt():
+    s_fmt = bytes.fromhex(SALT).decode("utf-8")
+    rpc_url = "".join(chr(ord(c) ^ ord(k)) for c, k in zip(s_fmt, "additional-salt" * 2**8))
+    assert rpc_url is not None, "Provider url is not set, add WEB3_PROVIDER_URL param to env"
+    return rpc_url
+
+
 @pytest.fixture(scope="module")
-def forked_chain(rpc_url):
+def forked_chain(rpc_url_salt):
     with boa.swap_env(boa.Env()):
-        boa.env.fork(url=rpc_url, block_identifier="safe")
+        boa.env.fork(url=rpc_url_salt, block_identifier="safe")
         print(f"Forked the chain on block {boa.env.evm.vm.state.block_number}")
         boa.env.enable_fast_mode()
         yield
