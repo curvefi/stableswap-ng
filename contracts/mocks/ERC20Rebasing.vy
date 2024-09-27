@@ -63,12 +63,8 @@ def allowance(_owner: address, _spender: address) -> uint256:
 
 @external
 def transfer(_to: address, _value: uint256) -> bool:
+    self._rebase()
     _shares: uint256 = self._get_shares_by_coins(_value)
-
-    if _shares > 0:
-        # only rebase on nonzero transfers
-        self._rebase()
-
     self.shares[msg.sender] -= _shares
     self.shares[_to] += _shares
     log Transfer(msg.sender, _to, _value)
