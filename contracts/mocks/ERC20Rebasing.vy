@@ -74,13 +74,9 @@ def transfer(_to: address, _value: uint256) -> bool:
 
 @external
 def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
+    self._rebase()
     _shares: uint256 = self._get_shares_by_coins(_value)
     _shares = min(self.shares[_from], _shares)
-
-    if _shares > 0:
-        # only rebase on nonzero transfers
-        self._rebase()
-
     # Value can be less than expected even if self.shares[_from] > _shares
     _new_value: uint256 = self._get_coins_by_shares(_shares)
 

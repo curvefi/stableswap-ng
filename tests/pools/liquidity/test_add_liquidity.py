@@ -110,10 +110,6 @@ def test_insufficient_balance(charlie, swap, pool_type, decimals, meta_decimals,
         amounts = [(10**i) for i in decimals]
     else:
         amounts = [(10**i) for i in [meta_decimals, 18]]
-    # if pool_type == 0 and pool_token_types[0] == pool_token_types[1] == 2:
-    #     swap.add_liquidity(amounts, 0, sender=charlie)
-    #     pass
-    # else:
     with boa.reverts():  # invalid approval or balance
         swap.add_liquidity(amounts, 0, sender=charlie)
 
@@ -128,8 +124,6 @@ def test_min_amount_too_high(bob, swap, pool_type, deposit_amounts, pool_tokens)
 
 
 def test_event(bob, swap, pool_type, deposit_amounts, pool_tokens, pool_token_types, metapool_token_type):
-    # if pool_type == 1 and metapool_token_type == 0:
-    #     pytest.xfail("pool_type = meta, meta token type = plain - should be fixed")
     size = 2
     check_invariant = True
     if pool_type == 0:

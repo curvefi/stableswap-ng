@@ -39,7 +39,7 @@ def test_insufficient_balance(
     # the transfer of tokens. Otherwise, the pool is safe.
     # !!!!!!! Fixed with changing rebase logic to not rebase at 0 transfer !!!!!!!!!!
     #
-    # what is not fixed - is that this min function transfers 0 evein if
+    # what is not fixed - is that this min function transfers 0 even if
     # non-0 is requested, and this bypasses dx > 0 assert in the contract,
     # resulting in a 0->swap (that fails the test in some cases)
     # Thus still skipping problematic tests.

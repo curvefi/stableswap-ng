@@ -22,18 +22,6 @@ pytest_plugins = [
 
 
 def pytest_generate_tests(metafunc):
-    # some targeted debug
-    # if metafunc.function.__name__ == "test_price_ema_remove_imbalance":
-    #     print("Debugging...")
-    #     metafunc.parametrize("pool_type", [0])
-    #     metafunc.parametrize("pool_token_types", [(0, 0)])
-    #     # metafunc.parametrize("sending,receiving", [(0, 1)])
-    #     metafunc.parametrize("metapool_token_type", [None])
-    #     metafunc.parametrize("initial_decimals", [(18, 18)])
-    #     return
-    # Combined parametrization of pool_type and metapool_token_type (to avoid repeating tests in basic_pools
-    # for various metapool_token_types)
-
     if ALL_TOKEN_PAIRS and not EXTENSIVE_TOKEN_PAIRS:
         metafunc.definition.add_marker(pytest.mark.all_token_pairs)
     if EXTENSIVE_TOKEN_PAIRS:
@@ -92,17 +80,15 @@ def get_pool_token_pairs(metafunc):
     items = get_tokens_for_metafunc(metafunc)
     # make all combinations possible
     all_combinations = list(combinations_with_replacement(items, 2))  # 6 combinations (1,0 == 0,1)
-    all_all_combinations = list(product(items, items))  # 9 combinations (1,0 != 0,1)
+    extensive_combinations = list(product(items, items))  # 9 combinations (1,0 != 0,1)
     if len(all_combinations) < 2 or metafunc.definition.get_closest_marker("all_token_pairs"):
         return all_combinations
     if metafunc.definition.get_closest_marker("extensive_token_pairs"):
-        return all_all_combinations
+        return extensive_combinations
     # make sure we get the same result in each worker
     random = Random(len(metafunc.fixturenames))
     # take 2 combinations for smaller test set
     return sorted(random.sample(all_combinations, k=2))
-    # Q: why sample only 2 when we have 6? and even 9?
-    # todo - ideally we test all possible combinations
     # dev: added all_ and extensive_token_pairs marker to test all combinations
 
 

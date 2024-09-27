@@ -131,8 +131,6 @@ def test_price_ema_remove_one(swap, alice, amount, dt0, dt):
     dt=strategy("uint256", min_value=0, max_value=10**6),
 )
 @settings(**SETTINGS)
-# @pytest.mark.parametrize("amount, dt0, dt", [(99190, 12, 12)])
-# @pytest.mark.parametrize("amount, dt0, dt", [(94741, 12, 12)])
 def test_price_ema_remove_imbalance(swap, alice, dt0, dt, pool_size, deposit_amounts, amount):
     i = random.choice(range(swap.N_COINS()))
     # i = 1

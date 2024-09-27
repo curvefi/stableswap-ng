@@ -38,7 +38,6 @@ def test_remove_liquidity(
         assert amount_after == pytest.approx(
             amount_before * 2, rel=1.5e-2
         )  # we deposit half of all balance value (approx for orcales, rebasing etc)
-
         if (pool_type == 0 and coin_type == 2) or (pool_type == 1 and metapool_token_type == 2):
             assert coin.balanceOf(swap) == pytest.approx(
                 0, abs=(amount_after - amount_before) * (1 - 1000000 / 1000001)  # approx for rebasing tokens
