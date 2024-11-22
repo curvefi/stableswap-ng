@@ -26,9 +26,11 @@ def initial_amounts(pool_type, basic_initial_amounts, meta_initial_amounts) -> l
 @pytest.fixture()
 def deposit_basic_amounts(initial_amounts: list[int], pool_token_types, pool_tokens) -> list[int]:
     return [
-        initial_amounts[i] * 10**18 // pool_token.exchangeRate() // 2
-        if pool_token_type == 1
-        else initial_amounts[i] // 2
+        (
+            initial_amounts[i] * 10**18 // pool_token.exchangeRate() // 2
+            if pool_token_type == 1
+            else initial_amounts[i] // 2
+        )
         for i, (pool_token_type, pool_token) in enumerate(zip(pool_token_types, pool_tokens))
     ]
 
@@ -38,9 +40,11 @@ def deposit_meta_amounts(
     meta_initial_amounts: list[int], metapool_token_type, pool_tokens, underlying_tokens
 ) -> list[int]:
     return [
-        meta_initial_amounts[0] // 2
-        if metapool_token_type != 1
-        else meta_initial_amounts[0] * 10**18 // underlying_tokens[0].exchangeRate() // 2,
+        (
+            meta_initial_amounts[0] // 2
+            if metapool_token_type != 1
+            else meta_initial_amounts[0] * 10**18 // underlying_tokens[0].exchangeRate() // 2
+        ),
         meta_initial_amounts[1] // 2,
     ]
 

@@ -2,7 +2,6 @@ import boa
 import pytest
 
 from tests.fixtures.constants import INITIAL_AMOUNT
-from tests.utils import get_asset_types_in_pool
 from tests.utils.tokens import mint_for_testing
 
 SWAP_AMOUNT = INITIAL_AMOUNT // 1000
@@ -99,39 +98,54 @@ def transfer_and_swap(
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_exchange_received_nonrebasing(
-    bob, swap, pool_tokens, sending, receiving, transfer_and_swap, skip_rebasing_tokens
-):
-    swap_data = transfer_and_swap(swap, sending, receiving, False)
+def test_exchange_received_nonrebasing(swap, sending, receiving, transfer_and_swap, check_rebasing):
+    if swap._immutables.pool_contains_rebasing_tokens:
+        # we are in case of rebasing tokens, they are not supported by this test
+        with (
+            boa.reverts()
+            # ideally revert with
+            # dev="exchange_received not supported if pool contains rebasing tokens",
+            # but boa has bug and gives some #comment line from callback_swap contract
+        ):
+            swap_data = None
+            swap_data = transfer_and_swap(swap, sending, receiving, False)
+            assert swap_data is None
+    else:
+        swap_data = transfer_and_swap(swap, sending, receiving, False)
+        assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
+        assert (
+            swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0] == swap_data["amount_out"]
+        )
 
-    assert swap_data["bob"]["sending_token"][0] - swap_data["bob"]["sending_token"][1] == swap_data["amount_in"]
-    assert swap_data["bob"]["receiving_token"][1] - swap_data["bob"]["receiving_token"][0] == swap_data["amount_out"]
-
-    assert swap_data["swap"]["sending_token"][1] - swap_data["swap"]["sending_token"][0] == swap_data["amount_in"]
-    assert swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1] == swap_data["amount_out"]
+        assert swap_data["swap"]["sending_token"][1] - swap_data["swap"]["sending_token"][0] == swap_data["amount_in"]
+        assert (
+            swap_data["swap"]["receiving_token"][0] - swap_data["swap"]["receiving_token"][1] == swap_data["amount_out"]
+        )
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_exchange_not_received(bob, swap, pool_tokens, sending, receiving, skip_rebasing_tokens):
-    with boa.env.prank(bob), boa.reverts():
-        swap.exchange_received(sending, receiving, 1, 0, bob)
+def test_exchange_not_received(bob, swap, pool_tokens, sending, receiving):
+    if not swap._immutables.pool_contains_rebasing_tokens:
+        with boa.env.prank(bob), boa.reverts():
+            swap.exchange_received(sending, receiving, 1, 0, bob)
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
-def test_exchange_received_no_dos(
-    bob, charlie, swap, pool_tokens, sending, receiving, transfer_and_swap, skip_rebasing_tokens
-):
-    mint_for_testing(bob, 1, pool_tokens[sending], False)
-    pool_tokens[sending].transfer(swap, 1, sender=bob)
+def test_exchange_received_no_dos(bob, charlie, swap, pool_tokens, sending, receiving, transfer_and_swap):
+    if not swap._immutables.pool_contains_rebasing_tokens:
+        mint_for_testing(bob, 1, pool_tokens[sending], False)
+        pool_tokens[sending].transfer(swap, 1, sender=bob)
 
-    mint_for_testing(charlie, 10**18, pool_tokens[sending], False)
-    transfer_and_swap(swap, sending, receiving, False)
+        mint_for_testing(charlie, 10**18, pool_tokens[sending], False)
+        transfer_and_swap(swap, sending, receiving, False)
 
 
 @pytest.mark.parametrize("sending,receiving", [(0, 1), (1, 0)])
 def test_exchange_received_rebasing_reverts(
     bob, swap, transfer_and_swap, pool_tokens, sending, receiving, contains_rebasing_tokens
 ):
-    if 2 in get_asset_types_in_pool(swap):
-        with boa.reverts():
-            transfer_and_swap(swap, sending, receiving, False)
+    if swap._immutables.pool_contains_rebasing_tokens:
+        with boa.reverts():  # must revert
+            result = None
+            result = transfer_and_swap(swap, sending, receiving, False)
+            assert result is None

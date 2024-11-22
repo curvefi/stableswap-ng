@@ -52,7 +52,10 @@ def metapool_token(metapool_token_type, request, initial_decimals, pool_token_ty
         TOKEN_TYPES["oracle"]: "oracle_tokens",
         TOKEN_TYPES["rebasing"]: "rebasing_tokens",
     }
-    metapool_token, _ = request.getfixturevalue(fixture[metapool_token_type])
+    if metapool_token_type is not None:
+        metapool_token, _ = request.getfixturevalue(fixture[metapool_token_type])
+    else:
+        metapool_token = None
     return metapool_token
 
 
@@ -75,7 +78,10 @@ def base_pool_lp_token(deployer, curve_token_v3_deployer):
 
 @pytest.fixture()
 def underlying_tokens(metapool_token, base_pool_tokens, base_pool_lp_token):
-    return [metapool_token, base_pool_lp_token, *base_pool_tokens]
+    if metapool_token is not None:
+        return [metapool_token, base_pool_lp_token, *base_pool_tokens]
+    else:
+        return []
 
 
 # <---------------------   Gauge rewards  --------------------->

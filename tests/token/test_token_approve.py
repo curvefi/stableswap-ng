@@ -68,7 +68,7 @@ def permit_class(swap) -> type[EIP712Message]:
         # EIP-712 Domain Fields
         _name_: "string" = swap.name()  # noqa: F821
         _version_: "string" = swap.version()  # noqa: F821
-        _chainId_: "uint256" = boa.env.chain.chain_id  # noqa: F821
+        _chainId_: "uint256" = boa.env.evm.chain.chain_id  # noqa: F821
         _verifyingContract_: "address" = swap.address  # noqa: F821
         _salt_: "bytes32" = swap.salt()  # noqa: F821
 

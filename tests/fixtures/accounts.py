@@ -4,10 +4,9 @@ import boa
 import pytest
 from eth_account.account import Account, LocalAccount
 
+from tests.constants import POOL_TYPES
+from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils.tokens import mint_for_testing
-
-from ..constants import POOL_TYPES
-from .constants import INITIAL_AMOUNT
 
 
 @pytest.fixture()
@@ -165,18 +164,13 @@ def basic_setup(
     pool_tokens,
     metapool_token_type,
 ):
-    mint_account(alice, pool_tokens, initial_balance, basic_initial_amounts)
-    approve_account(alice, pool_tokens, basic_swap)
-    assert metapool_token_type is not None, "Fixture required downstream"
-    mint_for_testing(bob, 1 * 10**18, None, True)
-
+    # bob and alice have tokens from pool
+    for user in [alice, bob]:
+        mint_account(user, pool_tokens, initial_balance, basic_initial_amounts)
+        approve_account(user, pool_tokens, basic_swap)
+    # alice adds liquidity to the pool, bob holds tokens for tests
     with boa.env.prank(alice):
         basic_swap.add_liquidity(deposit_basic_amounts, 0)
-
-    mint_account(bob, pool_tokens, initial_balance, basic_initial_amounts)
-    with boa.env.prank(bob):
-        for token in pool_tokens:
-            token.approve(basic_swap.address, 2**256 - 1)
 
 
 @pytest.fixture()
@@ -193,7 +187,6 @@ def meta_setup(
     meta_initial_amounts,
     underlying_tokens,
     pool_tokens,
-    add_initial_liquidity_owner_meta,
     metapool_token,
 ):
     approve_account(alice, pool_tokens, meta_swap)
@@ -227,6 +220,12 @@ def initial_setup(pool_type, request, metapool_token_type, pool_token_types, ini
     Set up the initial state for a pool test.
     Run either basic_setup or meta_setup depending on the pool_type.
     """
-    assert metapool_token_type is not None and pool_token_types and initial_decimals, "Fixtures required downstream"
+    if pool_type == POOL_TYPES["meta"]:
+        assert metapool_token_type is not None, "metapool_token_type is required for meta pools"
+    else:
+        # For basic pools, we don't care about metapool_token_type
+        metapool_token_type = None
+    # Continue with the general logic
+    assert all(fixture is not None for fixture in (initial_decimals, pool_token_types)), "Fixtures required downstream"
     fixture_name = {POOL_TYPES["basic"]: "basic_setup", POOL_TYPES["meta"]: "meta_setup"}[pool_type]
     return request.getfixturevalue(fixture_name)
