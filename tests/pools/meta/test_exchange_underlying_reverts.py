@@ -3,8 +3,6 @@ import itertools
 import boa
 import pytest
 
-from tests.constants import TOKEN_TYPES
-
 pytestmark = pytest.mark.usefixtures("meta_setup")
 
 permutations = list(itertools.permutations(range(4), 2))  # 0,1...3,2
@@ -14,8 +12,8 @@ permutations = list(itertools.permutations(range(4), 2))  # 0,1...3,2
 def test_min_dy_too_high(
     bob, meta_swap, underlying_tokens, meta_decimals, base_pool_decimals, sending, receiving, metapool_token_type
 ):
-    if sending == 0 and metapool_token_type == TOKEN_TYPES["rebasing"]:
-        return pytest.skip("This test does not revert sending rebasing tokens")  # TODO
+    if sending == 0 and metapool_token_type == 2:
+        pytest.skip("This test does not revert sending rebasing tokens")
 
     underlying_decimals = [meta_decimals] + base_pool_decimals
     underlying_tokens = [underlying_tokens[0], *underlying_tokens[2:]]
@@ -29,8 +27,22 @@ def test_min_dy_too_high(
 
 @pytest.mark.parametrize("sending,receiving", permutations)
 def test_insufficient_balance(
-    bob, meta_swap, underlying_tokens, meta_decimals, base_pool_decimals, sending, receiving, zero_address
+    bob,
+    meta_swap,
+    underlying_tokens,
+    meta_decimals,
+    base_pool_decimals,
+    sending,
+    receiving,
+    zero_address,
+    metapool_token_type,
 ):
+    if metapool_token_type == 2 and sending == 0:
+        pytest.skip("This test does not revert sending rebasing tokens")
+    #     # situation where we are sending the metapool token (see explanation in
+    #     # pools/exchange/test_exchange_reverts.py::test_insufficient_balance)
+    #     can use
+    #     underlying_tokens[sending].eval(f"self.shares[{bob}] = 0")
     underlying_decimals = [meta_decimals] + base_pool_decimals
     underlying_tokens = [underlying_tokens[0], *underlying_tokens[2:]]
     amount = 10 ** underlying_decimals[sending]

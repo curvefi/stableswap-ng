@@ -1,5 +1,5 @@
 import boa
-from boa.vyper.contract import VyperContract
+from boa.contracts.vyper.vyper_contract import VyperContract
 from eth_utils import to_checksum_address
 
 

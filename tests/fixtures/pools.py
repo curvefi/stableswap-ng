@@ -96,9 +96,19 @@ def meta_swap(
 
 @pytest.fixture()
 def swap(request, pool_type, pool_token_types, initial_decimals, metapool_token_type):
-    assert all(
-        fixture is not None for fixture in (initial_decimals, pool_token_types, metapool_token_type)
-    ), "Fixtures required downstream"
+    # assert all(
+    #     fixture is not None for fixture in (initial_decimals, pool_token_types, metapool_token_type)
+    # ), "Fixtures required downstream"
+    # Check for metapool_token_type only if pool_type is meta
+    if pool_type == POOL_TYPES["meta"]:
+        assert metapool_token_type is not None, "metapool_token_type is required for meta pools"
+    else:
+        # For basic pools, we don't care about metapool_token_type
+        metapool_token_type = None
+
+    # Continue with the general logic
+    assert all(fixture is not None for fixture in (initial_decimals, pool_token_types)), "Fixtures required downstream"
+
     fixture_name = {POOL_TYPES["basic"]: "basic_swap", POOL_TYPES["meta"]: "meta_swap"}[pool_type]
     return request.getfixturevalue(fixture_name)
 

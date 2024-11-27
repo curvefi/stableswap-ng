@@ -24,7 +24,7 @@ See the [documentation](https://docs.curve.fi) for more detailed information.
 Install dependencies using poetry (python ^3.10.4)
 
 ```shell
-pip install poetry==1.5.1
+pip install poetry==1.8.3
 poetry install
 ```
 
