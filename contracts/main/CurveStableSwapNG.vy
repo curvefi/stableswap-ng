@@ -144,9 +144,15 @@ event ApplyNewFee:
     fee: uint256
     offpeg_fee_multiplier: uint256
 
+event ApplyNewAdminFee:
+    admin_fee: uint256
+
 event SetNewMATime:
     ma_exp_time: uint256
     D_ma_time: uint256
+
+event SetAdmin:
+    admin: Factory
 
 
 MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
@@ -159,6 +165,7 @@ N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
 
 factory: immutable(Factory)
+admin: Factory  # follows interface of Factory
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_types: immutable(DynArray[uint8, MAX_COINS])
 pool_contains_rebasing_tokens: immutable(bool)
@@ -285,6 +292,7 @@ def __init__(
     rate_multipliers = _rate_multipliers
 
     factory = Factory(msg.sender)
+    self.admin = Factory(msg.sender)  # initially owned by deployment factory, vote to update
 
     A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
@@ -986,7 +994,7 @@ def _exchange(
 
 @internal
 def _withdraw_admin_fees():
-    fee_receiver: address = factory.fee_receiver()
+    fee_receiver: address = self.admin.fee_receiver()
     if fee_receiver == empty(address):
         return  # Do nothing.
 
@@ -1823,7 +1831,7 @@ def dynamic_fee(i: int128, j: int128) -> uint256:
 
 @external
 def ramp_A(_future_A: uint256, _future_time: uint256):
-    assert msg.sender == factory.admin()  # dev: only owner
+    assert msg.sender == self.admin.admin()  # dev: only admin
     assert block.timestamp >= self.initial_A_time + MIN_RAMP_TIME
     assert _future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
 
@@ -1846,7 +1854,7 @@ def ramp_A(_future_A: uint256, _future_time: uint256):
 
 @external
 def stop_ramp_A():
-    assert msg.sender == factory.admin()  # dev: only owner
+    assert msg.sender == self.admin.admin()  # dev: only admin
 
     current_A: uint256 = self._A()
     self.initial_A = current_A
@@ -1860,8 +1868,7 @@ def stop_ramp_A():
 
 @external
 def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
-
-    assert msg.sender == factory.admin()
+    assert msg.sender == self.admin.admin()
 
     # set new fee:
     assert _new_fee <= MAX_FEE
@@ -1888,3 +1895,19 @@ def set_ma_exp_time(_ma_exp_time: uint256, _D_ma_time: uint256):
     self.D_ma_time = _D_ma_time
 
     log SetNewMATime(_ma_exp_time, _D_ma_time)
+
+
+@external
+def set_admin(_new_admin: Factory):
+    assert msg.sender == factory.admin()  # dev: only owner
+
+    self.admin = _new_admin
+    log SetAdmin(_new_admin)
+
+
+@external
+def set_new_admin_fee(_new_admin_fee: uint256):
+    assert msg.sender == self.admin.admin()  # dev: only admin
+    assert _new_admin_fee <= MAX_FEE
+
+    log ApplyNewAdminFee(_new_admin_fee)
