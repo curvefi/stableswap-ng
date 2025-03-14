@@ -175,7 +175,7 @@ stored_balances: DynArray[uint256, MAX_COINS]
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 fee: public(uint256)  # fee * 1e10
 offpeg_fee_multiplier: public(uint256)  # * 1e10
-admin_fee: public(constant(uint256)) = 5000000000
+admin_fee: public(uint256)
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 
 # ---------------------- Pool Amplification Parameters -----------------------
@@ -293,6 +293,8 @@ def __init__(
 
     factory = Factory(msg.sender)
     self.admin = Factory(msg.sender)  # initially owned by deployment factory, vote to update
+
+    self.admin_fee = 5000000000
 
     A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
@@ -658,7 +660,7 @@ def add_liquidity(
             xs = unsafe_div(rates[i] * (old_balances[i] + new_balance), PRECISION)
             _dynamic_fee_i = self._dynamic_fee(xs, ys, base_fee)
             fees.append(unsafe_div(_dynamic_fee_i * difference, FEE_DENOMINATOR))
-            self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
+            self.admin_balances[i] += unsafe_div(fees[i] * self.admin_fee, FEE_DENOMINATOR)
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
@@ -718,7 +720,7 @@ def remove_liquidity_one_coin(
     dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i)
     assert dy >= _min_received, "Not enough coins removed"
 
-    self.admin_balances[i] += unsafe_div(fee * admin_fee, FEE_DENOMINATOR)
+    self.admin_balances[i] += unsafe_div(fee * self.admin_fee, FEE_DENOMINATOR)
 
     self._burnFrom(msg.sender, _burn_amount)
 
@@ -786,7 +788,7 @@ def remove_liquidity_imbalance(
         dynamic_fee = self._dynamic_fee(xs, ys, base_fee)
         fees.append(unsafe_div(dynamic_fee * difference, FEE_DENOMINATOR))
 
-        self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
+        self.admin_balances[i] += unsafe_div(fees[i] * self.admin_fee, FEE_DENOMINATOR)
         new_balances[i] -= fees[i]
 
     D1 = self.get_D_mem(rates, new_balances, amp)  # dev: reuse D1 for new D.
@@ -933,7 +935,7 @@ def __exchange(
     dy = (dy - dy_fee) * PRECISION / rates[j]
 
     self.admin_balances[j] += unsafe_div(
-        unsafe_div(dy_fee * admin_fee, FEE_DENOMINATOR) * PRECISION,
+        unsafe_div(dy_fee * self.admin_fee, FEE_DENOMINATOR) * PRECISION,
         rates[j]
     )
 
@@ -1910,4 +1912,5 @@ def set_new_admin_fee(_new_admin_fee: uint256):
     assert msg.sender == self.admin.admin()  # dev: only admin
     assert _new_admin_fee <= MAX_FEE
 
+    self.admin_fee = _new_admin_fee
     log ApplyNewAdminFee(_new_admin_fee)
