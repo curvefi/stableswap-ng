@@ -152,7 +152,7 @@ event SetNewMATime:
     D_ma_time: uint256
 
 event SetAdmin:
-    admin: Factory
+    admin: address
 
 
 MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
@@ -1904,7 +1904,7 @@ def set_admin(_new_admin: Factory):
     assert msg.sender == factory.admin()  # dev: only owner
 
     self.admin = _new_admin
-    log SetAdmin(_new_admin)
+    log SetAdmin(_new_admin.address)
 
 
 @external
