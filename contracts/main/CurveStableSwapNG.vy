@@ -165,7 +165,7 @@ N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
 
 factory: immutable(Factory)
-admin: address
+admin: public(address)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_types: immutable(DynArray[uint8, MAX_COINS])
 pool_contains_rebasing_tokens: immutable(bool)
