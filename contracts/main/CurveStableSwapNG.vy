@@ -1918,7 +1918,7 @@ def set_admin(_new_admin: address):
 @external
 def set_new_admin_fee(_new_admin_fee: uint256):
     self._check_admins()
-    assert _new_admin_fee <= MAX_FEE
+    assert _new_admin_fee <= 10**10 # dev: more than 100%
 
     self.admin_fee = _new_admin_fee
     log ApplyNewAdminFee(_new_admin_fee)
