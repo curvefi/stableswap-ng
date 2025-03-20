@@ -1833,9 +1833,15 @@ def dynamic_fee(i: int128, j: int128) -> uint256:
 # --------------------------- AMM Admin Functions ----------------------------
 
 
+@view
+@internal
+def _check_admins():
+    assert msg.sender == factory.admin() or msg.sender == self.admin  # dev: only admin
+
+
 @external
 def ramp_A(_future_A: uint256, _future_time: uint256):
-    assert msg.sender == factory.admin() or msg.sender == self.admin  # dev: only admin
+    self._check_admins()
     assert block.timestamp >= self.initial_A_time + MIN_RAMP_TIME
     assert _future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
 
@@ -1858,7 +1864,7 @@ def ramp_A(_future_A: uint256, _future_time: uint256):
 
 @external
 def stop_ramp_A():
-    assert msg.sender == factory.admin() or msg.sender == self.admin  # dev: only admin
+    self._check_admins()
 
     current_A: uint256 = self._A()
     self.initial_A = current_A
@@ -1872,7 +1878,7 @@ def stop_ramp_A():
 
 @external
 def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
-    assert msg.sender == factory.admin() or msg.sender == self.admin  # dev: only admin
+    self._check_admins()
 
     # set new fee:
     assert _new_fee <= MAX_FEE
@@ -1892,7 +1898,7 @@ def set_ma_exp_time(_ma_exp_time: uint256, _D_ma_time: uint256):
     @param _ma_exp_time Moving average window for the price oracle. It is time_in_seconds / ln(2).
     @param _D_ma_time Moving average window for the D oracle. It is time_in_seconds / ln(2).
     """
-    assert msg.sender == factory.admin()  # dev: only owner
+    self._check_admins()
     assert unsafe_mul(_ma_exp_time, _D_ma_time) > 0  # dev: 0 in input values
 
     self.ma_exp_time = _ma_exp_time
@@ -1911,7 +1917,7 @@ def set_admin(_new_admin: address):
 
 @external
 def set_new_admin_fee(_new_admin_fee: uint256):
-    assert msg.sender == factory.admin() or msg.sender == self.admin  # dev: only admin
+    self._check_admins()
     assert _new_admin_fee <= MAX_FEE
 
     self.admin_fee = _new_admin_fee
