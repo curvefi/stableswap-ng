@@ -1928,6 +1928,7 @@ def set_admin(_new_admin: address):
 @external
 def set_new_admin_fee(_new_admin_fee: uint256):
     self._check_admins()
+    # FEE_DENOMINATOR = 1 = 100%
     assert _new_admin_fee <= FEE_DENOMINATOR  # dev: more than 100%
 
     self.admin_fee = _new_admin_fee
