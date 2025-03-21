@@ -1235,8 +1235,9 @@ def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
 
 @internal
 def _withdraw_admin_fees():
-
-    fee_receiver: address = factory.fee_receiver()
+    fee_receiver: address = self.admin
+    if fee_receiver == empty(address):
+        fee_receiver = factory.fee_receiver()
     if fee_receiver == empty(address):
         return  # Do nothing.
 
