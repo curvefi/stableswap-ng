@@ -193,9 +193,15 @@ event ApplyNewFee:
     fee: uint256
     offpeg_fee_multiplier: uint256
 
+event ApplyNewAdminFee:
+    admin_fee: uint256
+
 event SetNewMATime:
     ma_exp_time: uint256
     D_ma_time: uint256
+
+event SetAdmin:
+    admin: address
 
 
 MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
@@ -215,6 +221,7 @@ BASE_COINS: public(immutable(DynArray[address, MAX_COINS]))
 
 math: immutable(Math)
 factory: immutable(Factory)
+admin: public(address)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_type: immutable(uint8)
 pool_contains_rebasing_tokens: immutable(bool)
@@ -224,7 +231,7 @@ stored_balances: uint256[N_COINS]
 FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 fee: public(uint256)  # fee * 1e10
 offpeg_fee_multiplier: public(uint256)  # * 1e10
-admin_fee: public(constant(uint256)) = 5000000000
+admin_fee: public(uint256)
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 
 # ---------------------- Pool Amplification Parameters -----------------------
@@ -373,6 +380,9 @@ def __init__(
     # ----------------- Parameters independent of pool type ------------------
 
     factory = Factory(msg.sender)
+    self.admin = empty(address)
+
+    self.admin_fee = 5000000000
 
     A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
@@ -836,7 +846,7 @@ def add_liquidity(
             fees[i] = unsafe_div(_dynamic_fee_i * difference, FEE_DENOMINATOR)
 
             # fees[i] * admin_fee / FEE_DENOMINATOR
-            self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
+            self.admin_balances[i] += unsafe_div(fees[i] * self.admin_fee, FEE_DENOMINATOR)
             new_balances[i] -= fees[i]
 
         xp: uint256[N_COINS] = self._xp_mem(rates, new_balances)
@@ -910,7 +920,7 @@ def remove_liquidity_one_coin(
     assert dy >= _min_received, "Not enough coins removed"
 
     # fee * admin_fee / FEE_DENOMINATOR
-    self.admin_balances[i] += unsafe_div(fee * admin_fee, FEE_DENOMINATOR)
+    self.admin_balances[i] += unsafe_div(fee * self.admin_fee, FEE_DENOMINATOR)
 
     self._burnFrom(msg.sender, _burn_amount)
 
@@ -979,7 +989,7 @@ def remove_liquidity_imbalance(
         fees[i] = unsafe_div(dynamic_fee * difference, FEE_DENOMINATOR)
 
         # fees[i] * admin_fee / FEE_DENOMINATOR
-        self.admin_balances[i] += unsafe_div(fees[i] * admin_fee, FEE_DENOMINATOR)
+        self.admin_balances[i] += unsafe_div(fees[i] * self.admin_fee, FEE_DENOMINATOR)
 
         new_balances[i] -= fees[i]
 
@@ -1131,7 +1141,7 @@ def __exchange(
 
     # admin_fee = dy_fee * admin_fee / FEE_DENOMINATOR
     self.admin_balances[j] += unsafe_div(
-        unsafe_div(dy_fee * admin_fee, FEE_DENOMINATOR) * PRECISION,
+        unsafe_div(dy_fee * self.admin_fee, FEE_DENOMINATOR) * PRECISION,
         rates[j]  # we can do unsafediv here because we did safediv before
     )
 
@@ -1225,8 +1235,9 @@ def _meta_add_liquidity(dx: uint256, base_i: int128) -> uint256:
 
 @internal
 def _withdraw_admin_fees():
-
-    fee_receiver: address = factory.fee_receiver()
+    fee_receiver: address = self.admin
+    if fee_receiver == empty(address):
+        fee_receiver = factory.fee_receiver()
     if fee_receiver == empty(address):
         return  # Do nothing.
 
@@ -1832,9 +1843,15 @@ def dynamic_fee(i: int128, j: int128) -> uint256:
 # --------------------------- AMM Admin Functions ----------------------------
 
 
+@view
+@internal
+def _check_admins():
+    assert msg.sender == factory.admin() or msg.sender == self.admin  # dev: only admin
+
+
 @external
 def ramp_A(_future_A: uint256, _future_time: uint256):
-    assert msg.sender == factory.admin()  # dev: only owner
+    self._check_admins()
     assert block.timestamp >= self.initial_A_time + MIN_RAMP_TIME
     assert _future_time >= block.timestamp + MIN_RAMP_TIME  # dev: insufficient time
 
@@ -1857,7 +1874,7 @@ def ramp_A(_future_A: uint256, _future_time: uint256):
 
 @external
 def stop_ramp_A():
-    assert msg.sender == factory.admin()  # dev: only owner
+    self._check_admins()
 
     current_A: uint256 = self._A()
     self.initial_A = current_A
@@ -1871,8 +1888,7 @@ def stop_ramp_A():
 
 @external
 def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
-
-    assert msg.sender == factory.admin()
+    self._check_admins()
 
     # set new fee:
     assert _new_fee <= MAX_FEE
@@ -1892,10 +1908,28 @@ def set_ma_exp_time(_ma_exp_time: uint256, _D_ma_time: uint256):
     @param _ma_exp_time Moving average window for the price oracle. It is time_in_seconds / ln(2).
     @param _D_ma_time Moving average window for the D oracle. It is time_in_seconds / ln(2).
     """
-    assert msg.sender == factory.admin()  # dev: only owner
+    self._check_admins()
     assert unsafe_mul(_ma_exp_time, _D_ma_time) > 0  # dev: 0 in input values
 
     self.ma_exp_time = _ma_exp_time
     self.D_ma_time = _D_ma_time
 
     log SetNewMATime(_ma_exp_time, _D_ma_time)
+
+
+@external
+def set_admin(_new_admin: address):
+    assert msg.sender == factory.admin()  # dev: only owner
+
+    self.admin = _new_admin
+    log SetAdmin(_new_admin)
+
+
+@external
+def set_new_admin_fee(_new_admin_fee: uint256):
+    self._check_admins()
+    # FEE_DENOMINATOR = 1 = 100%
+    assert _new_admin_fee <= FEE_DENOMINATOR  # dev: more than 100%
+
+    self.admin_fee = _new_admin_fee
+    log ApplyNewAdminFee(_new_admin_fee)

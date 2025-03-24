@@ -76,7 +76,7 @@ def test_stop_ramp_A(owner, swap):
 
 
 def test_ramp_A_only_owner(bob, swap):
-    with boa.reverts():
+    with boa.reverts(dev="only admin"):
         swap.ramp_A(0, boa.env.evm.patch.timestamp + 1000000, sender=bob)
 
 
@@ -86,5 +86,5 @@ def test_ramp_A_insufficient_time(owner, swap):
 
 
 def test_stop_ramp_A_only_owner(bob, swap):
-    with boa.reverts():
+    with boa.reverts(dev="only admin"):
         swap.stop_ramp_A(sender=bob)
