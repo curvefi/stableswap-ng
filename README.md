@@ -14,7 +14,7 @@ The metapool factory has several core components:
 
 - [`Factory`](contracts/main/CurveStableSwapFactoryNG.vy) is the main contract used to deploy new metapools. It also acts a registry for finding the deployed pools and querying information about them.
 - New pools are deployed via blueprints. The [implementation contract](contracts/main/CurveStableSwapNG.vy) targeted by the proxy is determined according to the base pool.
-- There is extra StableSwap implementation with admin functionality on `admin-implementation` branch initially used by *crosscurve* on *Sonic*.
+- There is extra StableSwap implementation with admin functionality on [`admin-implementation`](https://github.com/curvefi/stableswap-ng/tree/admin-implementation) branch initially used by *crosscurve* on *Sonic*.
 
 See the [documentation](https://docs.curve.fi) for more detailed information.
 
