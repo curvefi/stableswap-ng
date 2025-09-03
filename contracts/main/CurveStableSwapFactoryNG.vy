@@ -609,7 +609,6 @@ def deploy_metapool(
     @param _oracle Rate oracle address.
     @return Address of the deployed pool
     """
-    assert not self.base_pool_assets[_coin], "Invalid asset: Cannot pair base pool asset with base pool's LP token"
     assert _fee <= 100000000, "Invalid fee"
     assert _offpeg_fee_multiplier * _fee <= MAX_FEE * FEE_DENOMINATOR
 
@@ -630,6 +629,7 @@ def deploy_metapool(
     for i in range(0, MAX_COINS):
         if i == base_pool_n_coins:
             break
+        assert _coin != self.base_pool_data[_base_pool].coins[i], "Invalid asset: Cannot pair meta pool asset with same assets in base pool"        
         asset_types.append(base_pool_asset_types[i])
 
     _coins: DynArray[address, MAX_COINS] = [_coin, self.base_pool_data[_base_pool].lp_token]
