@@ -144,7 +144,7 @@ event ApplyNewFee:
     fee: uint256
     offpeg_fee_multiplier: uint256
 
-event ApplyNewAdminFee:
+event SetAdminFee:
     admin_fee: uint256
 
 event SetNewMATime:
@@ -1936,4 +1936,4 @@ def set_new_admin_fee(_new_admin_fee: uint256):
     assert _new_admin_fee <= FEE_DENOMINATOR  # dev: more than 100%
 
     self.admin_fee = _new_admin_fee
-    log ApplyNewAdminFee(_new_admin_fee)
+    log SetAdminFee(_new_admin_fee)
