@@ -996,9 +996,7 @@ def _exchange(
 
 @internal
 def _withdraw_admin_fees():
-    fee_receiver: address = self.admin
-    if fee_receiver == empty(address):
-        fee_receiver = factory.fee_receiver()
+    fee_receiver: address = factory.fee_receiver()
     if fee_receiver == empty(address):
         return  # Do nothing.
 
