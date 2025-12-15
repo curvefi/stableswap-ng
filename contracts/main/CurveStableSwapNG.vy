@@ -154,6 +154,10 @@ event SetNewMATime:
 event SetAdmin:
     admin: address
 
+event UpdatePoolFeeReceiver:
+    old_receiver: address
+    new_receiver: address
+
 
 MAX_COINS: constant(uint256) = 8  # max coins is 8 in the factory
 MAX_COINS_128: constant(int128) = 8
@@ -166,6 +170,7 @@ PRECISION: constant(uint256) = 10 ** 18
 
 factory: immutable(Factory)
 admin: public(address)
+pool_fee_receiver: public(address)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_types: immutable(DynArray[uint8, MAX_COINS])
 pool_contains_rebasing_tokens: immutable(bool)
@@ -996,7 +1001,9 @@ def _exchange(
 
 @internal
 def _withdraw_admin_fees():
-    fee_receiver: address = factory.fee_receiver()
+    fee_receiver: address = self.pool_fee_receiver
+    if fee_receiver == empty(address):
+        fee_receiver = factory.fee_receiver()
     if fee_receiver == empty(address):
         return  # Do nothing.
 
@@ -1911,6 +1918,15 @@ def set_admin(_new_admin: address):
 
     self.admin = _new_admin
     log SetAdmin(_new_admin)
+
+
+@external
+def set_fee_receiver(_fee_receiver: address):
+    self._check_admins()
+
+    old_receiver: address = self.pool_fee_receiver
+    self.pool_fee_receiver = _fee_receiver
+    log UpdatePoolFeeReceiver(old_receiver, _fee_receiver)
 
 
 @external
