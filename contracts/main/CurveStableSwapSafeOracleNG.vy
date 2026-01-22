@@ -240,7 +240,7 @@ CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 
 last_rates: DynArray[uint256, MAX_COINS]
 last_rates_update: uint256  # block number of last update
-MAX_RATE_BUMP: constant(uint256) = 10 ** (18 - 2)  # max relative rate change (1%)
+MAX_RATE_BUMP: constant(uint256) = 10 ** (10 - 2)  # max relative rate change (1%)
 
 # ------------------------------ AMM Setup -----------------------------------
 
@@ -458,10 +458,7 @@ def _limited_rate(last_rate: uint256, new_rate: uint256, fee_delta: uint256) -> 
     @param new_rate New rate returned from oracle
     @param fee_delta fee * blocks since last update.
     """
-    max_change: uint256 = min(
-        last_rate * fee_delta / FEE_DENOMINATOR,
-        last_rate * MAX_RATE_BUMP / PRECISION,
-    )
+    max_change: uint256 = last_rate * min(fee_delta, MAX_RATE_BUMP) / FEE_DENOMINATOR
     # -max_change <= (new_rate - last_rate) <= max_change
     # 0 <= new_rate + max_change - last_rate <= 2 * max_change
     if unsafe_sub(new_rate + max_change, last_rate) > 2 * max_change:
