@@ -2,10 +2,10 @@
 # pragma optimize codesize
 # pragma evm-version shanghai
 """
-@title CurveStableSwapNG
+@title CurveStableSwapSafeOracleNG
 @author Curve.Fi
 @license Copyright (c) Curve.Fi, 2020-2023 - all rights reserved
-@notice Stableswap implementation for up to 8 coins with no rehypothecation,
+@notice Stableswap implementation with oracle safety checks for up to 8 coins with no rehypothecation,
         i.e. the AMM does not deposit tokens into other contracts. The Pool contract also
         records exponential moving averages for coins relative to coin 0.
 @dev Asset Types:
@@ -26,6 +26,7 @@
                            proceed with caution.
         NOTE: Pool Cannot support tokens with multiple asset types: e.g. ERC4626
               with fees are not supported.
+        NOTE: Pool _must_ contain at least one token with asset type 1 or 3.
      Supports:
         1. ERC20 support for return True/revert, return True/False, return None
         2. ERC20 tokens can have arbitrary decimals (<=18).
@@ -49,6 +50,7 @@
            input of coin[i] for an output amount of coin[j].
         5. Fees are dynamic: AMM will charge a higher fee if pool depegs. This can cause very
                              slight discrepancies between calculated fees and realised fees.
+        6. Rate oracle responses are bounded for additional safety.
 """
 
 from vyper.interfaces import ERC20
@@ -169,7 +171,8 @@ FEE_DENOMINATOR: constant(uint256) = 10 ** 10
 fee: public(uint256)  # fee * 1e10
 offpeg_fee_multiplier: public(uint256)  # * 1e10
 admin_fee: public(constant(uint256)) = 5000000000
-MAX_FEE: constant(uint256) = 5 * 10 ** 9
+MIN_FEE: constant(uint256) = 10 ** 4  # 0.0001%
+MAX_FEE: constant(uint256) = 5 * 10 ** 9  # 50%
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -192,6 +195,8 @@ admin_balances: public(DynArray[uint256, MAX_COINS])
 rate_multipliers: immutable(DynArray[uint256, MAX_COINS])
 # [bytes4 method_id][bytes8 <empty>][bytes20 oracle]
 rate_oracles: immutable(DynArray[uint256, MAX_COINS])
+# Variables related to stored rates are appended at the end
+# to preserve the existing storage layout.
 
 # For ERC4626 tokens, we need:
 call_amount: immutable(DynArray[uint256, MAX_COINS])
@@ -231,6 +236,11 @@ CACHED_CHAIN_ID: immutable(uint256)
 salt: public(immutable(bytes32))
 CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 
+# --------------------------- Oracle limiting vars ---------------------------
+
+last_rates: DynArray[uint256, MAX_COINS]
+last_rates_update: uint256  # block number of last update
+MAX_RATE_BUMP: constant(uint256) = 10 ** (10 - 2)  # max relative rate change (1%)
 
 # ------------------------------ AMM Setup -----------------------------------
 
@@ -289,6 +299,7 @@ def __init__(
     A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
     self.future_A = A
+    assert MIN_FEE < _fee and _fee <= MAX_FEE
     self.fee = _fee
     self.offpeg_fee_multiplier = _offpeg_fee_multiplier
 
@@ -302,6 +313,7 @@ def __init__(
     _call_amount: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _scale_factor: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _rate_oracles: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    has_oracle: bool = False
     for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if i < N_COINS_128 - 1:
@@ -322,9 +334,17 @@ def __init__(
             _call_amount.append(0)
             _scale_factor.append(0)
 
+        if (_asset_types[i] == 1 and _rate_oracles[i] != 0) or _asset_types[i] == 3:
+            has_oracle = True
+
+    assert has_oracle, "No oracle provided"
+
     call_amount = _call_amount
     scale_factor = _scale_factor
     rate_oracles = _rate_oracles
+
+    self.last_rates = self._fetch_rates()
+    self.last_rates_update = block.number
 
     # ----------------------------- ERC20 stuff ------------------------------
 
@@ -430,9 +450,28 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
 
 @view
 @internal
-def _stored_rates() -> DynArray[uint256, MAX_COINS]:
+def _limited_rate(last_rate: uint256, new_rate: uint256, fee_delta: uint256) -> uint256:
     """
-    @notice Gets rate multipliers for each coin.
+    @notice Limits the new rate value relative to the last observed rate.
+    @dev Limits relative change to min(fee-based bound, MAX_RATE_BUMP).
+    @param last_rate Last rate observed by the contract
+    @param new_rate New rate returned from oracle
+    @param fee_delta fee * blocks since last update.
+    """
+    max_change: uint256 = last_rate * min(fee_delta, MAX_RATE_BUMP) / FEE_DENOMINATOR
+    # -max_change <= (new_rate - last_rate) <= max_change
+    # 0 <= new_rate + max_change - last_rate <= 2 * max_change
+    if unsafe_sub(new_rate + max_change, last_rate) > 2 * max_change:
+        return last_rate + max_change if new_rate > last_rate else last_rate - max_change
+    # within boundaries
+    return new_rate
+
+
+@view
+@internal
+def _fetch_rates() -> DynArray[uint256, MAX_COINS]:
+    """
+    @notice Fetch rate multipliers for each coin.
     @dev If the coin has a rate oracle that has been properly initialised,
          this method queries that rate by static-calling an external
          contract.
@@ -465,6 +504,51 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
                 PRECISION
             )  # 1e18 precision
 
+    return rates
+
+
+@view
+@internal
+def _stored_rates(last_rates_update: uint256) -> DynArray[uint256, MAX_COINS]:
+    """
+    @notice Gets rate multipliers for each coin.
+    @dev If the coin has a rate oracle that has been properly initialised,
+         this method queries that rate by static-calling an external
+         contract.
+    @dev Limits rates relative to their last observed values.
+    @param last_rates_update Block number of the last update.
+    """
+
+    # already updated in this block
+    if last_rates_update >= block.number:
+        return self.last_rates
+
+    rates: DynArray[uint256, MAX_COINS] = self._fetch_rates()
+    last_rates: DynArray[uint256, MAX_COINS] = self.last_rates
+    # load and calculate once for all coins
+    fee_delta: uint256 = self.fee * (block.number - last_rates_update)
+    for i in range(N_COINS_128, bound=MAX_COINS_128):
+        if (asset_types[i] == 1 and rate_oracles[i] != 0) or asset_types[i] == 3:
+            rates[i] = self._limited_rate(last_rates[i], rates[i], fee_delta)
+    return rates
+
+
+@internal
+def _stored_rates_w() -> DynArray[uint256, MAX_COINS]:
+    """
+    @notice Gets rate multipliers for each coin.
+    @dev If the coin has a rate oracle that has been properly initialised,
+         this method queries that rate by static-calling an external
+         contract.
+    @dev Caches the rates and updates last_rates_update in storage.
+    """
+    last_rates_update: uint256 = self.last_rates_update
+    if last_rates_update >= block.number:
+        return self.last_rates
+
+    rates: DynArray[uint256, MAX_COINS] = self._stored_rates(last_rates_update)
+    self.last_rates = rates
+    self.last_rates_update = block.number
     return rates
 
 
@@ -583,7 +667,7 @@ def add_liquidity(
 
     amp: uint256 = self._A()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
+    rates: DynArray[uint256, MAX_COINS] = self._stored_rates_w()
 
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
@@ -707,7 +791,7 @@ def remove_liquidity_one_coin(
     amp: uint256 = empty(uint256)
     D: uint256 = empty(uint256)
 
-    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i)
+    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i, self._stored_rates_w())
     assert dy >= _min_received, "Not enough coins removed"
 
     self.admin_balances[i] += unsafe_div(fee * admin_fee, FEE_DENOMINATOR)
@@ -738,7 +822,7 @@ def remove_liquidity_imbalance(
     @return Actual amount of the LP token burned in the withdrawal
     """
     amp: uint256 = self._A()
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
+    rates: DynArray[uint256, MAX_COINS] = self._stored_rates_w()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
     new_balances: DynArray[uint256, MAX_COINS] = old_balances
@@ -953,7 +1037,7 @@ def _exchange(
     assert i != j  # dev: coin index out of range
     assert _dx > 0  # dev: do not exchange 0 coins
 
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
+    rates: DynArray[uint256, MAX_COINS] = self._stored_rates_w()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, old_balances)
 
@@ -1232,7 +1316,8 @@ def get_D_mem(
 @internal
 def _calc_withdraw_one_coin(
     _burn_amount: uint256,
-    i: int128
+    i: int128,
+    rates: DynArray[uint256, MAX_COINS]
 ) -> (
     uint256,
     uint256,
@@ -1244,7 +1329,6 @@ def _calc_withdraw_one_coin(
     # * Get current D
     # * Solve Eqn against y_i for D - _token_amount
     amp: uint256 = self._A()
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, self._balances())
     D0: uint256 = self.get_D(xp, amp)
 
@@ -1433,7 +1517,7 @@ def get_p(i: uint256) -> uint256:
     """
     amp: uint256 = self._A()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
-        self._stored_rates(), self._balances()
+        self._stored_rates(self.last_rates_update), self._balances()
     )
     D: uint256 = self.get_D(xp, amp)
     return self._get_p(xp, amp, D)[i]
@@ -1720,7 +1804,7 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256:
     @param i Index value of the coin to withdraw
     @return Amount of coin received
     """
-    return self._calc_withdraw_one_coin(_burn_amount, i)[0]
+    return self._calc_withdraw_one_coin(_burn_amount, i, self._stored_rates(self.last_rates_update))[0]
 
 
 @view
@@ -1747,7 +1831,7 @@ def get_virtual_price() -> uint256:
     """
     amp: uint256 = self._A()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
-        self._stored_rates(), self._balances()
+        self._stored_rates(self.last_rates_update), self._balances()
     )
     D: uint256 = self.get_D(xp, amp)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
@@ -1803,7 +1887,7 @@ def get_balances() -> DynArray[uint256, MAX_COINS]:
 @view
 @external
 def stored_rates() -> DynArray[uint256, MAX_COINS]:
-    return self._stored_rates()
+    return self._stored_rates(self.last_rates_update)
 
 
 @view
@@ -1864,7 +1948,7 @@ def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
     assert msg.sender == factory.admin()
 
     # set new fee:
-    assert _new_fee <= MAX_FEE
+    assert MIN_FEE < _new_fee and _new_fee <= MAX_FEE
     self.fee = _new_fee
 
     # set new offpeg_fee_multiplier:
