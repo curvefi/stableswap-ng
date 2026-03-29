@@ -385,8 +385,6 @@ def __init__(
     # ----------------- Parameters independent of pool type ------------------
 
     factory = Factory(msg.sender)
-    self.admin = empty(address)
-
     self.admin_fee = 5000000000
 
     A: uint256 = unsafe_mul(_A, A_PRECISION)
