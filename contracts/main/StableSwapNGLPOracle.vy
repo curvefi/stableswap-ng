@@ -27,7 +27,8 @@ def _sanity_check(pool: IStableSwapNG):
     # Basic sanity checks for required pool methods.
     assert staticcall pool.get_virtual_price() > 0
     assert staticcall pool.price_oracle(0) > 0
-    assert staticcall pool.A_precise() > POOL_A_PRECISION, "Bad A value"
+    A: uint256 = staticcall pool.A_precise()
+    assert POOL_A_PRECISION <= A and A <= lp_oracle_2.MAX_A * POOL_A_PRECISION, "Bad A value"
     success: bool = False
     response: Bytes[32] = b""
     success, response = raw_call(
@@ -77,6 +78,7 @@ def _portfolio_value(pool: IStableSwapNG, i: uint256=0) -> uint256:
 @internal
 @view
 def _lp_price(pool: IStableSwapNG, i: uint256=0) -> uint256:
+    # Uses the pool's current virtual price.
     return unsafe_div(self._portfolio_value(pool, i) * staticcall pool.get_virtual_price(), PRECISION)
 
 
@@ -84,10 +86,17 @@ def _lp_price(pool: IStableSwapNG, i: uint256=0) -> uint256:
 @external
 def portfolio_value(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
     """
-    @notice Returns the pool portfolio value in the selected coin numeraire.
+    @notice Returns the pool portfolio value in the selected coin base numeraire.
+    @dev The result is scaled to 1e18 and quoted in the base asset of coin `_i`.
+         For plain ERC20 coins this matches the token itself. For yield-bearing
+         coins, e.g. `sA`, the quote is in the underlying/base asset `A`, not in
+         `sA`.
+         To convert the result to token `_i` space while keeping 1e18 scaling:
+         `token_rate = _pool.stored_rates()[_i] / 10**(18 - decimals(_pool.coins(_i)))`
+         `value_token = value_base * 1e18 / token_rate`
     @param _pool Address of the StableSwapNG pool.
     @param _i Coin index used as the numeraire, where 0 or 1 are supported.
-    @return uint256 Portfolio value scaled to 1e18 in coin `_i` units.
+    @return uint256 Portfolio value scaled to 1e18 in the base asset of coin `_i`.
     """
     return self._portfolio_value(_pool, _i)
 
@@ -96,9 +105,18 @@ def portfolio_value(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
 @view
 def lp_price(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
     """
-    @notice Returns LP token price in the selected coin numeraire.
+    @notice Returns the LP token price in the selected coin base numeraire.
+    @dev The result is scaled to 1e18 and quoted in the base asset of coin `_i`.
+         For plain ERC20 coins this matches the token itself. For yield-bearing
+         coins, e.g. `sA`, the quote is in the underlying/base asset `A`, not in
+         `sA`.
+         To convert the result to token `_i` space while keeping 1e18 scaling:
+         `token_rate = _pool.stored_rates()[_i] / 10**(18 - decimals(_pool.coins(_i)))`
+         `price_token = price_base * 1e18 / token_rate`
+    @dev This call can revert if `_pool.get_virtual_price()` reverts, e.g.
+         because the pool's external rate oracle path fails.
     @param _pool Address of the StableSwapNG pool.
     @param _i Coin index used as the numeraire, where 0 or 1 are supported.
-    @return uint256 LP price scaled to 1e18 in coin `_i` units.
+    @return uint256 LP price scaled to 1e18 in the base asset of coin `_i`.
     """
     return self._lp_price(_pool, _i)
