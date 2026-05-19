@@ -5,6 +5,8 @@
 @author Curve.Fi
 @license MIT
 @notice LP oracle for StableSwap-NG (n=2) reusing lp_oracle_bisection math.
+@dev Attention: LP pricing here depends on the pool `virtual_price`; see
+     `lp_price()` comments for important caveats.
 """
 
 from curve_std.stableswap import lp_oracle_2
@@ -113,6 +115,9 @@ def lp_price(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
          To convert the result to token `_i` space while keeping 1e18 scaling:
          `token_rate = _pool.stored_rates()[_i] / 10**(18 - decimals(_pool.coins(_i)))`
          `price_token = price_base * 1e18 / token_rate`
+    @dev LP token price can be inflated by a natural increase in
+         `_pool.get_virtual_price()`, including through wash trading or due to
+         the rate oracles used by the pool tokens.
     @dev This call can revert if `_pool.get_virtual_price()` reverts, e.g.
          because the pool's external rate oracle path fails.
     @param _pool Address of the StableSwapNG pool.
