@@ -118,6 +118,9 @@ def lp_price(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
     @dev LP token price can be inflated by a natural increase in
          `_pool.get_virtual_price()`, including through wash trading or due to
          the rate oracles used by the pool tokens.
+    @dev The underlying `_pool.price_oracle(0)` used by this LP token oracle is
+         capped at 2.0 (2e18), so the LP token price returned by this oracle is
+         capped accordingly.
     @dev This call can revert if `_pool.get_virtual_price()` reverts, e.g.
          because the pool's external rate oracle path fails.
     @param _pool Address of the StableSwapNG pool.
