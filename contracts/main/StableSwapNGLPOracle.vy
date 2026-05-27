@@ -16,6 +16,7 @@ interface IStableSwapNG:
     def A_precise() -> uint256: view
     def get_virtual_price() -> uint256: view
     def price_oracle(i: uint256) -> uint256: view
+    def coins(i: uint256) -> address: view
 
 
 PRECISION: constant(uint256) = 10**18
@@ -41,6 +42,7 @@ def _sanity_check(pool: IStableSwapNG):
         is_static_call=True,
     )
     assert not success, "Supports only 2-coin pool"
+    _: address = staticcall pool.coins(1)  # 63/64 msg.gas attack safety
 
 @view
 @external
