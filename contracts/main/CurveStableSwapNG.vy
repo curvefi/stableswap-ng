@@ -454,6 +454,10 @@ def _limited_rate(last_rate: uint256, new_rate: uint256, fee_delta: uint256) -> 
     """
     @notice Limits the new rate value relative to the last observed rate.
     @dev Limits relative change to min(fee-based bound, MAX_RATE_BUMP).
+         The fee-based bound uses double fee as a safe threshold where updates
+         cannot be sandwiched. MAX_RATE_BUMP caps a single update in case of
+         exceptional conditions: missing arbitrage, blockchain outage, a
+         real sharp rate move, etc.
     @param last_rate Last rate observed by the contract
     @param new_rate New rate returned from oracle
     @param fee_delta fee * blocks since last update.
