@@ -17,7 +17,7 @@ pre-commit = "^3.3.3"
 titanoboa-zksync = {git = "https://github.com/DanielSchiavini/titanoboa-zksync.git", tag = "v0.1.2"} # inherits titanoboa 0.1.10
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.0.0"
+black = ">=24,<27"
 flake8 = "^7.0.0"
 isort = "^5.0.0"
 mamushi = "^0.0.4a3"
