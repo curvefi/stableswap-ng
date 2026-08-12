@@ -86,25 +86,6 @@ def _lp_price(pool: IStableSwapNG, i: uint256=0) -> uint256:
     return unsafe_div(self._portfolio_value(pool, i) * staticcall pool.get_virtual_price(), PRECISION)
 
 
-@view
-@external
-def portfolio_value(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
-    """
-    @notice Returns the pool portfolio value in the selected coin base numeraire.
-    @dev The result is scaled to 1e18 and quoted in the base asset of coin `_i`.
-         For plain ERC20 coins this matches the token itself. For yield-bearing
-         coins, e.g. `sA`, the quote is in the underlying/base asset `A`, not in
-         `sA`.
-         To convert the result to token `_i` space while keeping 1e18 scaling:
-         `token_rate = _pool.stored_rates()[_i] / 10**(18 - decimals(_pool.coins(_i)))`
-         `value_token = value_base * 1e18 / token_rate`
-    @param _pool Address of the StableSwapNG pool.
-    @param _i Coin index used as the numeraire, where 0 or 1 are supported.
-    @return uint256 Portfolio value scaled to 1e18 in the base asset of coin `_i`.
-    """
-    return self._portfolio_value(_pool, _i)
-
-
 @external
 @view
 def lp_price(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
