@@ -18,15 +18,29 @@ The metapool factory has several core components:
 
 See the [documentation](https://docs.curve.fi) for more detailed information.
 
+## Library usage
+
+Install the repository as a Python package, then import the LP oracle from Vyper:
+
+```vyper
+from stableswap_ng import LPOracle
+```
+
 ## Testing
 
 ### Installation
 
-Install dependencies using poetry (python ^3.10.4)
+Install dependencies using uv (python >=3.10)
 
 ```shell
-pip install poetry==1.8.3
-poetry install
+uv sync --group dev
+```
+
+The contracts in this repository use Vyper 0.3.10, while the packaged LP oracle
+uses Vyper 0.4.3. Run the legacy contract tests in their locked environment:
+
+```shell
+uv run --python 3.10 --no-project --with-requirements requirements-tests.txt pytest tests/
 ```
 
 ### Type of tests

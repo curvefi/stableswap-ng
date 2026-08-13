@@ -13,12 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup Python 3.10.4
-        uses: actions/setup-python@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: 3.10.4
+          version: "0.8.3"
+          enable-cache: true
 
-      - uses: pre-commit/action@v3.0.0
+      - name: Setup Python 3.10.4
+        run: uv python install 3.10.4
+
+      - name: Run pre-commit
+        run: uv run --group dev --frozen pre-commit run --all-files
 
   tests:
     runs-on: ubuntu-latest
@@ -45,24 +50,21 @@ jobs:
           path: ~/.vvm
           key: compiler-cache
 
-      - name: Setup Python 3.10.4
-        uses: actions/setup-python@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: 3.10.4
+          version: "0.8.3"
+          enable-cache: true
 
-      - name: Install Requirements
-        run: |
-          pip install poetry==1.8.3
-          poetry config virtualenvs.in-project true
-          poetry install --no-interaction --without dev
+      - name: Setup Python 3.10.4
+        run: uv python install 3.10.4
 
       - name: Run Tests
         env:
           WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
         run: |
-          source .venv/bin/activate
           if [[ ${{ matrix.name }} == "pools/oracle" ]]; then
-            pytest --numprocesses=auto --dist=loadscope tests/${{ matrix.name }}/
+            uv run --python 3.10.4 --no-project --with-requirements requirements-tests.txt pytest --numprocesses=auto --dist=loadscope tests/${{ matrix.name }}/
           else
-            pytest --numprocesses=auto tests/${{ matrix.name }}/
+            uv run --python 3.10.4 --no-project --with-requirements requirements-tests.txt pytest --numprocesses=auto tests/${{ matrix.name }}/
           fi

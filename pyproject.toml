@@ -1,42 +1,36 @@
-[tool.poetry]
+[project]
 name = "stableswap-ng"
-version = "0.1.0"
-description = "Stableswap-ng environment for testing"
-authors = ["Curve.fi"]
-license = "MIT"
-readme = "README.md"
-packages = []
-package-mode = false
-
-[tool.poetry.dependencies]
-python = "^3.10"
-poetry = "^1.8.0"
-vyper = "0.3.10"
-pycryptodome = "^3.18.0"
-pre-commit = "^3.3.3"
-titanoboa-zksync = {git = "https://github.com/DanielSchiavini/titanoboa-zksync.git", tag = "v0.1.2"} # inherits titanoboa 0.1.10
-
-[tool.poetry.group.dev.dependencies]
-black = "^24.0.0"
-flake8 = "^7.0.0"
-isort = "^5.0.0"
-mamushi = "^0.0.4a3"
-
-
-[tool.poetry.group.testing.dependencies]
-eip712 = {git = "https://github.com/DanielSchiavini/eip712.git", rev = "main"}
-eth-account = "~0.13.0"
-ipython = "^8.14.0"
-hypothesis = "^6.79.3"
-pytest = "^7.4.0"
-pytest-xdist = "^3.3.1"
-pytest-forked = "^1.6.0"
-pytest-repeat = "^0.9.1"
-pdbpp = "^0.10.3"
+version = "0.0.1"
+requires-python = ">=3.10"
+dependencies = [
+  "curve-std",
+  "snekmate>=0.1.2",
+  "vyper==0.4.3",
+]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel.force-include]
+"contracts/main/StableSwapNGLPOracle.vy" = "stableswap_ng/LPOracle.vy"
+
+[dependency-groups]
+dev = [
+  "black>=24.0.0,<25",
+  "eth-account>=0.13.0,<0.14",
+  "flake8>=7.0.0,<8",
+  "ipython>=8.14.0,<9",
+  "isort>=5.0.0,<6",
+  "mamushi>=0.0.4a3,<0.0.5",
+  "pre-commit>=3.3.3,<4",
+  "pycryptodome>=3.18.0,<4",
+  "titanoboa>=0.2.8",
+  "titanoboa-zksync",
+]
+
+[tool.uv.sources]
+curve-std = { git = "https://github.com/curvefi/curve-std", rev = "e2101dc898591fb5e95b1f79e6163b2a7927bd63" }
 
 [tool.black]
 exclude = '''
@@ -60,7 +54,7 @@ target_version = ['py310']
 [tool.isort]
 profile = "black"
 py_version = 310
-known_first_party = "poetry"
+known_first_party = "stableswap_ng"
 
 [tool.pytest.ini_options]
 markers = [
