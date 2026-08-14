@@ -30,7 +30,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-curve-std = { git = "https://github.com/curvefi/curve-std", rev = "048cb23d0ed4c48768815ea5c46d4a676da8de35" }
+curve-std = { git = "https://github.com/curvefi/curve-std", rev = "main" }
 
 [tool.black]
 exclude = '''
