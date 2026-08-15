@@ -20,7 +20,6 @@ dev = [
   "black>=24.0.0,<25",
   "eth-account>=0.13.0,<0.14",
   "flake8>=7.0.0,<8",
-  "ipython>=8.14.0,<9",
   "isort>=5.0.0,<6",
   "mamushi>=0.0.4a3,<0.0.5",
   "pre-commit>=3.3.3,<4",
@@ -28,6 +27,11 @@ dev = [
   "titanoboa>=0.2.8",
   "titanoboa-zksync",
 ]
+
+[tool.uv]
+# titanoboa 0.2.8 pins mkdocs-material 9.5.41, whose declared 10.x range
+# includes versions affected by GHSA-gm37-52c6-37mw.
+override-dependencies = ["pymdown-extensions==11.0.1"]
 
 [tool.uv.sources]
 curve-std = { git = "https://github.com/curvefi/curve-std", rev = "main" }
