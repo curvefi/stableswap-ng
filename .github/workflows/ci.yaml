@@ -11,14 +11,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.8.3"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Setup Python 3.10.4
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.10.4
+        run: uv python install 3.10.4
 
-      - uses: pre-commit/action@v3.0.0
+      - name: Run pre-commit
+        run: uv run --group dev --frozen pre-commit run --all-files
 
   tests:
     runs-on: ubuntu-latest
@@ -37,32 +43,30 @@ jobs:
           - factory
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
 
       - name: Cache Compiler Installations
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: ~/.vvm
           key: compiler-cache
 
-      - name: Setup Python 3.10.4
-        uses: actions/setup-python@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          python-version: 3.10.4
+          version: "0.8.3"
+          enable-cache: true
+          cache-dependency-glob: requirements-tests.txt
 
-      - name: Install Requirements
-        run: |
-          pip install poetry==1.8.3
-          poetry config virtualenvs.in-project true
-          poetry install --no-interaction --without dev
+      - name: Setup Python 3.10.4
+        run: uv python install 3.10.4
 
       - name: Run Tests
         env:
           WEB3_PROVIDER_URL: ${{ secrets.WEB3_PROVIDER_URL }}
         run: |
-          source .venv/bin/activate
           if [[ ${{ matrix.name }} == "pools/oracle" ]]; then
-            pytest --numprocesses=auto --dist=loadscope tests/${{ matrix.name }}/
+            uv run --python 3.10.4 --no-project --with-requirements requirements-tests.txt pytest --numprocesses=auto --dist=loadscope tests/${{ matrix.name }}/
           else
-            pytest --numprocesses=auto tests/${{ matrix.name }}/
+            uv run --python 3.10.4 --no-project --with-requirements requirements-tests.txt pytest --numprocesses=auto tests/${{ matrix.name }}/
           fi
