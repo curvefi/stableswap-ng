@@ -208,7 +208,7 @@ typing-extensions==4.12.2
     #   pydantic
     #   pydantic-core
     #   titanoboa
-urllib3==2.2.3
+urllib3==2.7.0
     # via requests
 vyper==0.3.10
     # via titanoboa
