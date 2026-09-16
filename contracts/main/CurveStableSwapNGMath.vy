@@ -12,6 +12,12 @@ MAX_COINS: constant(uint256) = 8
 MAX_COINS_128: constant(int128) = 8
 A_PRECISION: constant(uint256) = 100
 
+interface ERC4626:
+    def convertToAssets(shares: uint256) -> uint256: view
+
+# shift(2**32 - 1, 224)
+ORACLE_BIT_MASK: constant(uint256) = (2**32 - 1) * 256**28
+
 
 @external
 @pure
@@ -267,3 +273,89 @@ def exp(x: int256) -> uint256:
     # subsequently to `uint256`. Remember that the EVM default behaviour is
     # to use two's complement representation to handle signed integers.
     return unsafe_mul(convert(convert(r, bytes32), uint256), 3822833074963236453042738258902158003155416615667) >> convert(unsafe_sub(195, k), uint256)
+
+
+@external
+@pure
+def bound_rates(
+    _rates: DynArray[uint256, MAX_COINS],
+    _last: DynArray[uint256, MAX_COINS],
+    _bump: uint256,
+    _limit: uint256,
+) -> (DynArray[uint256, MAX_COINS], bool):
+    """
+    @notice Bound a pool's rates against the ones it last accepted.
+    @dev No coin moves more than _bump, and no two coins move apart by more than
+         _bump, a coin whose rate cannot move counting as unmoved. A coin whose
+         _last is 0 is unseeded and passes through. The second value is whether
+         any reading is further than _limit from its anchor; a _limit of 0 skips
+         that test. Both are FEE_DENOMINATOR (1e10) scaled.
+    @param _rates Rates as the pool's sources report them now
+    @param _last The rates the pool last accepted
+    @param _bump The furthest one update may move a rate
+    @param _limit The furthest a reading may sit from its anchor before it halts the pool
+    @return The bounded rates, and whether they halt the pool
+    """
+    rates: DynArray[uint256, MAX_COINS] = _rates
+    n: uint256 = len(_rates)
+    b: int256 = convert(_bump, int256)
+    fd: int256 = 10**10
+    raw: int256[MAX_COINS] = empty(int256[MAX_COINS])
+    hi: int256 = 0
+    lo: int256 = 0
+    halt: bool = False
+    for i in range(n, bound=MAX_COINS):
+        if _last[i] != 0:
+            u: int256 = convert(_rates[i] * 10**10 / _last[i], int256) - fd
+            if _limit != 0 and abs(u) > convert(_limit, int256):
+                halt = True
+            hi = max(hi, min(u, b))
+            lo = min(lo, max(u, -b))
+            raw[i] = u
+    # every move must fit one window of width _bump that also holds 0, the unmoved coins
+    c: int256 = 0
+    w: int256 = b
+    if hi - lo > b:
+        w = b / 2
+        c = min(max((hi + lo) / 2, -w), w)
+    for i in range(n, bound=MAX_COINS):
+        m: int256 = min(max(raw[i], c - w), c + w)
+        if m != raw[i]:
+            rates[i] = convert(convert(_last[i], int256) * (fd + m) / fd, uint256)
+    return rates, halt
+
+
+@external
+@view
+def rate_now(
+    _coin: address,
+    _asset_type: uint8,
+    _rate_oracle: uint256,
+    _rate_multiplier: uint256,
+    _call_amount: uint256,
+    _scale_factor: uint256,
+) -> uint256:
+    """
+    @notice One coin's rate as its source reports it now, for a pool seeding its bound at deploy.
+    @dev The pool's own rate fetch, for one coin, so a constructor need not carry a second copy.
+         Fails closed: a source that reverts, or answers with anything but 32 bytes, reverts.
+    @param _coin The coin; read for an ERC4626 vault (asset type 3)
+    @param _asset_type The coin's asset type
+    @param _rate_oracle [bytes4 method_id][bytes8 <empty>][bytes20 oracle], for asset type 1
+    @param _rate_multiplier 10 ** (36 - the coin's decimals)
+    @param _call_amount 10 ** the vault's decimals, for asset type 3
+    @param _scale_factor 10 ** (18 - the vault asset's decimals), for asset type 3
+    @return The rate, 1e18 precision, as the pool would compute it
+    """
+    if _asset_type == 1 and _rate_oracle != 0:
+        response: Bytes[32] = raw_call(
+            convert(_rate_oracle % 2**160, address),
+            _abi_encode(_rate_oracle & ORACLE_BIT_MASK),
+            max_outsize=32,
+            is_static_call=True,
+        )
+        assert len(response) == 32
+        return unsafe_div(_rate_multiplier * convert(response, uint256), 10**18)
+    if _asset_type == 3:
+        return unsafe_div(_rate_multiplier * ERC4626(_coin).convertToAssets(_call_amount) * _scale_factor, 10**18)
+    return _rate_multiplier
