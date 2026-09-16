@@ -24,6 +24,7 @@ def fetch_url(network):
 def set_contract_pragma(contract_file, network) -> boa.contracts.vyper.vyper_contract.VyperDeployer:
     with open(contract_file, "r") as f:
         source = f.read()
+    deploy_utils.check_evm_version(source, network)
 
     is_shanghai_chain = any([x in network for x in ["ethereum", "gnosis"]])
 

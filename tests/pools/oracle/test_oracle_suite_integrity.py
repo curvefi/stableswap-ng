@@ -1,13 +1,14 @@
 """The oracle tests themselves must be able to run, and must check what they claim.
 
 Each failure pinned here - an API the pinned titanoboa lacks, a source read from a
-git ref, a selector the oracle recovery misses, a pragma the deploy script cannot
-retarget - lets a test error, skip or pass without checking anything, and no contract
+git ref, a selector the oracle recovery misses, a pool the deploy script
+would ship to a chain that cannot run it - lets a test error, skip or pass without checking anything, and no contract
 test would show it.
 """
 
 import os
 import re
+import sys
 
 import boa
 import pytest
@@ -85,24 +86,37 @@ def test_oracle_recovery_finds_every_selector(
     assert all(o.lower() in found for o in oracles), f"selector 0x{selector}: recovered {sorted(found)}"
 
 
-def test_every_pool_pragma_is_one_the_deploy_script_can_retarget():
-    """The deploy script must understand every evm-version the pools declare.
+def test_the_deploy_script_refuses_cancun_pools_on_chains_without_cancun():
+    """Pools built for cancun must not ship to a chain that rejects its opcodes.
 
-    A pragma set_contract_pragma does not name passes through unchanged, so the pool
-    would ship to chains without the EVM version it was built for.
+    Built for shanghai or paris they exceed the blueprint size limit, so retargeting is
+    not an option: the deploy has to refuse rather than ship bytecode whose every
+    nonreentrant call reverts. deploy_infra itself needs boa_zksync to import, so the
+    check lives in deployment_utils and the script is only checked for calling it.
     """
+    sys.path.insert(0, os.path.join(REPO, "scripts"))
+    import deployment_utils
+
+    with open(os.path.join(REPO, "scripts", "deployments.py"), encoding="utf8") as handle:
+        networks = handle.read()
+    # probed: both reject TLOAD, TSTORE and MCOPY as invalid opcodes. Pinned so an
+    # emptied list cannot make every check below pass without running.
+    assert {"polygon-zkevm", "fantom"} <= set(deployment_utils.CHAINS_WITHOUT_CANCUN)
+    for chain in deployment_utils.CHAINS_WITHOUT_CANCUN:
+        assert f'"{chain}:' in networks, f"{chain} is not a network the deploy scripts know"
+
+    main = os.path.join(REPO, "contracts", "main")
+    for name in ("CurveStableSwapNG.vy", "CurveStableSwapMetaNG.vy"):
+        with open(os.path.join(main, name), encoding="utf8") as handle:
+            source = handle.read()
+        for chain in deployment_utils.CHAINS_WITHOUT_CANCUN:
+            with pytest.raises(ValueError):
+                deployment_utils.check_evm_version(source, f"{chain}:mainnet")
+        deployment_utils.check_evm_version(source, "ethereum:mainnet")  # a cancun chain passes
+
     with open(os.path.join(REPO, "scripts", "deploy_infra.py"), encoding="utf8") as handle:
         script = handle.read()
     begin = script.index("def set_contract_pragma")
     body = script[begin:]
-    body = body[: body.index("\ndef ", 1)] if "\ndef " in body[1:] else body
-    handled = set(re.findall(r"evm-version (\w+)", body))
-
-    used = {}
-    main = os.path.join(REPO, "contracts", "main")
-    for name in ("CurveStableSwapNG.vy", "CurveStableSwapMetaNG.vy"):
-        with open(os.path.join(main, name), encoding="utf8") as handle:
-            m = re.search(r"# pragma evm-version (\w+)", handle.read())
-        used[name] = m.group(1) if m else None
-    unknown = {k: v for k, v in used.items() if v not in handled}
-    assert not unknown, f"deploy_infra.set_contract_pragma handles {sorted(handled)}; pools declare {unknown}"
+    body = body[: body.index("\ndef ", 1)]
+    assert "check_evm_version(source, network)" in body, "set_contract_pragma no longer refuses unsupported chains"
