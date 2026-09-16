@@ -336,9 +336,9 @@ def __init__(
     rate_multipliers = _rate_multipliers
 
     factory = Factory(msg.sender)
+    # immutable, and the rate seed below calls it for every coin, so a factory with no
+    # math implementation cannot deploy a pool
     math = Math(Factory(msg.sender).math_implementation())
-    # math is immutable: without code here the pool would revert on every deposit
-    assert math.address.codesize > 0  # dev: math implementation not set
 
     # the range ramp_A enforces
     assert 0 < _A and _A < MAX_A  # dev: A out of range
