@@ -1,36 +1,32 @@
-"""Forked-Arbitrum tests for the operator-controlled-oracle pool signature.
+"""Forked-Arbitrum record of the operator-controlled-oracle pool signature.
 
-Fourteen pools on the Arbitrum factory share one configuration:
+These assert properties of fourteen pools already deployed on the Arbitrum factory,
+through their own bytecode, and are marked xfail: no change in this repository
+reaches them. The parts of this shape a pool can refuse are pinned against this
+repository's code in test_operator_skim.py and test_rate_safety.py. The fourteen
+share:
 
-  * both coins priced by a `getRate()` oracle that is an UPGRADEABLE proxy, all
+  * both coins priced by a `getRate()` oracle that is an upgradeable proxy, all
     fourteen pointing at a single beacon whose owner is an EOA. Whoever holds that
     key decides what every rate returns, including returning nothing.
-  * `A = 100000` on all fourteen, the maximum, so a given rate move shifts the most
-    value a trade can reach.
-  * `offpeg_fee_multiplier = 0` on all fourteen. Being below FEE_DENOMINATOR this
-    makes `_dynamic_fee` hand back the base fee unchanged, disabling the off-peg
-    escalation that would otherwise make trading a dislocated pool expensive.
+  * `A = 100000`, which flattens the invariant so a rate move reaches more value.
+  * `offpeg_fee_multiplier = 0`, at or below FEE_DENOMINATOR, so `_dynamic_fee`
+    returns the base fee and trading a dislocated pool stays cheap.
 
-All fourteen now revert out of `stored_rates()`, which bricks every rate-dependent
-path. The pair names are not stablecoin pairs — USDC/WETH, WBTC/USDC, ARB/USDC,
-wstETH/WETH — so the oracle was the only thing setting the price.
+The pairs are not stablecoin pairs - USDC/WETH, WBTC/USDC, ARB/USDC, wstETH/WETH -
+so the oracle was the only thing setting the price. All fourteen revert out of
+`stored_rates()`, which also hides them from any screen that classifies pools by
+reading it.
 
-Note what the shape defeats: a screen that finds oracle-backed pools by reading
-`stored_rates()` drops these before it classifies them, because the read reverts.
-They are invisible to the obvious query.
-
-They did not break later. Bisecting each pool's history down from a block that holds
-no code, the first block with code is already a block at which `stored_rates()`
-reverts:
+They were deployed that way: the first block with code already reverts.
 
     usdc_usdt     371,290,609    revert
     usdc_weth_a   368,706,180    revert
     wsteth_weth   379,177,058    revert
     arb_usdc      378,485,405    revert
 
-They were deployed broken and never priced, not for one block. So no implementation
-change reaches them: failing closed is correct here, and any "fallback" that let
-them trade would be inventing a price for assets they have never been able to value.
+Having never priced, failing closed is correct for them; a fallback that let them
+trade would invent a price for assets they have never been able to value.
 
 Set ARBITRUM_RPC_URL to use your own archive node.
 """
@@ -43,16 +39,14 @@ import pytest
 
 RPC = os.environ.get("ARBITRUM_RPC_URL", "https://arbitrum-one.public.blastapi.io")
 
-# These tests fork the chain more than once each, at different blocks, and
-# titanoboa 0.1.10's boa.env.fork rewrites the current env in place. That pulls the
-# state out from under every fixture anchor the boa plugin has stacked, and the
-# anchors then fail to unwind at teardown. Each test manages its own chain state, so
-# the plugin's isolation is switched off here rather than fought.
+# titanoboa 0.1.10's boa.env.fork rewrites the env in place, pulling state out from
+# under the boa plugin's fixture anchors so they fail to unwind at teardown. Each
+# test manages its own chain state, so the plugin's isolation is switched off.
 pytestmark = [
     pytest.mark.ignore_isolation,
     pytest.mark.xfail(
         reason=(
-            "asserts properties of pools already deployed on mainnet; titanoboa's .at() binds the ABI to "
+            "asserts properties of pools already deployed on Arbitrum; titanoboa's .at() binds the ABI to "
             "the deployed bytecode, so no change in this repository can make these pass"
         ),
         strict=False,
@@ -100,10 +94,9 @@ def _fork():
 def _oracles(address):
     """Recover the pool's rate oracle addresses from its immutables.
 
-    Vyper appends immutables to the runtime code as whole 32-byte words, so the
-    words are read aligned from the end of the code. Matching at any offset instead
-    lets a selector that ends in a 0 nibble start a match half a byte early and
-    swallow the real word - one selector in sixteen was silently dropped that way.
+    Vyper appends immutables to the runtime code as whole 32-byte words, so words
+    are read aligned from the end of the code. Matching at any offset would let a
+    selector ending in a 0 nibble start half a byte early and swallow the real word.
     """
     code = boa.env.get_code(address).hex().lower()
     found = set()
@@ -154,16 +147,15 @@ def test_offpeg_fee_escalation_is_enabled(name):
 
 @pytest.mark.parametrize("name", list(POOLS))
 def test_pricing_survives_oracle_failure(swap_deployer, name):
-    """An oracle that reverts must not take the pool down with it.
+    """Records that a reverting oracle takes every rate-dependent path down.
 
-    `_fetch_rates` calls out with `raw_call(..., is_static_call=True)` and no failure
-    handling, so a reverting oracle propagates through `stored_rates` into `get_dy`,
-    `get_virtual_price`, `calc_withdraw_one_coin` and every exchange path. Balances
-    and totalSupply keep answering, so the pool reads as broken rather than empty,
-    and proportional `remove_liquidity` is the only exit left.
+    A reverting oracle propagates through `stored_rates` into `get_dy`,
+    `get_virtual_price`, `calc_withdraw_one_coin` and every exchange path, while
+    balances keep answering, so proportional `remove_liquidity` is the only exit.
 
-    Falling back to the last accepted rate would turn this into a freeze instead —
-    safe precisely because a per-update cap bounds how stale that rate can be.
+    The assertion is the property these pools lack, not a target: for a source that
+    has never priced, failing closed is correct, and this repository's pools also
+    fail closed on a broken source rather than falling back to a stale rate.
     """
     _fork()
     pool = swap_deployer.at(POOLS[name])

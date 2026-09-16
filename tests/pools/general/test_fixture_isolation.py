@@ -1,13 +1,7 @@
-"""A function-scoped fixture's changes to the chain must not outlive its test.
+"""A function fixture's block/timestamp changes must not outlive its test.
 
-titanoboa anchors every fixture and unwinds them in reverse. Module-scoped fixtures
-that are first created lazily, inside a function-scoped chain, sit above that test's
-own function fixtures on the anchor stack - and then the function fixtures' changes
-are not unwound when the test ends. The contract state is, but block number and
-timestamp are not.
-
-This has to be its own module: the leak needs these tests to be the first to trigger
-the module-scoped implementation fixtures.
+They leak when a module-scoped fixture is first created inside that test's fixture chain, so this
+module must be the first thing to request the implementations.
 """
 
 import boa
@@ -22,6 +16,7 @@ def jumps_the_chain():
     return boa.env.evm.patch.block_number
 
 
+# requests the session fixtures up front, so only the module-scoped implementations can still be created late
 def test_0_record_the_starting_block(
     amm_deployer,
     meta_deployer,
@@ -36,14 +31,6 @@ def test_0_record_the_starting_block(
     zero_address,
     initial_balance,
 ):
-    """Create every session fixture the pool chain uses, before the test that moves the chain.
-
-    Any longer-lived fixture created lazily inside a test's fixture chain traps that
-    test's function fixtures on titanoboa's anchor stack - session fixtures included,
-    and that part predates this change. Creating them all here leaves the
-    module-scoped implementations as the only thing that could still be created
-    late, which is what this module isolates.
-    """
     SEEN["start"] = boa.env.evm.patch.block_number
 
 
@@ -54,7 +41,6 @@ def test_1_a_fixture_moves_the_chain(jumps_the_chain, swap):
 
 
 def test_2_the_move_does_not_leak():
-    """(#20) With module-scoped implementations, block 1001 leaked into this test."""
     if "jumped_to" not in SEEN:
         pytest.skip("depends on the previous test having run first")
     assert boa.env.evm.patch.block_number == SEEN["start"], (

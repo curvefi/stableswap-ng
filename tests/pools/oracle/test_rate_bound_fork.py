@@ -1,18 +1,18 @@
-"""Forked-mainnet tests for the oracle rate bound.
+"""Forked-mainnet record of unbounded oracle steps in deployed pools.
 
-These fail against the current implementation, on live pools rather than fixtures,
-because the failures are real. As of block 25,933,995 there are 18 StableSwap-NG
-pools whose rate oracle steps further in a single block than the pool's own fee can
-absorb; the two used here are among them.
+These assert properties of two StableSwap-NG pools already deployed on mainnet,
+through their own bytecode, and are marked xfail: no change in this repository
+reaches them. As of block 25,933,995, 18 StableSwap-NG pools had a rate oracle that
+stepped further in one block than the pool's fee can absorb; these two are among
+them. The bound this repository adds is pinned in test_rate_safety.py.
 
-Background. A sandwich around one rate update costs the attacker two fees, so an
-update stays non-arbitrageable exactly while it is within `2 * fee`. That threshold
-is not a convention but a measured breakeven, confirmed three ways: by grid
-simulation over the pool math, by a forked-EVM measurement on real balances, and by
-replaying 5,493 real trades.
+A swap sandwich around one update costs two fees, so these check against `2 * fee`.
+This repository bounds an update more tightly - one fee in a two-coin pool, never
+above 1% - because a single-sided deposit and proportional withdrawal cash a step
+more cheaply than a sandwich.
 
 Each case names the block the step lands in, so pool state and oracle value are both
-genuine and nothing is mocked. Set ETH_RPC_URL to use your own archive node.
+genuine. Set ETH_RPC_URL to use your own archive node.
 """
 
 import os
@@ -22,7 +22,7 @@ import pytest
 
 # Real single-block steps, located by narrowing a 30-day window to block resolution.
 #   step   measured relative move across `block - 1` -> `block`
-#   bound  2 * fee, the largest non-arbitrageable single update
+#   bound  2 * fee, the breakeven for a swap sandwich
 POOLS = {
     "ynusdx_scrvusd": dict(
         pool="0xa256d38e73cce6e00447fa64a95069ea7d32f841", block=25_787_886, step=0.00171369, bound=0.0002
@@ -34,11 +34,9 @@ POOLS = {
 
 RPC = os.environ.get("ETH_RPC_URL", "https://eth.drpc.org")
 
-# These tests fork the chain more than once each, at different blocks, and
-# titanoboa 0.1.10's boa.env.fork rewrites the current env in place. That pulls the
-# state out from under every fixture anchor the boa plugin has stacked, and the
-# anchors then fail to unwind at teardown. Each test manages its own chain state, so
-# the plugin's isolation is switched off here rather than fought.
+# titanoboa 0.1.10's boa.env.fork rewrites the env in place, pulling state out from
+# under the boa plugin's fixture anchors so they fail to unwind at teardown. Each
+# test manages its own chain state, so the plugin's isolation is switched off.
 pytestmark = [
     pytest.mark.ignore_isolation,
     pytest.mark.xfail(
@@ -69,10 +67,9 @@ def _at(deployer, spec, block):
 def _deal(token, account, amount):
     """Set an ERC20 balance on a fork by finding the slot its balances live in.
 
-    boa.deal does this, but the pinned titanoboa does not have it. Solidity keys a
-    mapping entry at keccak(key . slot) and Vyper at keccak(slot . key); both are
-    tried over the first 32 slots, and every probe is put back if it misses. Returns
-    False for a token that keeps balances anywhere else.
+    The pinned titanoboa has no boa.deal. Solidity keys a mapping entry at
+    keccak(key . slot) and Vyper at keccak(slot . key); both are tried over the
+    first 32 slots and each missed probe is restored. False if none matches.
     """
     from eth_utils import keccak
 
@@ -92,9 +89,7 @@ def _deal(token, account, amount):
 def _fund(erc20_deployer, coin, account, amount):
     """Fund an account, skipping when the token's balance slot cannot be found.
 
-    Some of these coins are proxies or compute supply on the fly. Skipping keeps the
-    distinction between "cannot fund" and "the pool is safe" - the two must never
-    look alike.
+    Skipping keeps "cannot fund" from ever looking like "the pool is safe".
     """
     if not _deal(erc20_deployer.at(coin), account, amount):
         pytest.skip(f"cannot fund {coin}: no balance slot found")
@@ -139,9 +134,8 @@ def test_single_block_step_stays_within_two_fee(swap_deployer, name):
 def test_step_cannot_be_sandwiched(swap_deployer, erc20_deployer, name):
     """Bracketing the step must not pay.
 
-    Buys in immediately before the update and sells back immediately after, over
-    the real exchange path and real balances. Profit is denominated in the input
-    coin, so anything above zero came out of the LPs.
+    Buys in the block before the step and sells back in the block of it. Profit is
+    in the input coin, so anything above zero came out of the LPs.
     """
     spec = POOLS[name]
     attacker = boa.env.generate_address()
@@ -172,9 +166,8 @@ def test_step_cannot_be_sandwiched(swap_deployer, erc20_deployer, name):
 def test_quote_is_honoured_at_execution(swap_deployer, name):
     """A quote must still hold when the trade lands.
 
-    `_stored_rates` is read inside the trade, so a taker is priced at whatever the
-    oracle returns on execution rather than at what they were quoted. An aggregator
-    quoting one block ahead cannot bind the fill, and the gap is the whole step.
+    The deployed pools read the oracle inside the trade, so an aggregator quoting
+    one block ahead cannot bind the fill, and the gap is the whole step.
     """
     spec = POOLS[name]
 
