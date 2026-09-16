@@ -88,6 +88,20 @@ interface Math:
         _n_coins: uint256
     ) -> uint256: view
     def exp(_power: int256) -> uint256: view
+    def bound_rates(
+        _rates: DynArray[uint256, MAX_COINS],
+        _last: DynArray[uint256, MAX_COINS],
+        _bump: uint256,
+        _limit: uint256,
+    ) -> (DynArray[uint256, MAX_COINS], bool): view
+    def rate_now(
+        _coin: address,
+        _asset_type: uint8,
+        _rate_oracle: uint256,
+        _rate_multiplier: uint256,
+        _call_amount: uint256,
+        _scale_factor: uint256,
+    ) -> uint256: view
 
 interface ERC1271:
     def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
@@ -199,6 +213,8 @@ admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_FEE: constant(uint256) = 10 ** 4  # 0.0001%; a zero fee gives a zero bound
 BUMP_CEILING: constant(uint256) = 10 ** 8  # 1%, the loosest any pool may be set
+HALT_THRESHOLD: constant(uint256) = 500000000  # 5%: a reading this far from its anchor halts trading
+HALTED: constant(uint256) = 2**255  # flag in last_rates_block: a halt was recorded
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -346,6 +362,8 @@ def __init__(
     _scale_factor: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _rate_oracles: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _has_rate_source: bool = False
+    # seeded at deploy with each source's reading; a coin reading zero stays unseeded
+    _seed: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if i < N_COINS_128 - 1:
@@ -368,10 +386,17 @@ def __init__(
             _call_amount.append(0)
             _scale_factor.append(0)
 
+        _seed.append(math.rate_now(
+            _coins[i], _asset_types[i], _rate_oracles[i], _rate_multipliers[i], _call_amount[i], _scale_factor[i]
+        ))
+
     call_amount = _call_amount
     scale_factor = _scale_factor
     rate_oracles = _rate_oracles
     has_rate_source = _has_rate_source
+    if _has_rate_source:
+        self.last_rates = _seed
+        self.last_rates_block = block.number - 1  # deploy block stays unfrozen
 
     # ----------------------------- ERC20 stuff ------------------------------
 
@@ -522,9 +547,11 @@ def _max_rate_bump() -> uint256:
     """
     @notice The furthest one update may move a rate, FEE_DENOMINATOR-scaled.
     @dev Read from the current fee, so a fee change moves the bound with it.
-         fee * N / (N - 1) is the break-even for a round trip through the pool:
-         2 * fee for a swap in a two-coin pool, and tighter in larger pools, where a
-         single-sided deposit and withdrawal cost less than a swap does.
+         fee * N / (2 * (N - 1)) is the break-even for the cheapest way to cash a
+         rate pushed for one block: a single-sided deposit, which pays about half a
+         fee, then a proportional withdrawal, which reads no rates and pays nothing.
+         A one-way swap into the pushed rate pays a whole fee and breaks even at
+         fee, which this never exceeds.
 
          What this buys is protection from a rate pushed for one block - a flash
          donation to a vault, say. It does not stop a trader who knows a lasting
@@ -533,30 +560,57 @@ def _max_rate_bump() -> uint256:
          than one bound per block, and that lag is open to anyone.
 
          Both have the same answer, and it is the fee rather than this function: a
-         pool whose fee is at least half its oracle's largest step has a bound at
-         least as large as the step, so a genuine step lands in one update and a
-         position taken ahead of it does not cover two fees.
+         pool whose bound is at least its oracle's largest step - in a two-coin
+         pool, a fee at least the step - reprices a genuine step in one update, and
+         a position taken ahead of it does not cover two fees.
     """
-    return min(self.fee * N_COINS / (N_COINS - 1), BUMP_CEILING)
+    return min(self.fee * N_COINS / (2 * (N_COINS - 1)), BUMP_CEILING)
 
 
 @view
 @internal
-def _bounded_rates() -> DynArray[uint256, MAX_COINS]:
+def _rates_this_block(_poke: bool) -> (DynArray[uint256, MAX_COINS], uint256):
     """
-    @notice Rates bounded against the last accepted ones.
-    """
-    rates: DynArray[uint256, MAX_COINS] = self._fetch_rates()
-    last: DynArray[uint256, MAX_COINS] = self.last_rates
-    if len(last) == 0:
-        return rates  # first write seeds; there is nothing yet to bound against
+    @notice The rates this block prices at, and the last_rates_block to record with them.
+    @dev Frozen once a block has accepted them, so a trade already in flight cannot
+         be repriced underneath it; the block to record is then 0, since there is
+         nothing new to record. A trade reverts while the pool is halted, and in a
+         block whose rates would halt it; poke_rates records the halt instead.
 
+         No coin moves more than one bound, and no two coins move apart by more
+         than one bound, an unrated or unseeded coin counting as unmoved. Bounded
+         one coin at a time, two rates pushed in opposite directions would move
+         apart by twice the bound and pay out as one step twice that size.
+
+         A reading further from its anchor than HALT_THRESHOLD halts the pool rather
+         than being clamped into a near-par rate for a coin that has collapsed.
+         Once poke_rates has recorded a halt it stands until every reading is back
+         within two bounds of its anchor, so trading resumes on a rate at most one
+         bound from its source.
+
+         While the pool is empty nobody is exposed to the rate: the bound accrues
+         with the blocks since the last update, up to BUMP_CEILING, and nothing
+         halts, so a pool that sat empty while its source moved is never locked.
+    """
+    lrb: uint256 = self.last_rates_block
+    if lrb & ~HALTED >= block.number:
+        assert lrb < HALTED and not _poke  # dev: rates halted, or already set this block
+        return self.last_rates, 0
+    _halted: bool = lrb >= HALTED
     bump: uint256 = self._max_rate_bump()
-    for i in range(N_COINS_128, bound=MAX_COINS_128):
-        if (asset_types[i] == 1 and rate_oracles[i] != 0) or asset_types[i] == 3:
-            max_change: uint256 = last[i] * bump / FEE_DENOMINATOR
-            rates[i] = min(max(rates[i], unsafe_sub(last[i], max_change)), last[i] + max_change)
-    return rates
+    limit: uint256 = HALT_THRESHOLD
+    if _halted:
+        limit = 2 * bump
+    if self.total_supply == 0:
+        bump = min(bump * (block.number - (self.last_rates_block & ~HALTED)), BUMP_CEILING)
+        limit = 0
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    halt: bool = False
+    rates, halt = math.bound_rates(self._fetch_rates(), self.last_rates, bump, limit)
+    if halt:
+        assert _poke  # dev: rates halted
+        return rates, block.number | HALTED
+    return rates, block.number
 
 
 @view
@@ -564,14 +618,14 @@ def _bounded_rates() -> DynArray[uint256, MAX_COINS]:
 def _stored_rates() -> DynArray[uint256, MAX_COINS]:
     """
     @notice The rates a trade in this block would be priced at.
-    @dev Frozen once a block has accepted them, so a trade already in flight cannot
-         be repriced underneath it, and bounded across blocks by _max_rate_bump.
+    @dev See _rates_this_block. Reverts while the pool is halted.
     """
     if not has_rate_source:
         return rate_multipliers
-    if self.last_rates_block >= block.number:
-        return self.last_rates
-    return self._bounded_rates()
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(False)
+    return rates
 
 
 @internal
@@ -584,11 +638,12 @@ def _stored_rates_w() -> DynArray[uint256, MAX_COINS]:
     """
     if not has_rate_source:
         return rate_multipliers
-    if self.last_rates_block >= block.number:
-        return self.last_rates
-    rates: DynArray[uint256, MAX_COINS] = self._bounded_rates()
-    self.last_rates = rates
-    self.last_rates_block = block.number
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(False)
+    if lrb != 0:
+        self.last_rates = rates
+        self.last_rates_block = lrb
     return rates
 
 
@@ -1757,6 +1812,24 @@ def max_rate_bump() -> uint256:
     @dev Derived from the current fee and the number of coins; see _max_rate_bump.
     """
     return self._max_rate_bump()
+
+
+@external
+@nonreentrant('lock')
+def poke_rates():
+    """
+    @notice Walk a halted pool's rates one bound towards their sources
+    @dev A halting commit reverts with its trade, so without this a genuine step past
+         the halt threshold would halt the pool for good. It moves the anchor exactly
+         as far as a trade would, once per block. An empty pool never halts, and is
+         not walked: its anchor moves only with a deposit.
+    """
+    assert self.total_supply != 0  # dev: nothing to walk
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(True)
+    self.last_rates = rates
+    self.last_rates_block = lrb
 
 
 @external
