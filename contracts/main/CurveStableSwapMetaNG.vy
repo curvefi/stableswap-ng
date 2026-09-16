@@ -1,6 +1,6 @@
 # pragma version 0.3.10
 # pragma optimize codesize
-# pragma evm-version paris
+# pragma evm-version cancun
 """
 @title CurveStableSwapMetaNG
 @author Curve.Fi
@@ -217,6 +217,7 @@ math: immutable(Math)
 factory: immutable(Factory)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_type: immutable(uint8)
+coin0_rated: immutable(bool)  # coin 0 is priced by an oracle or an ERC4626 vault
 pool_contains_rebasing_tokens: immutable(bool)
 stored_balances: uint256[N_COINS]
 
@@ -226,6 +227,8 @@ fee: public(uint256)  # fee * 1e10
 offpeg_fee_multiplier: public(uint256)  # * 1e10
 admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
+MIN_FEE: constant(uint256) = 10 ** 4  # 0.0001%; a zero fee gives a zero bound
+BUMP_CEILING: constant(uint256) = 10 ** 8  # 1%, the loosest any pool may be set
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -284,6 +287,10 @@ NAME_HASH: immutable(bytes32)
 CACHED_CHAIN_ID: immutable(uint256)
 salt: public(immutable(bytes32))
 CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
+
+# --------------------------- Oracle rate bound ------------------------------
+last_rate: uint256  # coin 0's last accepted rate; coin 1 is always read live
+last_rates_block: uint256
 
 
 # ------------------------------ AMM Setup -----------------------------------
@@ -374,6 +381,9 @@ def __init__(
 
     factory = Factory(msg.sender)
 
+    assert 0 < _A and _A < MAX_A  # dev: A out of range
+    assert MIN_FEE < _fee and _fee <= MAX_FEE  # dev: fee out of range
+    assert _offpeg_fee_multiplier > FEE_DENOMINATOR  # dev: offpeg fee disabled
     A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
     self.future_A = A
@@ -390,6 +400,7 @@ def __init__(
     self.stored_balances = [0, 0]
 
     rate_oracle = convert(_method_ids[0], uint256) * 2**224 | convert(_oracles[0], uint256)
+    coin0_rated = (_asset_types[0] == 1 and rate_oracle != 0) or _asset_types[0] == 3
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -525,15 +536,27 @@ def _transfer_out(
 
 @view
 @internal
-def _stored_rates() -> uint256[N_COINS]:
+def _base_vp() -> uint256:
     """
-    @notice Gets rate multipliers for each coin.
-    @dev If the coin has a rate oracle that has been properly initialised,
-         this method queries that rate by static-calling an external
-         contract.
+    @notice Coin 1's rate: the base pool's virtual price, read live.
+    @dev Fails closed. The base pool's get_virtual_price is @nonreentrant, so its
+         reverting is also how a read-only-reentrancy guard shows up, and catching
+         it would swallow the guard. Never cached and never bounded: for a swap
+         between two base coins it is the only thing that moves, so a metapool
+         that trailed it would understate its own LP value.
     """
-    rates: uint256[N_COINS] = [rate_multiplier, StableSwap(BASE_POOL).get_virtual_price()]
+    return StableSwap(BASE_POOL).get_virtual_price()
 
+
+@view
+@internal
+def _coin0_rate() -> uint256:
+    """
+    @notice Coin 0's rate as its source reports it now.
+    @dev Fails closed: a source that reverts, or answers with anything but 32
+         bytes, reverts the call rather than degrading to a remembered rate.
+         Proportional remove_liquidity reads no rates, so LPs can always leave.
+    """
     if asset_type == 1 and not rate_oracle == 0:
 
         # NOTE: fetched_rate is assumed to be 10**18 precision
@@ -544,19 +567,84 @@ def _stored_rates() -> uint256[N_COINS]:
             is_static_call=True,
         )
         assert len(oracle_response) == 32
-        fetched_rate: uint256 = convert(oracle_response, uint256)
+        return unsafe_div(rate_multiplier * convert(oracle_response, uint256), PRECISION)
+
+    if asset_type == 3:  # ERC4626
 
         # rates[0] * fetched_rate / PRECISION
-        rates[0] = unsafe_div(rates[0] * fetched_rate, PRECISION)
-
-    elif asset_type == 3:  # ERC4626
-
-        # rates[0] * fetched_rate / PRECISION
-        rates[0] = unsafe_div(
-            rates[0] * ERC4626(coins[0]).convertToAssets(call_amount) * scale_factor,
+        return unsafe_div(
+            rate_multiplier * ERC4626(coins[0]).convertToAssets(call_amount) * scale_factor,
             PRECISION
         )  # 1e18 precision
 
+    return rate_multiplier
+
+
+@view
+@internal
+def _max_rate_bump() -> uint256:
+    """
+    @notice The furthest one update may move coin 0's rate, FEE_DENOMINATOR-scaled.
+    @dev Read from the current fee, so a fee change moves the bound with it. 2 * fee
+         is the break-even for a swap round trip in a two-coin pool.
+
+         What this buys is protection from a rate pushed for one block. It does not
+         stop a trader who knows a lasting step is coming, nor reprice a genuine
+         step faster than one bound per block; a fee of at least half the oracle's
+         largest step answers both, since the bound then covers the step.
+    """
+    return min(2 * self.fee, BUMP_CEILING)
+
+
+@view
+@internal
+def _bounded_rate0() -> uint256:
+    """
+    @notice Coin 0's rate bounded against the last accepted one.
+    """
+    observed: uint256 = self._coin0_rate()
+    last: uint256 = self.last_rate
+    if last == 0:
+        return observed  # first write seeds; there is nothing yet to bound against
+    max_change: uint256 = last * self._max_rate_bump() / FEE_DENOMINATOR
+    return min(max(observed, unsafe_sub(last, max_change)), last + max_change)
+
+
+@view
+@internal
+def _stored_rates() -> uint256[N_COINS]:
+    """
+    @notice The rates a trade in this block would be priced at.
+    @dev Coin 0 is frozen once a block has accepted it, and bounded across blocks.
+         The freeze is checked before the source is queried, so a frozen call does
+         not pay for an oracle read it would only throw away.
+    """
+    rates: uint256[N_COINS] = [rate_multiplier, self._base_vp()]
+    if not coin0_rated:
+        return rates
+    if self.last_rates_block >= block.number:
+        rates[0] = self.last_rate
+        return rates
+    rates[0] = self._bounded_rate0()
+    return rates
+
+
+@internal
+def _stored_rates_w() -> uint256[N_COINS]:
+    """
+    @notice _stored_rates, accepting coin 0's rate as the new starting point.
+    @dev Called from every path that moves value through this pool, including a
+         one-coin withdrawal. A pool whose coin 0 carries no rate keeps no cache.
+    """
+    rates: uint256[N_COINS] = [rate_multiplier, self._base_vp()]
+    if not coin0_rated:
+        return rates
+    if self.last_rates_block >= block.number:
+        rates[0] = self.last_rate
+        return rates
+    rates[0] = self._bounded_rate0()
+    self.last_rate = rates[0]
+    self.last_rates_block = block.number
     return rates
 
 
@@ -674,7 +762,15 @@ def exchange_underlying(
     """
     assert _receiver != empty(address)  # dev: do not send tokens to zero_address
 
-    rates: uint256[N_COINS] = self._stored_rates()
+    # A base-to-base swap trades only on the base pool and never prices against
+    # this pool's rates, so it must not commit one. It is free and works on an
+    # empty metapool, so committing here let anyone seed coin 0's bound with a
+    # pushed rate that the first depositor then inherited.
+    rates: uint256[N_COINS] = empty(uint256[N_COINS])
+    if i > 0 and j > 0:
+        rates = self._stored_rates()
+    else:
+        rates = self._stored_rates_w()
     old_balances: uint256[N_COINS] = self._balances()
     xp: uint256[N_COINS]  = self._xp_mem(rates, old_balances)
 
@@ -767,7 +863,7 @@ def add_liquidity(
 
     amp: uint256 = self._A()
     old_balances: uint256[N_COINS] = self._balances()
-    rates: uint256[N_COINS] = self._stored_rates()
+    rates: uint256[N_COINS] = self._stored_rates_w()
 
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
@@ -906,7 +1002,9 @@ def remove_liquidity_one_coin(
     amp: uint256 = empty(uint256)
     D: uint256 = empty(uint256)
 
-    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i)
+    # the write variant: a one-coin withdrawal moves value, so it has to commit the
+    # block's rate like every other such path, or the freeze never engages
+    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i, self._stored_rates_w())
     assert dy >= _min_received, "Not enough coins removed"
 
     # fee * admin_fee / FEE_DENOMINATOR
@@ -939,7 +1037,7 @@ def remove_liquidity_imbalance(
     """
 
     amp: uint256 = self._A()
-    rates: uint256[N_COINS] = self._stored_rates()
+    rates: uint256[N_COINS] = self._stored_rates_w()
     old_balances: uint256[N_COINS] = self._balances()
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
     new_balances: uint256[N_COINS] = old_balances
@@ -1159,7 +1257,7 @@ def _exchange(
     assert i != j  # dev: coin index out of range
     assert _dx > 0  # dev: do not exchange 0 coins
 
-    rates: uint256[N_COINS] = self._stored_rates()
+    rates: uint256[N_COINS] = self._stored_rates_w()
     old_balances: uint256[N_COINS] = self._balances()
     xp: uint256[N_COINS] = self._xp_mem(rates, old_balances)
 
@@ -1291,7 +1389,8 @@ def get_D_mem(
 @internal
 def _calc_withdraw_one_coin(
     _burn_amount: uint256,
-    i: int128
+    i: int128,
+    rates: uint256[N_COINS]
 ) -> (
     uint256,
     uint256,
@@ -1306,7 +1405,6 @@ def _calc_withdraw_one_coin(
 
     # get pool state
     amp: uint256 = self._A()
-    rates: uint256[N_COINS] = self._stored_rates()
     xp: uint256[N_COINS] = self._xp_mem(rates, self._balances())
     D0: uint256 = math.get_D([xp[0], xp[1]], amp, N_COINS)
 
@@ -1728,7 +1826,7 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256:
     @param i Index value of the coin to withdraw
     @return Amount of coin received
     """
-    return self._calc_withdraw_one_coin(_burn_amount, i)[0]
+    return self._calc_withdraw_one_coin(_burn_amount, i, self._stored_rates())[0]
 
 
 @view
@@ -1753,7 +1851,9 @@ def get_virtual_price() -> uint256:
          contains rebasing tokens. For integrators, caution is advised.
     @return LP token virtual price normalized to 1e18
     """
-    xp: uint256[N_COINS] = self._xp_mem(self._stored_rates(), self._balances())
+    # Valued at the rates the sources report now, not the bounded trading rate:
+    # LP redeems proportionally for the underlying coins, which reads no rates.
+    xp: uint256[N_COINS] = self._xp_mem([self._coin0_rate(), self._base_vp()], self._balances())
     D: uint256 = math.get_D([xp[0], xp[1]], self._A(), N_COINS)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
@@ -1819,6 +1919,16 @@ def stored_rates() -> DynArray[uint256, MAX_COINS]:
 
 @view
 @external
+def max_rate_bump() -> uint256:
+    """
+    @notice The furthest one update may move coin 0's rate, FEE_DENOMINATOR-scaled.
+    @dev Derived from the current fee; see _max_rate_bump.
+    """
+    return self._max_rate_bump()
+
+
+@view
+@external
 def dynamic_fee(i: int128, j: int128) -> uint256:
     """
     @notice Return the fee for swapping between `i` and `j`
@@ -1875,10 +1985,11 @@ def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
     assert msg.sender == factory.admin()
 
     # set new fee:
-    assert _new_fee <= MAX_FEE
+    assert MIN_FEE < _new_fee and _new_fee <= MAX_FEE
     self.fee = _new_fee
 
     # set new offpeg_fee_multiplier:
+    assert _new_offpeg_fee_multiplier > FEE_DENOMINATOR  # dev: offpeg fee disabled
     assert _new_offpeg_fee_multiplier * _new_fee <= MAX_FEE * FEE_DENOMINATOR  # dev: offpeg multiplier exceeds maximum
     self.offpeg_fee_multiplier = _new_offpeg_fee_multiplier
 
