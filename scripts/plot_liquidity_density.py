@@ -22,15 +22,15 @@ Note: the on-chain `A` field equals A_math * A_PRECISION (A_PRECISION = 100).
 This script uses mathematical A directly.
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def get_y(A: float, D: float, x: np.ndarray, n: int = 2) -> np.ndarray:
     """Solve the n-coin Stableswap invariant for y given x. n=2 reduces to a quadratic."""
     Ann = A * n**n
-    S = x          # sum of all balances except y
-    P = x          # product of all balances except y (n=2)
+    S = x  # sum of all balances except y
+    P = x  # product of all balances except y (n=2)
     b = S + D / Ann
     c = D ** (n + 1) / (n**n * P * Ann)
     # y^2 + (b - D) y - c = 0
@@ -46,7 +46,7 @@ def liquidity_density(A: float, D: float, x: np.ndarray, n: int = 2):
 
     df_dx = Ann + D ** (n + 1) / (n**n * x * prod)
     df_dy = Ann + D ** (n + 1) / (n**n * y * prod)
-    p = df_dy / df_dx                  # |dx/dy|
+    p = df_dy / df_dx  # |dx/dy|
 
     # dp/dx along the invariant — analytic, so we don't rely on a sampled grid.
     # Let g = D^(n+1) / (n^n * x * y * prod) = D^(n+1) / (n^n * (x y)^2) for n=2,
@@ -54,7 +54,7 @@ def liquidity_density(A: float, D: float, x: np.ndarray, n: int = 2):
     #   df_dx = Ann + D^3 / (4 x^2 y),  df_dy = Ann + D^3 / (4 x y^2)
     # dy/dx = -df_dx / df_dy.
     # Then differentiate p = df_dy / df_dx w.r.t. x using y = y(x).
-    K = D ** 3 / 4.0
+    K = D**3 / 4.0
     a_x = Ann + K / (x**2 * y)
     a_y = Ann + K / (x * y**2)
     dy_dx = -a_x / a_y
@@ -85,8 +85,7 @@ def main():
 
     # Constant-product baseline: L = 1/4 everywhere (Uniswap V2).
     for ax in (ax1, ax2):
-        ax.axhline(0.25, color="gray", linestyle="--", linewidth=1,
-                   label="Uniswap V2 (L = 1/4)")
+        ax.axhline(0.25, color="gray", linestyle="--", linewidth=1, label="Uniswap V2 (L = 1/4)")
         ax.set_xlabel("price  p = dx/dy")
         ax.set_ylabel("liquidity density  L = 1 / [(x + p y) (dp/dx) / p]")
         ax.grid(True, which="both", alpha=0.3)
