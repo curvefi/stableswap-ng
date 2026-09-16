@@ -9,8 +9,13 @@ from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils.tokens import mint_for_testing
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def deployer():
+    """Module-scoped to match `boa_setup`, which swaps in a fresh env per module.
+
+    Only ever used as a prank sender for deployments, never asserted on, so sharing
+    it across a module changes nothing a test can observe.
+    """
     return boa.env.generate_address()
 
 
