@@ -831,25 +831,24 @@ def test_the_bound_never_exceeds_its_ceiling(plain, owner):
 
 
 def test_empty_pool_does_not_anchor_a_manipulated_seed(meta):
-    """A rate accepted while the pool holds nothing must not bind later depositors.
+    """A base-to-base swap must not commit the metapool's rates.
 
-    A base-to-base swap is free on an empty metapool and never prices against its
-    rates. If it committed coin 0's rate, anyone could move the anchor to a pushed rate
-    that the first real deposit then inherits.
+    It is free, works on an empty metapool and never prices against this pool's rates.
+    If it committed, anyone could fix a block's rate at a pushed value for the first
+    real deposit to inherit. A commit freezes the block, so it shows up directly: an
+    oracle move later in the same block stops reaching stored_rates.
     """
     m, base, meta_coin, base_coins, oracle, _, lp = meta(seed=False)
     atk = boa.env.generate_address()
     mint_for_testing(atk, 10**18, base_coins[0], False)
     base_coins[0].approve(m.address, 2**256 - 1, sender=atk)
 
-    oracle.set_exchange_rate(2 * 10**18)
     m.exchange_underlying(1, 2, 10**18, 0, sender=atk)  # base-to-base: never touches the metapool
-    oracle.set_exchange_rate(10**18)
-    boa.env.time_travel(blocks=1)
+    before = m.stored_rates()[0]
+    half_bound = m.max_rate_bump() // 2
+    oracle.set_exchange_rate(oracle.exchangeRate() * (FEE_DENOMINATOR + half_bound) // FEE_DENOMINATOR)
 
-    assert (
-        m.stored_rates()[0] <= 10**18 * 101 // 100
-    ), f"an empty metapool kept a pushed seed: rate {m.stored_rates()[0] / 1e18:.4f} with the oracle at 1.0"
+    assert m.stored_rates()[0] > before, "a base-to-base swap froze the metapool's rates for the block"
 
 
 # <---------------------   No cost where nothing is rated   --------------------->
@@ -901,9 +900,9 @@ def test_factory_without_math_cannot_deploy_a_plain_pool(
     """A plain pool must not deploy with no math contract behind it.
 
     math is immutable and read from the factory at construction, so a pool deployed
-    while the factory's math_implementation is unset would revert on every deposit.
-    The constructor's rate seed also calls math, so the deploy reverts even without
-    the explicit codesize check.
+    while the factory's math_implementation is unset would register and then revert on
+    every deposit. The constructor seeds every coin's rate through math, and that call
+    reverts when math has no code, so the deploy fails before the pool can register.
     """
     with boa.env.prank(deployer):
         bare = factory_deployer.deploy(fee_receiver, owner)
@@ -926,3 +925,35 @@ def test_factory_without_math_cannot_deploy_a_plain_pool(
             [zero_address, zero_address],
         )
     ), "a plain pool deployed with no math implementation"
+
+
+def test_factory_without_math_cannot_deploy_a_metapool(
+    deployer,
+    owner,
+    fee_receiver,
+    factory_deployer,
+    views_implementation,
+    amm_implementation_meta,
+    erc20_deployer,
+    zero_address,
+    plain,
+):
+    """A metapool must not deploy with no math contract behind it either.
+
+    The factory hands the metapool its math_implementation as a constructor argument,
+    unchecked. The metapool seeds coin 0's rate through math, so a factory with none set
+    fails the deploy instead of registering a pool that reverts on every deposit.
+    """
+    base, _, _, _ = plain()  # a working base pool, from the factory that does have math
+    with boa.env.prank(deployer):
+        bare = factory_deployer.deploy(fee_receiver, owner)
+    with boa.env.prank(owner):
+        bare.set_views_implementation(views_implementation.address)
+        bare.set_metapool_implementations(0, amm_implementation_meta.address)
+        bare.add_base_pool(base.address, base.address, [0, 0], 2)
+    coin = erc20_deployer.deploy("M", "M", 18)
+    assert _reverts(
+        lambda: bare.deploy_metapool(
+            base.address, "m", "m", coin.address, 1000, 1_000_000, OFFPEG, 866, 0, 0, b"", zero_address
+        )
+    ), "a factory with no math implementation deployed a metapool"
