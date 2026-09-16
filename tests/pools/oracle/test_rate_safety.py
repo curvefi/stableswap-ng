@@ -34,6 +34,7 @@ transfer look like an oracle call and would kill the token along with the oracle
 
 import boa
 import pytest
+from boa.contracts.base_evm_contract import BoaError
 from eth_utils import function_signature_to_4byte_selector
 
 from tests.utils.tokens import mint_for_testing
@@ -66,10 +67,15 @@ def _called(computation):
     return seen
 
 
-def _fails(fn):
+def _reverts(fn):
+    """True only when the call reverts on chain.
+
+    Catching every Python exception would also swallow a renamed getter or a changed
+    signature, and the assertion would hold without the call ever reaching the pool.
+    """
     try:
         fn()
-    except Exception:
+    except BoaError:
         return True
     return False
 
@@ -219,10 +225,10 @@ def test_broken_oracle_fails_closed(plain, failure):
     boa.env.time_travel(blocks=1)
 
     mint_for_testing(lp, 10**18, coins[0], False)
-    assert _fails(
+    assert _reverts(
         lambda: swap.exchange(0, 1, 10**18, 0, sender=lp)
     ), f"exchange went through with a {failure} oracle - the pool priced a coin it cannot value"
-    assert _fails(lambda: swap.get_virtual_price()), f"get_virtual_price answered with a {failure} oracle"
+    assert _reverts(lambda: swap.get_virtual_price()), f"get_virtual_price answered with a {failure} oracle"
 
 
 def test_broken_vault_fails_closed(
@@ -265,8 +271,8 @@ def test_broken_vault_fails_closed(
 
     boa.env.set_code(vault.address, BROKEN_ORACLES["revert"])
     boa.env.time_travel(blocks=1)
-    assert _fails(lambda: swap.stored_rates()), "stored_rates answered with a dead vault"
-    assert _fails(lambda: swap.get_virtual_price()), "get_virtual_price answered with a dead vault"
+    assert _reverts(lambda: swap.stored_rates()), "stored_rates answered with a dead vault"
+    assert _reverts(lambda: swap.get_virtual_price()), "get_virtual_price answered with a dead vault"
 
 
 def test_withdrawals_survive_a_broken_oracle(plain):
@@ -294,7 +300,7 @@ def test_metapool_fails_closed_when_its_base_pool_does(meta):
     boa.env.set_code(base.address, BROKEN_ORACLES["revert"])
     boa.env.time_travel(blocks=1)
 
-    assert _fails(lambda: m.stored_rates()), "metapool priced base LP with a base pool that cannot answer"
+    assert _reverts(lambda: m.stored_rates()), "metapool priced base LP with a base pool that cannot answer"
 
 
 # ------------------------------------------ #1 #3: what the bound can and cannot do
@@ -514,32 +520,173 @@ def test_liquidity_round_trip_cannot_bracket_a_step(plain, n):
 # ------------------------------------------------------- #7: base LP at its true value
 
 
-def test_metapool_prices_base_lp_at_its_redeemable_value(meta):
-    """A metapool's rate for base LP must match what base LP redeems for. (#7)
+def _redeemable(base, base_oracle):
+    """What one base LP redeems for proportionally, at the oracle's true rate."""
+    balances = base.get_balances()
+    return (balances[0] * base_oracle.exchangeRate() // 10**18 + balances[1]) * 10**18 // base.totalSupply()
 
-    The metapool reads the base's virtual price. When the base clamps a rate, that
-    price trails what base LP can be proportionally redeemed for - which reads no
-    rates - so base LP bought on the metapool redeems for more than it cost.
 
-    Compared directly rather than through an arbitrage, because a rate rise also
-    unbalances the metapool, and rebalancing it is ordinary arbitrage that pays out
-    at HEAD too. The finding is the gap between the two valuations, not that.
+def _commit(m, base, meta_coin, lp):
+    """Write both pools in this block, then move to the next one."""
+    mint_for_testing(lp, 10**15, meta_coin, False)
+    m.exchange(0, 1, 10**15, 0, sender=lp)
+    boa.env.time_travel(blocks=1)
+
+
+def test_metapool_bounds_a_pushed_base_pool_rate(meta):
+    """A base-pool rate pushed for one block reaches the metapool as at most one bound. (#7)
+
+    The metapool's coin 1 is the base pool's virtual price. Read live, a 5% push of the
+    base's oracle moved it 250 bp and the metapool paid that out exactly as HEAD did.
+    Coin 1 has to be bounded like coin 0.
     """
     m, base, meta_coin, base_coins, _, base_oracle, lp = meta(meta_rated=False, base_rated=True)
-    base_oracle.set_exchange_rate(10**18 * 101 // 100)
-    for _ in range(20):  # the base sits idle while the metapool trades
-        boa.env.time_travel(blocks=1)
-        mint_for_testing(lp, 10**18, meta_coin, False)
-        m.exchange(0, 1, 10**18, 0, sender=lp)
+    _commit(m, base, meta_coin, lp)
+    before = m.stored_rates()[1]
 
-    balances = base.get_balances()
-    redeemable = (balances[0] * base_oracle.exchangeRate() // 10**18 + balances[1]) * 10**18 // base.totalSupply()
-    priced = m.stored_rates()[1]
-    gap = (redeemable - priced) / redeemable
-    assert gap <= 1e-5, (
-        f"the metapool prices base LP {gap * 1e4:.2f} bp below what it redeems for "
-        f"({priced / 1e18:.6f} vs {redeemable / 1e18:.6f})"
+    base_oracle.set_exchange_rate(10**18 * 105 // 100)
+    move = abs(m.stored_rates()[1] - before) / before
+    bound = m.max_rate_bump() / FEE_DENOMINATOR
+    assert move <= bound + 1e-12, f"a 5% base-oracle push moved the metapool's base LP rate {move * 1e4:.2f} bp"
+
+
+def test_metapool_freezes_the_base_pool_rate_within_a_block(meta):
+    """Once a metapool block has priced base LP, the base pool must not reprice it. (#7)
+
+    The freeze covered coin 0 only. Two identical trades in one block differed by 25 bp
+    when the base's oracle moved between them.
+    """
+    m, base, meta_coin, base_coins, _, base_oracle, lp = meta(meta_rated=False, base_rated=True)
+    _commit(m, base, meta_coin, lp)
+    mint_for_testing(lp, 10**15, meta_coin, False)
+    m.exchange(0, 1, 10**15, 0, sender=lp)  # first touch: fixes the block's rates
+    committed = m.stored_rates()[1]
+
+    base_oracle.set_exchange_rate(10**18 * 10_050 // 10_000)
+    assert m.stored_rates()[1] == committed, "the base LP rate moved inside the block after a trade"
+
+
+def test_metapool_closes_a_genuine_base_step_on_its_own_writes(meta):
+    """After a genuine base step, each metapool write closes the gap by a full bound. (#7)
+
+    Bounding base LP's rate makes it trail what base LP redeems for - which reads no
+    rates - by the part of a step the bound has not yet let through, and that gap is
+    open to anyone, as on coin 0 (#3). What must not happen is a gap that stops
+    closing: bounded at the base pool it only moved when the base itself was written,
+    so with the base idle it sat at ~49 bp while the metapool traded, a riskless round
+    trip.
+    """
+    m, base, meta_coin, base_coins, _, base_oracle, lp = meta(meta_rated=False, base_rated=True)
+    _commit(m, base, meta_coin, lp)
+    bound = m.max_rate_bump() / FEE_DENOMINATOR
+    start = m.stored_rates()[1]
+
+    base_oracle.set_exchange_rate(10**18 * 101 // 100)
+    boa.env.time_travel(blocks=1)
+    step = (_redeemable(base, base_oracle) - start) / start
+    for _ in range(20):  # the base sits idle while the metapool trades
+        _commit(m, base, meta_coin, lp)
+
+    redeemable = _redeemable(base, base_oracle)
+    gap = (redeemable - m.stored_rates()[1]) / redeemable
+    allowed = max(0.0, step - 20 * bound) + 1e-5
+    assert gap <= allowed, (
+        f"20 metapool writes after a {step * 1e4:.1f} bp base step left base LP priced "
+        f"{gap * 1e4:.2f} bp below what it redeems for; at {bound * 1e4:.1f} bp a write, {allowed * 1e4:.2f} bp"
     )
+
+
+def test_base_lp_lags_a_step_no_further_than_coin_0_does(meta):
+    """One block after a genuine step, base LP's rate trails no further than coin 0's. (#7, #3)
+
+    Whatever lag a bound leaves is open to a trader with no foresight, and on coin 0 #3
+    accepts it at one bound per write. Coin 1 must not be a second, slower lag.
+    Compared as rate gaps rather than arbitrage profits, which would also pay out
+    whatever imbalance the pool started with.
+    """
+    m, base, meta_coin, base_coins, _, base_oracle, lp = meta(meta_rated=False, base_rated=True)
+    _commit(m, base, meta_coin, lp)
+    base_oracle.set_exchange_rate(10**18 * 10_034 // 10_000)  # base LP worth ~17 bp more
+    boa.env.time_travel(blocks=1)
+    _commit(m, base, meta_coin, lp)
+    true1 = _redeemable(base, base_oracle)
+    gap1 = (true1 - m.stored_rates()[1]) / true1
+
+    m, base, meta_coin, base_coins, oracle, _, lp = meta(meta_rated=True, base_rated=False)
+    _commit(m, base, meta_coin, lp)
+    step = (true1 - 10**18) / 10**18  # the same step, on coin 0
+    oracle.set_exchange_rate(int(10**18 * (1 + step)))
+    boa.env.time_travel(blocks=1)
+    _commit(m, base, meta_coin, lp)
+    true0 = oracle.exchangeRate()
+    gap0 = (true0 - m.stored_rates()[0]) / true0
+
+    assert gap1 <= gap0 + 1e-5, (
+        f"after a {step * 1e4:.1f} bp step and one write, base LP trails by {gap1 * 1e4:.2f} bp "
+        f"against {gap0 * 1e4:.2f} bp for the same step on coin 0"
+    )
+
+
+# ------------------------------------------- #2: a collapsed reading halts, and reopens
+
+
+def test_a_collapsed_reading_halts_rather_than_clamping(plain):
+    """A reading far below its anchor halts the pool instead of being clamped in. (#2)
+
+    Clamped, a source answering zero left the pool quoting a worthless coin at nearly
+    par: 999,545 of a 1,000,000 pool paid out in one sale, because the bound walks
+    towards zero one step at a time and every step still prices the coin.
+    """
+    swap, coins, oracles, lp = plain()
+    oracles[1].set_exchange_rate(0)
+    boa.env.time_travel(blocks=1)
+
+    assert _reverts(lambda: swap.stored_rates()), "stored_rates answered for a collapsed source"
+    assert _reverts(lambda: swap.get_dy(0, 1, 10**18)), "get_dy quoted a collapsed source"
+    assert _reverts(lambda: swap.exchange(0, 1, 10**18, 0, sender=lp)), "a trade priced a collapsed source"
+    swap.remove_liquidity(10**18, [0, 0], sender=lp)  # proportional exit reads no rates
+
+
+def test_a_halted_pool_reopens_one_bound_per_poke(plain, owner):
+    """`poke_rates` walks a halted pool back, one bound per block, and then it trades. (#2)
+
+    Halting is only safe if a pool that halted on a genuine move can come back without
+    governance. The walk is permissionless and paced like any other update, so the
+    same bound that limits an attacker limits the recovery: a 6% step at a 0.3% fee
+    takes about twenty pokes.
+    """
+    swap, coins, oracles, lp = plain(fee=30_000_000)
+    oracles[1].set_exchange_rate(10**18 * 106 // 100)
+    boa.env.time_travel(blocks=1)
+    assert _reverts(lambda: swap.stored_rates()), "a 6% step did not halt the pool"
+
+    swap.poke_rates()
+    assert _reverts(lambda: swap.poke_rates()), "a second poke landed in the same block"
+
+    pokes = 1
+    while pokes < 100 and _reverts(lambda: swap.stored_rates()):
+        boa.env.time_travel(blocks=1)
+        swap.poke_rates()
+        pokes += 1
+
+    rate, reading = swap.stored_rates()[1], oracles[1].exchangeRate()
+    bound = swap.max_rate_bump() / FEE_DENOMINATOR
+    assert (reading - rate) / reading <= bound, "the pool reopened further than one bound from its source"
+    swap.exchange(0, 1, 10**18, 0, sender=lp)  # and it trades again
+
+
+def test_the_bound_never_exceeds_its_ceiling(plain, owner):
+    """However large the fee, one update may not move the rate more than BUMP_CEILING. (#2)
+
+    The bound tracks the fee, and `set_new_fee` accepts far more than the 1% the
+    factory allows at deploy. Without the ceiling a 5% fee would license a 5% move per
+    block, which is the size of move the halt exists to catch.
+    """
+    swap, coins, oracles, lp = plain(fee=30_000_000)
+    with boa.env.prank(owner):
+        swap.set_new_fee(500_000_000, OFFPEG)  # 5%
+
+    assert swap.max_rate_bump() == 10**8, "a 5% fee licensed a bound above the 1% ceiling"
 
 
 # --------------------------------------------------------- #9: no anchor while empty
@@ -593,14 +740,14 @@ def test_set_new_fee_enforces_the_constructor_offpeg_rule(plain, owner):
     """
     swap, *_ = plain()
     with boa.env.prank(owner):
-        assert _fails(lambda: swap.set_new_fee(swap.fee(), 0)), "set_new_fee disabled the off-peg brake"
+        assert _reverts(lambda: swap.set_new_fee(swap.fee(), 0)), "set_new_fee disabled the off-peg brake"
 
 
 def test_metapool_set_new_fee_enforces_the_constructor_offpeg_rule(meta, owner):
     """The same for a metapool. (#15)"""
     m, *_ = meta()
     with boa.env.prank(owner):
-        assert _fails(lambda: m.set_new_fee(m.fee(), 0)), "set_new_fee disabled the off-peg brake"
+        assert _reverts(lambda: m.set_new_fee(m.fee(), 0)), "set_new_fee disabled the off-peg brake"
 
 
 def test_factory_without_math_cannot_deploy_a_plain_pool(
@@ -625,7 +772,7 @@ def test_factory_without_math_cannot_deploy_a_plain_pool(
         bare.set_views_implementation(views_implementation.address)
         bare.set_pool_implementations(0, amm_implementation.address)
     coins = [erc20_deployer.deploy(f"C{i}", f"C{i}", 18) for i in range(2)]
-    assert _fails(
+    assert _reverts(
         lambda: bare.deploy_plain_pool(
             "p",
             "p",

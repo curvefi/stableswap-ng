@@ -14,9 +14,9 @@ say so, because the alternative reading - deleting them - would throw away the o
 place the new timing is written down.
 
 One test changed meaning rather than timing, and is renamed for it: a source that
-answers zero is a successful answer, so the bound walks the rate towards it rather
-than rejecting it. A source that fails outright - reverts, or returns nothing - halts
-the pool instead; that is pinned in `test_rate_safety.py`.
+answers zero is a successful answer, but one no bound should absorb, so the pool now
+halts on it rather than walking towards it. A source that fails outright - reverts, or
+returns nothing - halts the pool as well; that is pinned in `test_rate_safety.py`.
 """
 
 import boa
@@ -59,8 +59,10 @@ def test_stored_rate_follows_the_oracle(swap, pool_tokens, decimals):
     i = _oracle_coin(pool_tokens)
     before = swap.stored_rates()[i]
 
+    # a step the bound may absorb: a reading further than HALT_THRESHOLD from its
+    # anchor halts the pool instead, which test_rate_safety.py pins
     rate = pool_tokens[i].exchange_rate()
-    pool_tokens[i].set_exchange_rate(rate * 2)
+    pool_tokens[i].set_exchange_rate(rate * 102 // 100)
 
     assert swap.stored_rates()[i] == before, "the rate moved inside the block"
 
@@ -142,21 +144,19 @@ def test_virtual_price_follows_a_rate_increase(swap, pool_tokens):
 
 
 @pytest.mark.only_oracle_tokens
-def test_a_zero_rate_answer_moves_the_rate(swap, pool_tokens):
-    """A source that answers zero must not be absorbed into the healthy rate.
+def test_a_zero_rate_answer_halts_the_pool(swap, pool_tokens):
+    """A source that answers zero must halt the rate path rather than be clamped into it.
 
-    Zero is a successful 32-byte answer, not a failure, so the pool does not halt on
-    it - the bound walks the accepted rate towards it one step per block instead.
-    What must never happen is that answer being swallowed, leaving the pool reading
-    identically before and after its source went bad.
-
-    A source that fails outright is a different case and halts the pool; see
-    test_broken_oracle_fails_closed in test_rate_safety.py.
+    Zero is a successful 32-byte answer rather than a failed call, and the bound used
+    to walk the accepted rate towards it one step per block - which left the pool
+    quoting a collapsed coin near par for as long as that walk took. A reading this
+    far from its anchor halts instead. What a halt leaves open is pinned by
+    test_withdrawals_survive_a_broken_oracle in test_rate_safety.py.
     """
     i = _oracle_coin(pool_tokens)
-    healthy = swap.stored_rates()[i]
 
     with boa.env.anchor():
         pool_tokens[i].set_exchange_rate(0)
         boa.env.time_travel(blocks=1)
-        assert swap.stored_rates()[i] != healthy, "a zero answer read as the healthy rate"
+        with boa.reverts():
+            swap.stored_rates()
