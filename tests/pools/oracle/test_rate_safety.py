@@ -1,31 +1,25 @@
-"""Properties the oracle rate path must hold, each written against a review finding.
+"""Properties the oracle rate path must hold.
 
-These were written before any fix, against a rate path that had a per-update bound,
-a within-block freeze and an oracle-failure fallback. The review found that design
-violated most of what follows. Each test states one property in its name, and each
-cites the finding it encodes, so that a red test here names the defect rather than
-just the symptom.
+The rate path bounds each update to min(fee * N / (2(N - 1)), 1%) - one fee in a
+two-coin pool - and keeps rated coins from moving apart by more than one bound. It
+freezes rates once a block has accepted them, fails closed on a source that cannot
+answer, and halts on a reading more than 5% from its anchor until poke_rates walks the
+anchor back. Each test states one property in its name, so that a red test names the
+defect rather than just the symptom.
 
-Three tests are not like the others:
-
-  test_transient_manipulation_is_capped
-      guards the part of the design that works - freeze plus bound does stop a rate
-      pushed for one block from paying out. It passes before and after any fix, and
-      it must keep passing.
+Two tests are strict xfails, recording limits of the rate path rather than bugs in it:
 
   test_informed_prepositioning_is_not_prevented
   test_genuine_step_leaves_no_free_arbitrage_when_the_fee_is_undersized
-      are strict xfails, recording limits of the rate path rather than bugs in it. A
-      bound cannot stop a trader who knows a lasting step is coming - once the pool
+      A bound cannot stop a trader who knows a lasting step is coming - once the pool
       reflects the step, a position taken beforehand just waits for it - and it
-      cannot reprice a genuine step faster than one bound per block. Both have the
-      same answer, which is the fee: test_fee_sized_to_the_step_leaves_no_free_arbitrage
-      shows it. If either ever passes, the strict marker turns that into a failure,
-      because something has changed that deserves a second look.
+      cannot reprice a genuine step faster than one bound per block. The answer is
+      the fee, as test_fee_sized_to_the_step_leaves_no_free_arbitrage shows. If either
+      ever passes, something has changed that deserves a second look.
 
-      Charging the lag as a fee was tried as a fix for the second, and removed: the
-      operator controls the lag, so it sized the fee to each taker's tolerance and
-      reopened the skim that test_min_dy_is_a_safety_bound_not_a_price guards.
+      Charging the lag as a fee does not work: the operator controls the lag, so it
+      sizes the fee to each taker's tolerance and reopens the skim that
+      test_min_dy_is_a_safety_bound_not_a_price guards.
 
 Every pool here uses a plain token with a separate oracle contract as its rate
 source. The repo's ERC20Oracle mock is its own oracle, which would let an ordinary
@@ -54,7 +48,7 @@ BROKEN_ORACLES = {
 }
 
 
-# ------------------------------------------------------------------ helpers
+# <---------------------   Helpers   --------------------->
 
 
 def _called(computation):
@@ -209,16 +203,16 @@ def meta(
     return build
 
 
-# ---------------------------------------------- #2 #10: fail closed, stay exitable
+# <---------------------   Fail closed, stay exitable   --------------------->
 
 
 @pytest.mark.parametrize("failure", list(BROKEN_ORACLES))
 def test_broken_oracle_fails_closed(plain, failure):
-    """A rate source that stops answering must halt rate-dependent paths. (#2, #10)
+    """A rate source that stops answering must halt rate-dependent paths.
 
-    The fallback this replaces priced trades at the last healthy rate forever, and the
-    bound compared that rate with itself, so it never moved. Halting is what HEAD did,
-    and it is the safe outcome: proportional withdrawal needs no rate and stays open.
+    Falling back to the last healthy rate would price trades there forever, and the
+    bound, comparing that rate with itself, would never move it. Halting is safe
+    because proportional withdrawal needs no rate and stays open.
     """
     swap, coins, oracles, lp = plain()
     boa.env.set_code(oracles[1].address, BROKEN_ORACLES[failure])
@@ -234,12 +228,11 @@ def test_broken_oracle_fails_closed(plain, failure):
 def test_broken_vault_fails_closed(
     factory, amm_deployer, erc20_deployer, erc4626_deployer, zero_address, set_pool_implementations
 ):
-    """An ERC4626 coin whose vault stops answering must halt pricing too. (#2)
+    """An ERC4626 coin whose vault stops answering must halt pricing too.
 
-    Asset type 3 reads its rate through convertToAssets on the coin itself, a path
-    that also fell back to a remembered rate. The vault is the coin here, so killing
-    it breaks transfers as well; get_virtual_price and stored_rates move no tokens,
-    so a revert from them can only come from the rate read.
+    Asset type 3 reads its rate through convertToAssets on the coin itself. The vault
+    is the coin here, so killing it breaks transfers as well; get_virtual_price and
+    stored_rates move no tokens, so a revert from them can only come from the rate read.
     """
     asset = erc20_deployer.deploy("A", "A", 18)
     vault = erc4626_deployer.deploy("V", "V", 18, asset.address)
@@ -278,9 +271,7 @@ def test_broken_vault_fails_closed(
 def test_withdrawals_survive_a_broken_oracle(plain):
     """Proportional remove_liquidity must keep working whatever the oracle does.
 
-    This is the guarantee the fallback claimed to provide. It never needed one:
-    proportional withdrawal reads no rates. Pinned so that failing closed elsewhere
-    can never take it away.
+    It reads no rates. Pinned so that failing closed elsewhere can never take it away.
     """
     swap, coins, oracles, lp = plain()
     boa.env.set_code(oracles[1].address, BROKEN_ORACLES["revert"])
@@ -290,11 +281,11 @@ def test_withdrawals_survive_a_broken_oracle(plain):
 
 
 def test_metapool_fails_closed_when_its_base_pool_does(meta):
-    """If the base pool cannot report a virtual price, the metapool must not guess. (#5)
+    """If the base pool cannot report a virtual price, the metapool must not guess.
 
     The base's get_virtual_price is @nonreentrant, so its reverting is also how a
-    read-only-reentrancy guard shows up. Falling back to a stored value swallows that
-    guard, and the stored value is never bounded.
+    read-only-reentrancy guard shows up. Falling back to a stored value would swallow
+    that guard.
     """
     m, base, *_ = meta()
     boa.env.set_code(base.address, BROKEN_ORACLES["revert"])
@@ -303,7 +294,7 @@ def test_metapool_fails_closed_when_its_base_pool_does(meta):
     assert _reverts(lambda: m.stored_rates()), "metapool priced base LP with a base pool that cannot answer"
 
 
-# ------------------------------------------ #1 #3: what the bound can and cannot do
+# <---------------------   What the bound can and cannot do   --------------------->
 
 
 def _stale_arbitrage(swap, coins, oracle, lp, step_bp):
@@ -329,17 +320,16 @@ def _stale_arbitrage(swap, coins, oracle, lp, step_bp):
 
 @pytest.mark.xfail(
     strict=True,
-    reason="#3: a bound below the oracle's step reprices a genuine step over several blocks, and anyone "
-    "can take the gap. Charging the gap as a fee was tried and reopens the operator skim - the operator "
-    "controls the gap, so it sizes it to the taker's tolerance (test_min_dy_is_a_safety_bound_not_a_price). "
-    "The answer is sizing the fee to the step; see the test below.",
+    reason="a bound below the oracle's step reprices a genuine step over several blocks, and anyone "
+    "can take the gap. Charging the gap as a fee reopens the operator skim "
+    "(test_min_dy_is_a_safety_bound_not_a_price); the answer is sizing the fee to the step.",
 )
 def test_genuine_step_leaves_no_free_arbitrage_when_the_fee_is_undersized(plain):
-    """After a genuine step past the bound, a trader with no foresight profits. (#3)
+    """After a genuine step past the bound, a trader with no foresight profits.
 
-    Here the fee is 1 bp, so the bound is 2 bp, against a 17 bp step. An unbounded
-    pool reprices at once and leaves nothing; a bounded one walks towards the new
-    rate and publishes the gap for as long as it lags. Recorded as a cost.
+    The fee and so the bound are 1 bp, against a 17 bp step. A bounded pool walks
+    towards the new rate and publishes the gap for as long as it lags. Recorded as a
+    cost.
     """
     swap, coins, oracles, lp = plain()
     profit = _stale_arbitrage(swap, coins, oracles[1], lp, step_bp=17)
@@ -347,14 +337,13 @@ def test_genuine_step_leaves_no_free_arbitrage_when_the_fee_is_undersized(plain)
 
 
 def test_fee_sized_to_the_step_leaves_no_free_arbitrage(plain):
-    """A fee of at least half the oracle's step leaves nothing to take after it. (#3)
+    """A fee of at least half the oracle's step leaves nothing to take after it.
 
-    The bound is derived from the fee, so a pool whose fee covers half its oracle's
-    largest step has a bound that covers the whole step: a genuine step lands in one
-    update and there is no lag to arbitrage. The same fee is what makes taking a
-    position ahead of the step unprofitable (#1), so one number answers both.
+    In a two-coin pool the bound equals the fee, so the first update after the step
+    closes all but step - fee of the gap, and the trade that takes the rest pays a fee
+    at least that large.
     """
-    swap, coins, oracles, lp = plain(fee=9_000_000)  # 9 bp, so the bound is 18 bp
+    swap, coins, oracles, lp = plain(fee=9_000_000)  # 9 bp, so the bound is 9 bp
     profit = _stale_arbitrage(swap, coins, oracles[1], lp, step_bp=17)
     assert profit <= 10**15, f"a fee-sized pool still left {profit / 1e18:,.2f} after a 17 bp step"
 
@@ -362,10 +351,10 @@ def test_fee_sized_to_the_step_leaves_no_free_arbitrage(plain):
 def test_transient_manipulation_is_capped(plain):
     """A rate pushed for one block must pay out no more than about one fee.
 
-    This is what freeze plus bound actually buys, and it must survive every fix. An
-    attacker holding coin 1 inflates its oracle 5% for one block, is the first to
-    touch the pool, and sells. Unbounded, they would collect ~5%; bounded, the pool
-    accepts at most one step and they collect roughly that step less the fee.
+    This is what freeze plus bound buys. An attacker holding coin 1 inflates its oracle
+    5% for one block, is the first to touch the pool, and sells. Unbounded, they would
+    collect ~5%; bounded, they collect at most one bound less the fee. 5% is exactly
+    the halt threshold, so the reading is bounded rather than halted.
     """
     swap, coins, oracles, lp = plain()
     atk = boa.env.generate_address()
@@ -403,10 +392,7 @@ def _bracket(swap, coins, oracle, lp, step_bp, wait_blocks):
 
 
 def test_one_block_bracket_is_unprofitable(plain):
-    """Buying before a step and selling in the very next block must not pay.
-
-    The narrow claim the bound does keep. Guarded here so the fix cannot lose it.
-    """
+    """Buying before a step and selling in the very next block must not pay."""
     swap, coins, oracles, lp = plain()
     swap.exchange(0, 1, 10**18, 0, sender=lp)  # anchor the cache at the pre-step rate
     boa.env.time_travel(blocks=1)
@@ -415,27 +401,27 @@ def test_one_block_bracket_is_unprofitable(plain):
 
 @pytest.mark.xfail(
     strict=True,
-    reason="#1: no in-pool rate limit stops a trader who knows a persistent step is coming; "
+    reason="no in-pool rate limit stops a trader who knows a persistent step is coming; "
     "once the pool reflects the step, a position taken beforehand waits and sells. "
     "Mitigated by sizing the fee against the step, not by the rate path.",
 )
 def test_informed_prepositioning_is_not_prevented(plain):
-    """Holding through the catch-up recovers the whole step. Recorded, not fixable. (#1)"""
+    """Holding through the catch-up recovers the whole step. Recorded, not fixable."""
     swap, coins, oracles, lp = plain()
     swap.exchange(0, 1, 10**18, 0, sender=lp)
     boa.env.time_travel(blocks=1)
     assert _bracket(swap, coins, oracles[1], lp, step_bp=17, wait_blocks=12) <= 0
 
 
-# ---------------------------------------------------- #4 #19: freeze where it belongs
+# <---------------------   Freeze on every value-moving path   --------------------->
 
 
 def test_metapool_one_coin_withdrawal_freezes_the_block(meta):
-    """A one-coin withdrawal must fix the rate for the rest of its block. (#4)
+    """A one-coin withdrawal must fix the rate for the rest of its block.
 
-    MetaNG priced remove_liquidity_one_coin through the view, so it never committed
-    a rate and the freeze never engaged; an operator could reprice between two
-    value-moving calls in one block.
+    Priced through the view, remove_liquidity_one_coin commits no rate and the freeze
+    never engages, so an operator can reprice between two value-moving calls in one
+    block.
     """
     m, base, meta_coin, base_coins, oracle, _, lp = meta()
     boa.env.time_travel(blocks=1)
@@ -447,10 +433,10 @@ def test_metapool_one_coin_withdrawal_freezes_the_block(meta):
 
 
 def test_frozen_metapool_block_does_not_call_the_oracle(meta):
-    """Once a block's rate is fixed, later calls in that block must not re-fetch it. (#19)
+    """Once a block's rate is fixed, later calls in that block must not re-fetch it.
 
-    MetaNG fetched first and checked the freeze after, so every frozen call still paid
-    for the oracle staticcall and threw the answer away.
+    Fetching before checking the freeze pays for the oracle staticcall on every frozen
+    call and throws the answer away, which nothing else would notice.
     """
     m, base, meta_coin, base_coins, oracle, _, lp = meta()
     boa.env.time_travel(blocks=1)
@@ -461,11 +447,10 @@ def test_frozen_metapool_block_does_not_call_the_oracle(meta):
 
 
 def test_one_coin_withdrawal_freezes_the_block(plain):
-    """A one-coin withdrawal fixes the plain pool's rate for the rest of its block. (#4)
+    """A one-coin withdrawal fixes the plain pool's rate for the rest of its block.
 
-    Dropping the commit from this path leaves the freeze disengaged, and an operator
-    can reprice between two value-moving calls in one block. The metapool half of
-    this is pinned above; both paths write, so both are pinned.
+    The plain-pool counterpart of the metapool test above: without the commit, an
+    operator can reprice between two value-moving calls in one block.
     """
     swap, coins, oracles, lp = plain()
     swap.remove_liquidity_one_coin(swap.balanceOf(lp) // 20, 0, 0, sender=lp)
@@ -476,10 +461,9 @@ def test_one_coin_withdrawal_freezes_the_block(plain):
 
 
 def test_imbalanced_withdrawal_freezes_the_block(plain):
-    """An imbalanced withdrawal fixes the block's rate too. (#4)
+    """An imbalanced withdrawal fixes the block's rate too.
 
-    Same property as the one-coin path, and the same mutation survives without it:
-    remove_liquidity_imbalance moves value and must therefore commit.
+    remove_liquidity_imbalance moves value, so it must commit like the one-coin path.
     """
     swap, coins, oracles, lp = plain()
     swap.remove_liquidity_imbalance([TVL // 100, TVL // 200], 2**256 - 1, sender=lp)
@@ -490,11 +474,9 @@ def test_imbalanced_withdrawal_freezes_the_block(plain):
 
 
 def test_a_frozen_block_does_not_requery_the_oracle(plain):
-    """A view in a block whose rate is fixed must read the cache, not the source. (#19)
+    """A view in a block whose rate is fixed must read the cache, not the source.
 
-    The write path is pinned for the metapool above. This is the read path: moving the
-    fetch above the freeze check costs an oracle staticcall on every frozen call and
-    is otherwise invisible.
+    The read-path counterpart of the metapool write-path test above.
     """
     swap, coins, oracles, lp = plain()
     swap.exchange(0, 1, 10**18, 0, sender=lp)  # first touch: fixes the block's rate
@@ -503,15 +485,17 @@ def test_a_frozen_block_does_not_requery_the_oracle(plain):
     assert oracles[1].address.lower() not in _called(swap._computation), "a frozen view still queried the oracle"
 
 
+# <---------------------   Bound every rate source   --------------------->
+
+
 def test_the_bound_applies_to_an_erc4626_coin(
     factory, amm_deployer, erc20_deployer, erc4626_deployer, zero_address, set_pool_implementations
 ):
-    """A vault share price is bounded like any other rate source. (#1)
+    """A vault share price is bounded like any other rate source.
 
-    Asset type 3 reads its rate from the coin itself, and a flash donation to the
-    vault is exactly the one-block push the bound exists for - the case
-    _max_rate_bump's own docstring names. Dropping type 3 from the bound leaves that
-    push unclamped and no other test notices.
+    A flash donation to the vault is exactly the one-block push the bound exists for.
+    Dropping asset type 3 from the bound leaves that push unbounded and no other test
+    notices.
     """
     asset = erc20_deployer.deploy("A", "A", 18)
     vault = erc4626_deployer.deploy("V", "V", 18, asset.address)
@@ -552,11 +536,12 @@ def test_the_bound_applies_to_an_erc4626_coin(
 
 
 def test_two_rated_coins_cannot_be_pushed_apart(plain):
-    """Two rated coins may not move apart by more than one bound in a single update. (#8)
+    """Two rated coins may not move apart by more than one bound in a single update.
 
     Bounding each coin against its own anchor lets a pair separate by two bounds when
     one source is pushed up and the other down, and the trade prices off the ratio.
-    166 mainnet pools carry two rated coins.
+    166 mainnet pools carry two rated coins. Each push is 5%, the most that is bounded
+    rather than halted.
     """
     swap, coins, oracles, lp = plain(rated=(0, 1))
     before = swap.stored_rates()[0] / swap.stored_rates()[1]
@@ -574,13 +559,16 @@ def test_two_rated_coins_cannot_be_pushed_apart(plain):
     ), f"an opposite push moved the pair {moved * 1e4:.2f} bp, bound {bound * 1e4:.2f} bp"
 
 
+# <---------------------   Empty pools set no anchor   --------------------->
+
+
 def test_dust_cannot_anchor_an_unfunded_pool(plain):
-    """A dust round trip on an unfunded pool must not fix the rate the first LP pays. (#9)
+    """A dust round trip on an unfunded pool must not fix the rate the first LP pays.
 
     add_liquidity works on an empty pool and remove_liquidity gives the dust straight
-    back, so anchoring on the first write let anyone set the rate for nothing and the
-    bound then defended it: the first honest LP deposited at 1.9996 and lost 23% of
-    their deposit in the same block.
+    back. If that round trip could move the anchor freely, anyone could set the rate
+    for nothing and the bound would then defend it: on an unseeded pool the first
+    honest LP deposited at 1.9996 and lost 23% of their deposit in the same block.
     """
     swap, coins, oracles, attacker = plain(seed=False)
     oracles[1].set_exchange_rate(2 * 10**18)  # the push the attacker wants remembered
@@ -600,18 +588,18 @@ def test_dust_cannot_anchor_an_unfunded_pool(plain):
 
 
 def test_poke_cannot_seed_an_empty_pool(plain):
-    """poke_rates must do nothing on a pool that has never been funded. (#2 #9)
+    """poke_rates must do nothing on a pool that has never been funded.
 
-    The poke exists to walk a halted pool back to its source. On an empty pool there
-    is nothing to protect and an anchor to set, so letting it write would hand the
-    seed to whoever pokes first - the hole the test above closes.
+    The poke exists to walk a halted pool back to its source, and an empty pool never
+    halts. Letting it write there would hand the anchor to whoever pokes first - the
+    hole the test above closes.
     """
     swap, coins, oracles, lp = plain(seed=False)
 
     assert _reverts(lambda: swap.poke_rates()), "poke_rates wrote a rate to an unfunded pool"
 
 
-# -------------------------------------------------------- #6 #8: bound tracks the fee
+# <---------------------   Bound tracks the fee   --------------------->
 
 
 def _accepted_step(swap, i, oracle, owner, new_fee):
@@ -626,19 +614,20 @@ def _accepted_step(swap, i, oracle, owner, new_fee):
 
 
 def test_fee_cut_tightens_the_bound(plain, owner):
-    """After the fee falls, a single update must move no further than the new bound. (#6)
+    """After the fee falls, a single update must move no further than the new bound.
 
-    max_rate_bump was set once from the deploy fee, so cutting the fee left the bound
-    at twice the old fee and reopened a bracket the new fee could not pay for.
+    A bound fixed from the deploy fee would stay wide after a cut and leave open a
+    bracket the new fee cannot pay for.
     """
     swap, coins, oracles, lp = plain(fee=4_000_000)
     step = _accepted_step(swap, 1, oracles[1], owner, new_fee=1_000_000)
+    # two new fees: loose against the new 1 bp bound, still below the old 4 bp one
     bound = 2 * 1_000_000 / FEE_DENOMINATOR + 1e-12
     assert step <= bound, f"accepted {step * 1e4:.2f} bp after cutting the fee to 1 bp"
 
 
 def test_metapool_fee_cut_tightens_the_bound(meta, owner):
-    """The same for a metapool, which had no way to change its bound at all. (#6)"""
+    """The same for a metapool."""
     m, base, meta_coin, base_coins, oracle, _, lp = meta(fee=4_000_000)
     step = _accepted_step(m, 0, oracle, owner, new_fee=1_000_000)
     bound = 2 * 1_000_000 / FEE_DENOMINATOR + 1e-12
@@ -647,14 +636,13 @@ def test_metapool_fee_cut_tightens_the_bound(meta, owner):
 
 @pytest.mark.parametrize("n", [2, 3, 4, 8])
 def test_liquidity_round_trip_cannot_bracket_a_step(plain, n):
-    """Withdrawing and re-depositing across one accepted step must not gain LP share. (#8)
+    """Withdrawing and re-depositing across one accepted step must not gain LP share.
 
-    2 * fee is the break-even for a swap round trip. Single-sided liquidity costs less
-    per leg, so in pools of three or more coins the same bound leaves a profit of about
-    fee * (1 - 2/N). The bound has to know how many coins the pool holds.
+    A single-sided round trip costs less than a swap round trip, and less the more
+    coins the pool holds, so a bound that ignored N would leave pools of three or more
+    coins a profit. The bound is fee * N / (2(N - 1)) for that reason.
 
-    N=2 is the control: it sits exactly at break-even, and measures about +0.01 bp from
-    curvature alone. The tolerance separates that from the ~1 bp the finding is about.
+    Measured at about -1.5 bp for every N here; the tolerance is +0.05 bp.
     """
     swap, coins, oracles, lp = plain(n=n, rated=(0,), fee=3_000_000)
     oracles[0].set_exchange_rate(10**18 * 101 // 100)  # a real 1% step
@@ -668,7 +656,7 @@ def test_liquidity_round_trip_cannot_bracket_a_step(plain, n):
     assert gain <= 5e-6, f"N={n}: a liquidity round trip across one step gained {gain * 1e4:+.3f} bp of LP share"
 
 
-# ------------------------------------------------------- #7: base LP at its true value
+# <---------------------   Metapool base LP at its true value   --------------------->
 
 
 def _redeemable(base, base_oracle):
@@ -685,11 +673,11 @@ def _commit(m, base, meta_coin, lp):
 
 
 def test_metapool_bounds_a_pushed_base_pool_rate(meta):
-    """A base-pool rate pushed for one block reaches the metapool as at most one bound. (#7)
+    """A base-pool rate pushed for one block reaches the metapool as at most one bound.
 
     The metapool's coin 1 is the base pool's virtual price. Read live, a 5% push of the
-    base's oracle moved it 250 bp and the metapool paid that out exactly as HEAD did.
-    Coin 1 has to be bounded like coin 0.
+    base's oracle moves it 250 bp and the metapool pays that out, so coin 1 has to be
+    bounded like coin 0.
     """
     m, base, meta_coin, base_coins, _, base_oracle, lp = meta(meta_rated=False, base_rated=True)
     _commit(m, base, meta_coin, lp)
@@ -702,9 +690,9 @@ def test_metapool_bounds_a_pushed_base_pool_rate(meta):
 
 
 def test_metapool_freezes_the_base_pool_rate_within_a_block(meta):
-    """Once a metapool block has priced base LP, the base pool must not reprice it. (#7)
+    """Once a metapool block has priced base LP, the base pool must not reprice it.
 
-    The freeze covered coin 0 only. Two identical trades in one block differed by 25 bp
+    With the freeze on coin 0 only, two identical trades in one block differed by 25 bp
     when the base's oracle moved between them.
     """
     m, base, meta_coin, base_coins, _, base_oracle, lp = meta(meta_rated=False, base_rated=True)
@@ -718,14 +706,13 @@ def test_metapool_freezes_the_base_pool_rate_within_a_block(meta):
 
 
 def test_metapool_closes_a_genuine_base_step_on_its_own_writes(meta):
-    """After a genuine base step, each metapool write closes the gap by a full bound. (#7)
+    """After a genuine base step, each metapool write closes the gap by a full bound.
 
-    Bounding base LP's rate makes it trail what base LP redeems for - which reads no
-    rates - by the part of a step the bound has not yet let through, and that gap is
-    open to anyone, as on coin 0 (#3). What must not happen is a gap that stops
-    closing: bounded at the base pool it only moved when the base itself was written,
-    so with the base idle it sat at ~49 bp while the metapool traded, a riskless round
-    trip.
+    Bounding base LP's rate makes it trail what base LP redeems for by the part of a
+    step the bound has not yet let through, and that lag is accepted, as on coin 0.
+    What must not happen is a gap that stops closing: bounded at the base pool, it
+    moves only when the base itself is written, so with the base idle it sat at ~49 bp
+    while the metapool traded, a riskless round trip.
     """
     m, base, meta_coin, base_coins, _, base_oracle, lp = meta(meta_rated=False, base_rated=True)
     _commit(m, base, meta_coin, lp)
@@ -748,10 +735,10 @@ def test_metapool_closes_a_genuine_base_step_on_its_own_writes(meta):
 
 
 def test_base_lp_lags_a_step_no_further_than_coin_0_does(meta):
-    """One block after a genuine step, base LP's rate trails no further than coin 0's. (#7, #3)
+    """One block after a genuine step, base LP's rate trails no further than coin 0's.
 
-    Whatever lag a bound leaves is open to a trader with no foresight, and on coin 0 #3
-    accepts it at one bound per write. Coin 1 must not be a second, slower lag.
+    Whatever lag a bound leaves is open to a trader with no foresight, and on coin 0 it
+    is accepted at one bound per write. Coin 1 must not be a second, slower lag.
     Compared as rate gaps rather than arbitrage profits, which would also pay out
     whatever imbalance the pool started with.
     """
@@ -778,11 +765,11 @@ def test_base_lp_lags_a_step_no_further_than_coin_0_does(meta):
     )
 
 
-# ------------------------------------------- #2: a collapsed reading halts, and reopens
+# <---------------------   A collapsed reading halts, and reopens   --------------------->
 
 
 def test_a_collapsed_reading_halts_rather_than_clamping(plain):
-    """A reading far below its anchor halts the pool instead of being clamped in. (#2)
+    """A reading far below its anchor halts the pool instead of being clamped in.
 
     Clamped, a source answering zero left the pool quoting a worthless coin at nearly
     par: 999,545 of a 1,000,000 pool paid out in one sale, because the bound walks
@@ -799,12 +786,12 @@ def test_a_collapsed_reading_halts_rather_than_clamping(plain):
 
 
 def test_a_halted_pool_reopens_one_bound_per_poke(plain, owner):
-    """`poke_rates` walks a halted pool back, one bound per block, and then it trades. (#2)
+    """`poke_rates` walks a halted pool back, one bound per block, and then it trades.
 
     Halting is only safe if a pool that halted on a genuine move can come back without
     governance. The walk is permissionless and paced like any other update, so the
     same bound that limits an attacker limits the recovery: a 6% step at a 0.3% fee
-    takes about twenty pokes.
+    takes 19 pokes.
     """
     swap, coins, oracles, lp = plain(fee=30_000_000)
     oracles[1].set_exchange_rate(10**18 * 106 // 100)
@@ -827,7 +814,7 @@ def test_a_halted_pool_reopens_one_bound_per_poke(plain, owner):
 
 
 def test_the_bound_never_exceeds_its_ceiling(plain, owner):
-    """However large the fee, one update may not move the rate more than BUMP_CEILING. (#2)
+    """However large the fee, one update may not move the rate more than BUMP_CEILING.
 
     The bound tracks the fee, and `set_new_fee` accepts far more than the 1% the
     factory allows at deploy. Without the ceiling a 5% fee would license a 5% move per
@@ -840,15 +827,15 @@ def test_the_bound_never_exceeds_its_ceiling(plain, owner):
     assert swap.max_rate_bump() == 10**8, "a 5% fee licensed a bound above the 1% ceiling"
 
 
-# --------------------------------------------------------- #9: no anchor while empty
+# <---------------------   Empty metapools set no anchor   --------------------->
 
 
 def test_empty_pool_does_not_anchor_a_manipulated_seed(meta):
-    """A rate accepted while the pool holds nothing must not bind later depositors. (#9)
+    """A rate accepted while the pool holds nothing must not bind later depositors.
 
-    The first write seeds the cache unbounded, and the bound then makes it sticky. On
-    an empty metapool a base-to-base swap is free and still writes, so anyone could
-    seed coin 0 at a pushed rate that the first real deposit then inherits.
+    A base-to-base swap is free on an empty metapool and never prices against its
+    rates. If it committed coin 0's rate, anyone could move the anchor to a pushed rate
+    that the first real deposit then inherits.
     """
     m, base, meta_coin, base_coins, oracle, _, lp = meta(seed=False)
     atk = boa.env.generate_address()
@@ -865,11 +852,11 @@ def test_empty_pool_does_not_anchor_a_manipulated_seed(meta):
     ), f"an empty metapool kept a pushed seed: rate {m.stored_rates()[0] / 1e18:.4f} with the oracle at 1.0"
 
 
-# ----------------------------------------------- #18: no cost where nothing is rated
+# <---------------------   No cost where nothing is rated   --------------------->
 
 
 def test_pool_without_a_rate_source_keeps_no_rate_cache(plain):
-    """A pool with no oracle or vault coin must not maintain a rate cache. (#18)
+    """A pool with no oracle or vault coin must not maintain a rate cache.
 
     Its rates are constant, so the freeze, bound and cache can change nothing - and
     on-chain they cost it about 12k gas on the first swap of every block.
@@ -880,14 +867,14 @@ def test_pool_without_a_rate_source_keeps_no_rate_cache(plain):
     assert swap._storage.last_rates_block.get() == 0, "a pool with nothing rated wrote a rate cache"
 
 
-# --------------------------------------------------- #15 #17: deploy-time invariants
+# <---------------------   Deploy-time invariants   --------------------->
 
 
 def test_set_new_fee_enforces_the_constructor_offpeg_rule(plain, owner):
-    """The admin must not be able to set what the constructor refuses. (#15)
+    """The admin must not be able to set what the constructor refuses.
 
-    The constructor rejects an offpeg multiplier that disables the off-peg brake,
-    but set_new_fee accepted any value, including 0, one call after deployment.
+    The constructor rejects an offpeg multiplier that disables the off-peg brake;
+    without the same check, set_new_fee could set 0 one call after deployment.
     """
     swap, *_ = plain()
     with boa.env.prank(owner):
@@ -895,7 +882,7 @@ def test_set_new_fee_enforces_the_constructor_offpeg_rule(plain, owner):
 
 
 def test_metapool_set_new_fee_enforces_the_constructor_offpeg_rule(meta, owner):
-    """The same for a metapool. (#15)"""
+    """The same for a metapool."""
     m, *_ = meta()
     with boa.env.prank(owner):
         assert _reverts(lambda: m.set_new_fee(m.fee(), 0)), "set_new_fee disabled the off-peg brake"
@@ -911,11 +898,12 @@ def test_factory_without_math_cannot_deploy_a_plain_pool(
     erc20_deployer,
     zero_address,
 ):
-    """A plain pool must not deploy with no math contract behind it. (#17)
+    """A plain pool must not deploy with no math contract behind it.
 
-    math is immutable and read from the factory at construction. Deployed while the
-    factory's math_implementation is unset, the pool registers, then reverts forever
-    on its first deposit.
+    math is immutable and read from the factory at construction, so a pool deployed
+    while the factory's math_implementation is unset would revert on every deposit.
+    The constructor's rate seed also calls math, so the deploy reverts even without
+    the explicit codesize check.
     """
     with boa.env.prank(deployer):
         bare = factory_deployer.deploy(fee_receiver, owner)

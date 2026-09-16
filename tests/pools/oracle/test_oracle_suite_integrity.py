@@ -1,11 +1,9 @@
 """The oracle tests themselves must be able to run, and must check what they claim.
 
-The review found that several of the new oracle tests could not do their job. The
-fork proofs call APIs the pinned titanoboa does not have. The splice builder reads a
-git ref that CI does not fetch and that stops meaning "the deployed build" once this
-merges. The oracle-recovery regex silently missed one selector in sixteen. And the
-contracts' evm-version pragma is one the deploy script cannot retarget. None of that
-shows up as a failing contract test - these tests exist so it shows up somewhere.
+Each failure pinned here - an API the pinned titanoboa lacks, a source read from a
+git ref, a selector the oracle recovery misses, a pragma the deploy script cannot
+retarget - lets a test error, skip or pass without checking anything, and no contract
+test would show it.
 """
 
 import os
@@ -26,11 +24,10 @@ def _oracle_test_sources():
 
 
 def test_fork_suites_only_call_boa_apis_that_exist():
-    """Every boa.<name>(...) the oracle tests call must exist in the pinned titanoboa. (#11)
+    """Every boa.<name>(...) the oracle tests call must exist in the pinned titanoboa.
 
-    boa.fork and boa.deal are not in titanoboa 0.1.10, so every fork proof failed with
-    AttributeError before touching the network - and only ever passed in another
-    project's environment.
+    A missing one fails with AttributeError before touching the network; boa.fork and
+    boa.deal, for instance, are not in titanoboa 0.1.10.
     """
     missing = []
     for name, src in _oracle_test_sources():
@@ -41,15 +38,12 @@ def test_fork_suites_only_call_boa_apis_that_exist():
 
 
 def test_oracle_tests_do_not_read_contract_sources_from_git():
-    """No oracle test may take a contract's source from a git ref. (#12)
+    """No oracle test may take a contract's source from a git ref.
 
-    The splice builder read `git show main:...`. CI's shallow checkout has no main,
-    so every splice test skipped there instead of running; and once this merged,
-    main meant the patched contract rather than the deployed one. The builder is
-    gone - its variants tested a design that no longer exists - and this keeps the
-    dependency from coming back.
+    CI's shallow checkout does not fetch other refs, so such a test skips there
+    instead of running; and a ref like main names different code once a change merges.
     """
-    this = os.path.basename(__file__)  # describes the old dependency, so it names it
+    this = os.path.basename(__file__)  # this file names the pattern it searches for
     offenders = [name for name, src in _oracle_test_sources() if name != this and re.search(r"git[\"',\s]+show", src)]
     assert not offenders, f"these oracle tests read sources from git: {offenders}"
 
@@ -62,12 +56,11 @@ ANY_SELECTOR_ORACLE = bytes.fromhex("7f" + (10**18).to_bytes(32, "big").hex() + 
 def test_oracle_recovery_finds_every_selector(
     selector, factory, amm_deployer, erc20_deployer, zero_address, set_pool_implementations
 ):
-    """The rug suite's oracle recovery must find the oracle whatever its selector. (#22)
+    """The rug suite's oracle recovery must find the oracle whatever its selector.
 
-    Its regex runs findall over hex at any nibble offset, so a selector ending in a 0
-    nibble lets a match start half a byte early and swallow the real word. One
-    selector in sixteen was silently dropped, and the upgradeability check then
-    passed without checking anything.
+    Matching at any nibble offset lets a selector ending in a 0 nibble start half a
+    byte early and swallow the real word, dropping one selector in sixteen; the
+    upgradeability check then passes without checking anything.
     """
     from tests.pools.oracle.test_rug_signature_fork import _oracles
 
@@ -93,11 +86,10 @@ def test_oracle_recovery_finds_every_selector(
 
 
 def test_every_pool_pragma_is_one_the_deploy_script_can_retarget():
-    """The deploy script must understand every evm-version the pools declare. (#16)
+    """The deploy script must understand every evm-version the pools declare.
 
-    set_contract_pragma rewrites paris and shanghai to suit each chain. A pragma it
-    does not recognise passes through unchanged, so a cancun build would ship to
-    every chain the script meant to downgrade.
+    A pragma set_contract_pragma does not name passes through unchanged, so the pool
+    would ship to chains without the EVM version it was built for.
     """
     with open(os.path.join(REPO, "scripts", "deploy_infra.py"), encoding="utf8") as handle:
         script = handle.read()

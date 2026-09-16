@@ -212,7 +212,7 @@ offpeg_fee_multiplier: public(uint256)  # * 1e10
 admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_FEE: constant(uint256) = 10 ** 4  # 0.0001%; a zero fee gives a zero bound
-BUMP_CEILING: constant(uint256) = 10 ** 8  # 1%, the loosest any pool may be set
+BUMP_CEILING: constant(uint256) = 10 ** 8  # 1%: the widest rate bound, whatever the fee
 HALT_THRESHOLD: constant(uint256) = 500000000  # 5%: a reading this far from its anchor halts trading
 HALTED: constant(uint256) = 2**255  # flag in last_rates_block: a halt was recorded
 
@@ -277,6 +277,7 @@ salt: public(immutable(bytes32))
 CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 
 # --------------------------- Oracle rate bound ------------------------------
+
 # Appended last so the existing storage layout is preserved.
 last_rates: DynArray[uint256, MAX_COINS]
 last_rates_block: uint256
@@ -336,12 +337,10 @@ def __init__(
 
     factory = Factory(msg.sender)
     math = Math(Factory(msg.sender).math_implementation())
-    # math is immutable: a pool built before the factory has one would register,
-    # then revert on every deposit for ever.
+    # math is immutable: without code here the pool would revert on every deposit
     assert math.address.codesize > 0  # dev: math implementation not set
 
-    # ramp_A enforces MAX_A; the constructor did not, so a pool could be built
-    # above the cap and simply never ramped.
+    # the range ramp_A enforces
     assert 0 < _A and _A < MAX_A  # dev: A out of range
     assert MIN_FEE < _fee and _fee <= MAX_FEE  # dev: fee out of range
     assert _offpeg_fee_multiplier > FEE_DENOMINATOR  # dev: offpeg fee disabled
@@ -505,10 +504,10 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
 def _fetch_rates() -> DynArray[uint256, MAX_COINS]:
     """
     @notice Gets rate multipliers for each coin, as their sources report them now.
-    @dev Fails closed. A rate source that reverts, or answers with anything but 32
-         bytes, reverts the call - it does not degrade to a remembered rate, which
-         would price a coin the pool can no longer value. Proportional
-         remove_liquidity reads no rates, so LPs can always leave.
+    @dev Fails closed: a source that reverts, or answers with anything but 32 bytes,
+         reverts the call rather than degrading to a remembered rate for a coin the
+         pool can no longer value. Proportional remove_liquidity reads no rates, so
+         LPs can always leave.
     """
     rates: DynArray[uint256, MAX_COINS] = rate_multipliers
 
@@ -546,23 +545,14 @@ def _fetch_rates() -> DynArray[uint256, MAX_COINS]:
 def _max_rate_bump() -> uint256:
     """
     @notice The furthest one update may move a rate, FEE_DENOMINATOR-scaled.
-    @dev Read from the current fee, so a fee change moves the bound with it.
-         fee * N / (2 * (N - 1)) is the break-even for the cheapest way to cash a
-         rate pushed for one block: a single-sided deposit, which pays about half a
-         fee, then a proportional withdrawal, which reads no rates and pays nothing.
-         A one-way swap into the pushed rate pays a whole fee and breaks even at
-         fee, which this never exceeds.
-
-         What this buys is protection from a rate pushed for one block - a flash
-         donation to a vault, say. It does not stop a trader who knows a lasting
-         step is coming: once the pool reflects the step, a position taken
-         beforehand just waits for it. Nor can it reprice a genuine step faster
-         than one bound per block, and that lag is open to anyone.
-
-         Both have the same answer, and it is the fee rather than this function: a
-         pool whose bound is at least its oracle's largest step - in a two-coin
-         pool, a fee at least the step - reprices a genuine step in one update, and
-         a position taken ahead of it does not cover two fees.
+    @dev Follows the current fee. fee * N / (2 * (N - 1)) is the break-even for the
+         cheapest way to cash a rate pushed for one block (a flash donation to a
+         vault, say): a single-sided deposit, which pays about half a fee, then a
+         proportional withdrawal, which reads no rates and pays nothing. A swap
+         into the pushed rate pays a whole fee, which this never exceeds.
+         It does not stop a trader positioned ahead of a lasting step, and a genuine
+         step reprices at one bound per block. A fee whose bound covers the oracle's
+         largest step answers both: the step then lands in one update.
     """
     return min(self.fee * N_COINS / (2 * (N_COINS - 1)), BUMP_CEILING)
 
@@ -573,24 +563,16 @@ def _rates_this_block(_poke: bool) -> (DynArray[uint256, MAX_COINS], uint256):
     """
     @notice The rates this block prices at, and the last_rates_block to record with them.
     @dev Frozen once a block has accepted them, so a trade already in flight cannot
-         be repriced underneath it; the block to record is then 0, since there is
-         nothing new to record. A trade reverts while the pool is halted, and in a
-         block whose rates would halt it; poke_rates records the halt instead.
-
-         No coin moves more than one bound, and no two coins move apart by more
-         than one bound, an unrated or unseeded coin counting as unmoved. Bounded
-         one coin at a time, two rates pushed in opposite directions would move
-         apart by twice the bound and pay out as one step twice that size.
-
-         A reading further from its anchor than HALT_THRESHOLD halts the pool rather
-         than being clamped into a near-par rate for a coin that has collapsed.
-         Once poke_rates has recorded a halt it stands until every reading is back
-         within two bounds of its anchor, so trading resumes on a rate at most one
-         bound from its source.
-
-         While the pool is empty nobody is exposed to the rate: the bound accrues
-         with the blocks since the last update, up to BUMP_CEILING, and nothing
-         halts, so a pool that sat empty while its source moved is never locked.
+         be repriced underneath it; the block to record is then 0. Otherwise the
+         readings are bounded against last_rates, see math.bound_rates.
+         A reading more than HALT_THRESHOLD from its anchor halts the pool rather
+         than being clamped to a near-par rate for a coin that has collapsed: a
+         trade reverts, and only poke_rates records the halt. A recorded halt clears
+         once every reading is within two bounds of its anchor, so trading resumes
+         at most one bound from the source.
+         An empty pool exposes nobody to the rate: its bound accrues per block since
+         the last update, up to BUMP_CEILING, and it never halts, so a source that
+         moved while it sat empty cannot lock it.
     """
     lrb: uint256 = self.last_rates_block
     if lrb & ~HALTED >= block.number:
@@ -632,9 +614,8 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
 def _stored_rates_w() -> DynArray[uint256, MAX_COINS]:
     """
     @notice _stored_rates, accepting the result as the new starting point.
-    @dev Called from every path that moves value. A pool with no rated coin keeps
-         no cache at all: its rates are constant, so there is nothing to freeze or
-         bound, and the SSTOREs would cost every swap for nothing.
+    @dev Called from every path that prices at the rates. A pool with no rated coin
+         has constant rates and keeps no cache, sparing every swap the SSTOREs.
     """
     if not has_rate_source:
         return rate_multipliers
@@ -1670,10 +1651,9 @@ def get_virtual_price() -> uint256:
          contains rebasing tokens. For integrators, caution is advised.
     @return LP token virtual price normalized to 1e18
     """
-    # Valued at the rates the sources report now, not the bounded trading rates.
-    # LP can always be redeemed proportionally for the underlying coins, which
-    # reads no rates at all; a virtual price that trailed that would let a
-    # metapool sell base LP for less than it redeems for.
+    # At the rates the sources report now, not the bounded trading rates: LP
+    # redeems proportionally without reading rates, and a virtual price trailing
+    # that would let a metapool sell base LP for less than it redeems for.
     amp: uint256 = self._A()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
         self._fetch_rates(), self._balances()
@@ -1819,10 +1799,9 @@ def max_rate_bump() -> uint256:
 def poke_rates():
     """
     @notice Walk a halted pool's rates one bound towards their sources
-    @dev A halting commit reverts with its trade, so without this a genuine step past
-         the halt threshold would halt the pool for good. It moves the anchor exactly
-         as far as a trade would, once per block. An empty pool never halts, and is
-         not walked: its anchor moves only with a deposit.
+    @dev A trade that would halt the pool reverts, so without this a genuine step
+         past HALT_THRESHOLD would halt it for good. Moves the anchors as far as a
+         trade would, once per block. An empty pool never halts and is not walked.
     """
     assert self.total_supply != 0  # dev: nothing to walk
     rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])

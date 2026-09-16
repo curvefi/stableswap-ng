@@ -286,10 +286,11 @@ def bound_rates(
     """
     @notice Bound a pool's rates against the ones it last accepted.
     @dev No coin moves more than _bump, and no two coins move apart by more than
-         _bump, a coin whose rate cannot move counting as unmoved. A coin whose
-         _last is 0 is unseeded and passes through. The second value is whether
-         any reading is further than _limit from its anchor; a _limit of 0 skips
-         that test. Both are FEE_DENOMINATOR (1e10) scaled.
+         _bump, a coin whose rate cannot move counting as unmoved: bounded one at
+         a time, two rates pushed opposite ways would pay out as one step of twice
+         _bump. A coin whose _last is 0 is unseeded and passes through. The second
+         value is whether any reading is further than _limit from its anchor; a
+         _limit of 0 skips that test. Both are FEE_DENOMINATOR (1e10) scaled.
     @param _rates Rates as the pool's sources report them now
     @param _last The rates the pool last accepted
     @param _bump The furthest one update may move a rate
@@ -337,7 +338,7 @@ def rate_now(
 ) -> uint256:
     """
     @notice One coin's rate as its source reports it now, for a pool seeding its bound at deploy.
-    @dev The pool's own rate fetch, for one coin, so a constructor need not carry a second copy.
+    @dev The pool's rate fetch for one coin, kept here so the pools stay under EIP-170.
          Fails closed: a source that reverts, or answers with anything but 32 bytes, reverts.
     @param _coin The coin; read for an ERC4626 vault (asset type 3)
     @param _asset_type The coin's asset type
