@@ -34,6 +34,13 @@ POOLS = {
 
 RPC = os.environ.get("ETH_RPC_URL", "https://eth.drpc.org")
 
+# These tests fork the chain more than once each, at different blocks, and
+# titanoboa 0.1.10's boa.env.fork rewrites the current env in place. That pulls the
+# state out from under every fixture anchor the boa plugin has stacked, and the
+# anchors then fail to unwind at teardown. Each test manages its own chain state, so
+# the plugin's isolation is switched off here rather than fought.
+pytestmark = pytest.mark.ignore_isolation
+
 
 @pytest.fixture(scope="module")
 def swap_deployer():
@@ -46,21 +53,42 @@ def erc20_deployer():
 
 
 def _at(deployer, spec, block):
-    boa.fork(RPC, block_identifier=block, allow_dirty=True)
+    boa.env.fork(RPC, block_identifier=block)
     return deployer.at(spec["pool"])
 
 
-def _fund(erc20_deployer, coin, account, amount):
-    """Mint via boa's dealer, skipping when the token's balance slot is not findable.
+def _deal(token, account, amount):
+    """Set an ERC20 balance on a fork by finding the slot its balances live in.
 
-    Some of these coins are proxies or compute supply on the fly, which the dealer
-    cannot rewrite. Skipping keeps the distinction between "cannot fund" and "the
-    pool is safe" — the two must never look alike.
+    boa.deal does this, but the pinned titanoboa does not have it. Solidity keys a
+    mapping entry at keccak(key . slot) and Vyper at keccak(slot . key); both are
+    tried over the first 32 slots, and every probe is put back if it misses. Returns
+    False for a token that keeps balances anywhere else.
     """
-    try:
-        boa.deal(erc20_deployer.at(coin), account, amount)
-    except ValueError as exc:
-        pytest.skip(f"cannot fund {coin}: {exc}")
+    from eth_utils import keccak
+
+    key = bytes.fromhex(account[2:].lower().rjust(64, "0"))
+    for slot in range(32):
+        s = slot.to_bytes(32, "big")
+        for preimage in (key + s, s + key):
+            position = int.from_bytes(keccak(preimage), "big")
+            original = boa.env.get_storage(token.address, position)
+            boa.env.set_storage(token.address, position, amount)
+            if token.balanceOf(account) == amount:
+                return True
+            boa.env.set_storage(token.address, position, original)
+    return False
+
+
+def _fund(erc20_deployer, coin, account, amount):
+    """Fund an account, skipping when the token's balance slot cannot be found.
+
+    Some of these coins are proxies or compute supply on the fly. Skipping keeps the
+    distinction between "cannot fund" and "the pool is safe" - the two must never
+    look alike.
+    """
+    if not _deal(erc20_deployer.at(coin), account, amount):
+        pytest.skip(f"cannot fund {coin}: no balance slot found")
 
 
 def _oracle_idx(swap):
