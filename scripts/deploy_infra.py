@@ -27,7 +27,15 @@ def set_contract_pragma(contract_file, network) -> boa.contracts.vyper.vyper_con
 
     is_shanghai_chain = any([x in network for x in ["ethereum", "gnosis"]])
 
-    if is_shanghai_chain and "# pragma evm-version paris" in source:
+    if "# pragma evm-version cancun" in source:
+        # Cancun builds are kept as they are. Retargeting them to paris or shanghai
+        # would put the pools back over EIP-170: the rate bound only fits because the
+        # nonreentrant locks become TSTORE/TLOAD. Every chain StableSwap-NG ships to
+        # was probed and executes TSTORE/TLOAD/MCOPY, except kava, which is
+        # paris-only and has no pool with a rate source.
+        logger.log("Keeping EVM version Cancun ...")
+        new_source = source
+    elif is_shanghai_chain and "# pragma evm-version paris" in source:
         logger.log("Replacing EVM version to Shanghai ...")
         new_source = source.replace("# pragma evm-version paris\n", "# pragma evm-version shanghai\n")
     elif not is_shanghai_chain and "# pragma evm-version shanghai" in source:
