@@ -460,6 +460,157 @@ def test_frozen_metapool_block_does_not_call_the_oracle(meta):
     assert oracle.address.lower() not in _called(m._computation), "a frozen call still queried the oracle"
 
 
+def test_one_coin_withdrawal_freezes_the_block(plain):
+    """A one-coin withdrawal fixes the plain pool's rate for the rest of its block. (#4)
+
+    Dropping the commit from this path leaves the freeze disengaged, and an operator
+    can reprice between two value-moving calls in one block. The metapool half of
+    this is pinned above; both paths write, so both are pinned.
+    """
+    swap, coins, oracles, lp = plain()
+    swap.remove_liquidity_one_coin(swap.balanceOf(lp) // 20, 0, 0, sender=lp)
+    committed = swap.stored_rates()[1]
+
+    oracles[1].set_exchange_rate(oracles[1].exchangeRate() * 101 // 100)
+    assert swap.stored_rates()[1] == committed, "the rate moved inside the block after a one-coin withdrawal"
+
+
+def test_imbalanced_withdrawal_freezes_the_block(plain):
+    """An imbalanced withdrawal fixes the block's rate too. (#4)
+
+    Same property as the one-coin path, and the same mutation survives without it:
+    remove_liquidity_imbalance moves value and must therefore commit.
+    """
+    swap, coins, oracles, lp = plain()
+    swap.remove_liquidity_imbalance([TVL // 100, TVL // 200], 2**256 - 1, sender=lp)
+    committed = swap.stored_rates()[1]
+
+    oracles[1].set_exchange_rate(oracles[1].exchangeRate() * 101 // 100)
+    assert swap.stored_rates()[1] == committed, "the rate moved inside the block after an imbalanced withdrawal"
+
+
+def test_a_frozen_block_does_not_requery_the_oracle(plain):
+    """A view in a block whose rate is fixed must read the cache, not the source. (#19)
+
+    The write path is pinned for the metapool above. This is the read path: moving the
+    fetch above the freeze check costs an oracle staticcall on every frozen call and
+    is otherwise invisible.
+    """
+    swap, coins, oracles, lp = plain()
+    swap.exchange(0, 1, 10**18, 0, sender=lp)  # first touch: fixes the block's rate
+
+    swap.stored_rates()
+    assert oracles[1].address.lower() not in _called(swap._computation), "a frozen view still queried the oracle"
+
+
+def test_the_bound_applies_to_an_erc4626_coin(
+    factory, amm_deployer, erc20_deployer, erc4626_deployer, zero_address, set_pool_implementations
+):
+    """A vault share price is bounded like any other rate source. (#1)
+
+    Asset type 3 reads its rate from the coin itself, and a flash donation to the
+    vault is exactly the one-block push the bound exists for - the case
+    _max_rate_bump's own docstring names. Dropping type 3 from the bound leaves that
+    push unclamped and no other test notices.
+    """
+    asset = erc20_deployer.deploy("A", "A", 18)
+    vault = erc4626_deployer.deploy("V", "V", 18, asset.address)
+    plain_coin = erc20_deployer.deploy("P", "P", 18)
+    swap = amm_deployer.at(
+        factory.deploy_plain_pool(
+            "v",
+            "v",
+            [vault.address, plain_coin.address],
+            1000,
+            1_000_000,
+            OFFPEG,
+            866,
+            0,
+            [3, 0],
+            [b"", b""],
+            [zero_address, zero_address],
+        )
+    )
+    lp = boa.env.generate_address()
+    mint_for_testing(lp, 10 * TVL, asset, False)
+    asset.approve(vault.address, 2**256 - 1, sender=lp)
+    vault.deposit(TVL, lp, sender=lp)
+    mint_for_testing(lp, TVL, plain_coin, False)
+    vault.approve(swap.address, 2**256 - 1, sender=lp)
+    plain_coin.approve(swap.address, 2**256 - 1, sender=lp)
+    swap.add_liquidity([vault.balanceOf(lp), TVL], 0, sender=lp)
+    boa.env.time_travel(blocks=1)
+    before = swap.stored_rates()[0]
+
+    # a donation the vault counts as assets: its share price jumps with no shares minted
+    mint_for_testing(vault.address, TVL // 50, asset, False)  # +2% of the vault
+    boa.env.time_travel(blocks=1)
+
+    moved = (swap.stored_rates()[0] - before) / before
+    bound = swap.max_rate_bump() / FEE_DENOMINATOR
+    assert moved <= bound + 1e-12, f"a 2% donation moved a vault coin's rate {moved * 1e4:.2f} bp in one update"
+
+
+def test_two_rated_coins_cannot_be_pushed_apart(plain):
+    """Two rated coins may not move apart by more than one bound in a single update. (#8)
+
+    Bounding each coin against its own anchor lets a pair separate by two bounds when
+    one source is pushed up and the other down, and the trade prices off the ratio.
+    166 mainnet pools carry two rated coins.
+    """
+    swap, coins, oracles, lp = plain(rated=(0, 1))
+    before = swap.stored_rates()[0] / swap.stored_rates()[1]
+
+    oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 105 // 100)
+    oracles[1].set_exchange_rate(oracles[1].exchangeRate() * 95 // 100)
+    boa.env.time_travel(blocks=1)
+
+    moved = abs(swap.stored_rates()[0] / swap.stored_rates()[1] - before) / before
+    bound = swap.max_rate_bump() / FEE_DENOMINATOR
+    # the pair is a ratio, so one bound each way compounds to (1 + b) / (1 - b); the
+    # property is that they separate by one bound, not that the ratio moves by exactly b
+    assert (
+        moved <= bound * (1 + bound) + 1e-12
+    ), f"an opposite push moved the pair {moved * 1e4:.2f} bp, bound {bound * 1e4:.2f} bp"
+
+
+def test_dust_cannot_anchor_an_unfunded_pool(plain):
+    """A dust round trip on an unfunded pool must not fix the rate the first LP pays. (#9)
+
+    add_liquidity works on an empty pool and remove_liquidity gives the dust straight
+    back, so anchoring on the first write let anyone set the rate for nothing and the
+    bound then defended it: the first honest LP deposited at 1.9996 and lost 23% of
+    their deposit in the same block.
+    """
+    swap, coins, oracles, attacker = plain(seed=False)
+    oracles[1].set_exchange_rate(2 * 10**18)  # the push the attacker wants remembered
+    swap.add_liquidity([10**6, 10**6], 0, sender=attacker)
+    swap.remove_liquidity(swap.balanceOf(attacker), [0, 0], sender=attacker)
+    oracles[1].set_exchange_rate(10**18)  # and released
+    boa.env.time_travel(blocks=1)
+
+    honest = boa.env.generate_address()
+    for c in coins:
+        mint_for_testing(honest, TVL, c, False)
+        c.approve(swap.address, 2**256 - 1, sender=honest)
+    swap.add_liquidity([TVL, TVL], 0, sender=honest)
+
+    priced = swap.stored_rates()[1] / 10**18
+    assert abs(priced - 1) <= 0.01, f"the first honest deposit was priced at {priced:.4f} against a true rate of 1"
+
+
+def test_poke_cannot_seed_an_empty_pool(plain):
+    """poke_rates must do nothing on a pool that has never been funded. (#2 #9)
+
+    The poke exists to walk a halted pool back to its source. On an empty pool there
+    is nothing to protect and an anchor to set, so letting it write would hand the
+    seed to whoever pokes first - the hole the test above closes.
+    """
+    swap, coins, oracles, lp = plain(seed=False)
+
+    assert _reverts(lambda: swap.poke_rates()), "poke_rates wrote a rate to an unfunded pool"
+
+
 # -------------------------------------------------------- #6 #8: bound tracks the fee
 
 
