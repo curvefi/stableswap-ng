@@ -31,7 +31,10 @@ def _sanity_check(pool: IStableSwapNG):
     assert staticcall pool.get_virtual_price() > 0
     assert staticcall pool.price_oracle(0) > 0
     A: uint256 = staticcall pool.A_precise()
-    assert POOL_A_PRECISION <= A and A <= lp_oracle_2.MAX_A * POOL_A_PRECISION, "Bad A value"
+    assert (
+        POOL_A_PRECISION <= A
+        and A <= lp_oracle_2.MAX_A * N_COINS**(N_COINS - 1) * POOL_A_PRECISION
+    ), "Bad A value"
     success: bool = False
     response: Bytes[32] = b""
     success, response = raw_call(
