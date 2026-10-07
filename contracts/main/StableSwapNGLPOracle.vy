@@ -47,6 +47,7 @@ def _sanity_check(pool: IStableSwapNG):
     assert not success, "Supports only 2-coin pool"
     _: address = staticcall pool.coins(1)  # 63/64 msg.gas attack safety
 
+
 @view
 @external
 def sanity_check(_pool: IStableSwapNG) -> bool:
@@ -65,14 +66,12 @@ def _scaled_A_raw(pool: IStableSwapNG) -> uint256:
     # Pool stores A as: A_true * N_COINS**(N_COINS-1) * 100.
     # Solver expects: A_true * solver.A_PRECISION.
     A_pool: uint256 = staticcall pool.A_precise()
-    return unsafe_div(
-        A_pool * lp_oracle_2.A_PRECISION,
-        N_COINS**(N_COINS-1) * POOL_A_PRECISION
-    )
+    return unsafe_div(A_pool * lp_oracle_2.A_PRECISION, N_COINS**(N_COINS - 1) * POOL_A_PRECISION)
+
 
 @internal
 @view
-def _portfolio_value(pool: IStableSwapNG, i: uint256=0) -> uint256:
+def _portfolio_value(pool: IStableSwapNG, i: uint256 = 0) -> uint256:
     assert i < N_COINS
 
     p_oracle: uint256 = staticcall pool.price_oracle(0)
@@ -82,16 +81,19 @@ def _portfolio_value(pool: IStableSwapNG, i: uint256=0) -> uint256:
         return x_py * PRECISION // p_oracle
     return x_py
 
+
 @internal
 @view
-def _lp_price(pool: IStableSwapNG, i: uint256=0) -> uint256:
+def _lp_price(pool: IStableSwapNG, i: uint256 = 0) -> uint256:
     # Uses the pool's current virtual price.
-    return unsafe_div(self._portfolio_value(pool, i) * staticcall pool.get_virtual_price(), PRECISION)
+    return unsafe_div(
+        self._portfolio_value(pool, i) * staticcall pool.get_virtual_price(), PRECISION
+    )
 
 
 @external
 @view
-def lp_price(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
+def lp_price(_pool: IStableSwapNG, _i: uint256 = 0) -> uint256:
     """
     @notice Returns the LP token price in the selected coin base numeraire.
     @dev The result is scaled to 1e18 and quoted in the base asset of coin `_i`.
