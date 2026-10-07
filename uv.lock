@@ -599,7 +599,7 @@ toml = [
 [[package]]
 name = "curve-std"
 version = "0.1.0"
-source = { git = "https://github.com/curvefi/curve-std?rev=main#048cb23d0ed4c48768815ea5c46d4a676da8de35" }
+source = { git = "https://github.com/curvefi/curve-std?rev=68a13eb2ee80bd704fc259a3aed0a6ce53d59b72#68a13eb2ee80bd704fc259a3aed0a6ce53d59b72" }
 dependencies = [
     { name = "snekmate" },
     { name = "titanoboa" },
@@ -2135,7 +2135,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "curve-std", git = "https://github.com/curvefi/curve-std?rev=main" },
+    { name = "curve-std", git = "https://github.com/curvefi/curve-std?rev=68a13eb2ee80bd704fc259a3aed0a6ce53d59b72" },
     { name = "snekmate", specifier = ">=0.1.2" },
     { name = "vyper", specifier = "==0.4.3" },
 ]
