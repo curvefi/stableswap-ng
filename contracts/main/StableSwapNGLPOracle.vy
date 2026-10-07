@@ -123,8 +123,8 @@ def lp_price(_pool: IStableSwapNG, _i: uint256 = 0) -> uint256:
 
          This call reverts, with no fallback price, while
          `_pool.price_oracle(0)` is below `lp_oracle_2.MIN_P` = 0.01. The pool
-          caps the price only from above, at 2.0, so it can fall below 0.01 if
-          coin 1 collapses against coin 0.
+         caps the price only from above, at 2.0, so it can fall below 0.01 if
+         coin 1 collapses against coin 0.
     @param _pool Address of the StableSwapNG pool.
     @param _i Coin index used as the numeraire, where 0 or 1 are supported.
     @return uint256 LP price scaled to 1e18 in the base asset of coin `_i`.
