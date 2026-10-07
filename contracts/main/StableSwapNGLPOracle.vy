@@ -4,7 +4,7 @@
 @title StableSwapNGLPOracle
 @author Curve.Fi
 @license MIT
-@notice LP oracle for StableSwap-NG (n=2) reusing lp_oracle_bisection math.
+@notice LP oracle for StableSwap-NG (n=2) reusing the curve-std `lp_oracle_2` solver.
 @dev Attention: LP pricing here depends on the pool `virtual_price`; see
      `lp_price()` comments for important caveats.
 """
@@ -53,6 +53,7 @@ def _sanity_check(pool: IStableSwapNG):
 def sanity_check(_pool: IStableSwapNG) -> bool:
     """
     @notice Validates core pool parameters required by this oracle.
+    @dev Meant for integration-time validation: `lp_price()` does not call it.
     @param _pool Address of the StableSwapNG pool.
     @return bool True if all sanity checks pass, otherwise reverts.
     """
@@ -103,14 +104,27 @@ def lp_price(_pool: IStableSwapNG, _i: uint256 = 0) -> uint256:
          To convert the result to token `_i` space while keeping 1e18 scaling:
          `token_rate = _pool.stored_rates()[_i] / 10**(18 - decimals(_pool.coins(_i)))`
          `price_token = price_base * 1e18 / token_rate`
-    @dev LP token price can be inflated by a natural increase in
+
+         LP token price can be atomically inflated by a natural increase in
          `_pool.get_virtual_price()`, including through wash trading or due to
          the rate oracles used by the pool tokens.
-    @dev The underlying `_pool.price_oracle(0)` used by this LP token oracle is
+
+         The underlying `_pool.price_oracle(0)` used by this LP token oracle is
          capped at 2.0 (2e18), so the LP token price returned by this oracle is
          capped accordingly.
-    @dev This call can revert if `_pool.get_virtual_price()` reverts, e.g.
+
+         `_pool.price_oracle(0)` is an EMA of the pool spot price. In a pool
+         with low liquidity it can be biased at low cost, and the bias persists
+         for about the pool's EMA time even after liquidity is added. Do not use
+         this oracle for low-liquidity pools.
+
+         This call can revert if `_pool.get_virtual_price()` reverts, e.g.
          because the pool's external rate oracle path fails.
+
+         This call reverts, with no fallback price, while
+         `_pool.price_oracle(0)` is below `lp_oracle_2.MIN_P` = 0.01. The pool
+          caps the price only from above, at 2.0, so it can fall below 0.01 if
+          coin 1 collapses against coin 0.
     @param _pool Address of the StableSwapNG pool.
     @param _i Coin index used as the numeraire, where 0 or 1 are supported.
     @return uint256 LP price scaled to 1e18 in the base asset of coin `_i`.
