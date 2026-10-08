@@ -14,7 +14,7 @@ cached-property==1.5.2
     # via
     #   py-ecc
     #   py-evm
-cbor2==5.6.4
+cbor2==5.9.0
     # via vyper
 certifi==2024.8.30
     # via requests
