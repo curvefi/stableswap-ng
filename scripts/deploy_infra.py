@@ -24,10 +24,15 @@ def fetch_url(network):
 def set_contract_pragma(contract_file, network) -> boa.contracts.vyper.vyper_contract.VyperDeployer:
     with open(contract_file, "r") as f:
         source = f.read()
+    deploy_utils.check_evm_version(source, network)
 
     is_shanghai_chain = any([x in network for x in ["ethereum", "gnosis"]])
 
-    if is_shanghai_chain and "# pragma evm-version paris" in source:
+    if "# pragma evm-version cancun" in source:
+        # keep cancun: compiled for shanghai or paris the pools exceed the blueprint size limit
+        logger.log("Keeping EVM version Cancun ...")
+        new_source = source
+    elif is_shanghai_chain and "# pragma evm-version paris" in source:
         logger.log("Replacing EVM version to Shanghai ...")
         new_source = source.replace("# pragma evm-version paris\n", "# pragma evm-version shanghai\n")
     elif not is_shanghai_chain and "# pragma evm-version shanghai" in source:
