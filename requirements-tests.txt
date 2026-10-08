@@ -169,7 +169,7 @@ pytest-xdist==3.6.1
     # via -r requirements-tests.in
 regex==2024.9.11
     # via parsimonious
-requests==2.32.3
+requests==2.33.0
     # via titanoboa
 rich==13.8.1
     # via titanoboa
