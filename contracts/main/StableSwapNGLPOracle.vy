@@ -4,7 +4,7 @@
 @title StableSwapNGLPOracle
 @author Curve.Fi
 @license MIT
-@notice LP oracle for StableSwap-NG (n=2) reusing lp_oracle_bisection math.
+@notice LP oracle for StableSwap-NG (n=2) reusing the curve-std `lp_oracle_2` solver.
 @dev Attention: LP pricing here depends on the pool `virtual_price`; see
      `lp_price()` comments for important caveats.
 """
@@ -31,7 +31,10 @@ def _sanity_check(pool: IStableSwapNG):
     assert staticcall pool.get_virtual_price() > 0
     assert staticcall pool.price_oracle(0) > 0
     A: uint256 = staticcall pool.A_precise()
-    assert POOL_A_PRECISION <= A and A <= lp_oracle_2.MAX_A * POOL_A_PRECISION, "Bad A value"
+    assert (
+        POOL_A_PRECISION <= A
+        and A <= lp_oracle_2.MAX_A * N_COINS**(N_COINS - 1) * POOL_A_PRECISION
+    ), "Bad A value"
     success: bool = False
     response: Bytes[32] = b""
     success, response = raw_call(
@@ -44,11 +47,13 @@ def _sanity_check(pool: IStableSwapNG):
     assert not success, "Supports only 2-coin pool"
     _: address = staticcall pool.coins(1)  # 63/64 msg.gas attack safety
 
+
 @view
 @external
 def sanity_check(_pool: IStableSwapNG) -> bool:
     """
     @notice Validates core pool parameters required by this oracle.
+    @dev Meant for integration-time validation: `lp_price()` does not call it.
     @param _pool Address of the StableSwapNG pool.
     @return bool True if all sanity checks pass, otherwise reverts.
     """
@@ -62,14 +67,12 @@ def _scaled_A_raw(pool: IStableSwapNG) -> uint256:
     # Pool stores A as: A_true * N_COINS**(N_COINS-1) * 100.
     # Solver expects: A_true * solver.A_PRECISION.
     A_pool: uint256 = staticcall pool.A_precise()
-    return unsafe_div(
-        A_pool * lp_oracle_2.A_PRECISION,
-        N_COINS**(N_COINS-1) * POOL_A_PRECISION
-    )
+    return unsafe_div(A_pool * lp_oracle_2.A_PRECISION, N_COINS**(N_COINS - 1) * POOL_A_PRECISION)
+
 
 @internal
 @view
-def _portfolio_value(pool: IStableSwapNG, i: uint256=0) -> uint256:
+def _portfolio_value(pool: IStableSwapNG, i: uint256 = 0) -> uint256:
     assert i < N_COINS
 
     p_oracle: uint256 = staticcall pool.price_oracle(0)
@@ -79,16 +82,19 @@ def _portfolio_value(pool: IStableSwapNG, i: uint256=0) -> uint256:
         return x_py * PRECISION // p_oracle
     return x_py
 
+
 @internal
 @view
-def _lp_price(pool: IStableSwapNG, i: uint256=0) -> uint256:
+def _lp_price(pool: IStableSwapNG, i: uint256 = 0) -> uint256:
     # Uses the pool's current virtual price.
-    return unsafe_div(self._portfolio_value(pool, i) * staticcall pool.get_virtual_price(), PRECISION)
+    return unsafe_div(
+        self._portfolio_value(pool, i) * staticcall pool.get_virtual_price(), PRECISION
+    )
 
 
 @external
 @view
-def lp_price(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
+def lp_price(_pool: IStableSwapNG, _i: uint256 = 0) -> uint256:
     """
     @notice Returns the LP token price in the selected coin base numeraire.
     @dev The result is scaled to 1e18 and quoted in the base asset of coin `_i`.
@@ -98,14 +104,27 @@ def lp_price(_pool: IStableSwapNG, _i: uint256=0) -> uint256:
          To convert the result to token `_i` space while keeping 1e18 scaling:
          `token_rate = _pool.stored_rates()[_i] / 10**(18 - decimals(_pool.coins(_i)))`
          `price_token = price_base * 1e18 / token_rate`
-    @dev LP token price can be inflated by a natural increase in
+
+         LP token price can be atomically inflated by a natural increase in
          `_pool.get_virtual_price()`, including through wash trading or due to
          the rate oracles used by the pool tokens.
-    @dev The underlying `_pool.price_oracle(0)` used by this LP token oracle is
+
+         The underlying `_pool.price_oracle(0)` used by this LP token oracle is
          capped at 2.0 (2e18), so the LP token price returned by this oracle is
          capped accordingly.
-    @dev This call can revert if `_pool.get_virtual_price()` reverts, e.g.
+
+         `_pool.price_oracle(0)` is an EMA of the pool spot price. In a pool
+         with low liquidity it can be biased at low cost, and the bias persists
+         for about the pool's EMA time even after liquidity is added. Do not use
+         this oracle for low-liquidity pools.
+
+         This call can revert if `_pool.get_virtual_price()` reverts, e.g.
          because the pool's external rate oracle path fails.
+
+         This call reverts, with no fallback price, while
+         `_pool.price_oracle(0)` is below `lp_oracle_2.MIN_P` = 0.01. The pool
+         caps the price only from above, at 2.0, so it can fall below 0.01 if
+         coin 1 collapses against coin 0.
     @param _pool Address of the StableSwapNG pool.
     @param _i Coin index used as the numeraire, where 0 or 1 are supported.
     @return uint256 LP price scaled to 1e18 in the base asset of coin `_i`.
