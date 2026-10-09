@@ -132,6 +132,40 @@ def swap(empty_swap, bob, deposit_amounts):
     empty_swap.add_liquidity(deposit_amounts, 0, bob, sender=bob)
     return empty_swap
 
+def test_deploy_metapool_same_asset(
+    deployer,
+    factory,
+    zero_address,
+    meta_token,
+    ng_base_pool,
+    ng_base_pool_tokens,
+    meta_deployer,
+    add_ng_base_pool,
+    set_metapool_implementations,
+):
+    method_id = bytes(b"")
+    oracle = zero_address
+    offpeg_fee_multiplier = 20000000000
+    A = 1000
+    fee = 3000000
+    
+    with boa.reverts():
+        pool = factory.deploy_metapool(
+            ng_base_pool.address,  # _base_pool: address
+            "test",  # _name: String[32],
+            "test",  # _symbol: String[10],
+            ng_base_pool_tokens[1].address, 
+            A,  # _A: uint256,
+            fee,  # _fee: uint256,
+            offpeg_fee_multiplier,
+            866,  # _ma_exp_time: uint256,
+            0,  # _implementation_idx: uint256
+            meta_token.asset_type(),  # _asset_type: uint8
+            method_id,  # _method_id: bytes4
+            oracle,  # _oracle: address
+        )
+
+
 
 @pytest.mark.parametrize("sending,receiving", itertools.permutations(range(4), 2))
 def test_exchange_underlying_ng_base(swap, bob, sending, receiving):
