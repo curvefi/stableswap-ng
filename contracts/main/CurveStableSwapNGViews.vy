@@ -20,6 +20,7 @@ interface StableSwapNG:
     def fee() -> uint256: view
     def get_dy(i: int128, j: int128, dx: uint256) -> uint256: view
     def A() -> uint256: view
+    def A_precise() -> uint256: view
     def calc_withdraw_one_coin(_token_amount: uint256, i: int128) -> uint256: view
     def totalSupply() -> uint256: view
     def offpeg_fee_multiplier() -> uint256: view
@@ -72,7 +73,7 @@ def get_dy(i: int128, j: int128, dx: uint256, pool: address) -> uint256:
     xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     rates, balances, xp = self._get_rates_balances_xp(pool, N_COINS)
 
-    amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
+    amp: uint256 = StableSwapNG(pool).A_precise()
     D: uint256 = self.get_D(xp, amp, N_COINS)
 
     x: uint256 = xp[i] + (dx * rates[i] / PRECISION)
@@ -200,7 +201,7 @@ def get_dy_underlying(
             return StableSwapNG(BASE_POOL).get_dy(base_i, base_j, dx)
 
     # This pool is involved only when in-pool assets are used
-    amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
+    amp: uint256 = StableSwapNG(pool).A_precise()
     D: uint256 = self.get_D(xp, amp, N_COINS)
     y: uint256 = self.get_y(meta_i, meta_j, x, xp, amp, D, N_COINS)
     dy: uint256 = xp[meta_j] - y - 1
@@ -254,7 +255,7 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128, pool: address) -> u
     # * Get current D
     # * Solve Eqn against y_i for D - _token_amount
 
-    amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
+    amp: uint256 = StableSwapNG(pool).A_precise()
     N_COINS: uint256 = StableSwapNG(pool).N_COINS()
 
     rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
@@ -360,7 +361,7 @@ def _get_dx(
     xp: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     rates, balances, xp = self._get_rates_balances_xp(pool, N_COINS)
 
-    amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
+    amp: uint256 = StableSwapNG(pool).A_precise()
     D: uint256 = self.get_D(xp, amp, N_COINS)
 
     base_fee: uint256 = StableSwapNG(pool).fee()
@@ -400,7 +401,7 @@ def _calc_token_amount(
     n_coins: uint256,
 ) -> uint256:
 
-    amp: uint256 = StableSwapNG(pool).A() * A_PRECISION
+    amp: uint256 = StableSwapNG(pool).A_precise()
 
     rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     old_balances: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
