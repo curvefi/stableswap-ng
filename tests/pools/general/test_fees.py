@@ -1,3 +1,4 @@
+import boa
 import pytest
 
 pytestmark = pytest.mark.usefixtures("initial_setup")
@@ -73,3 +74,53 @@ def test_withdraw_admin_fees(bob, swap, pool_type, pool_tokens, underlying_token
     else:
         for i, coin in enumerate(underlying_tokens[:2]):
             assert coin.balanceOf(fee_receiver) == pytest.approx(fees[i], abs=1)
+
+
+def test_fees_route_to_pool_fee_receiver(
+    bob, swap, owner, fee_receiver, pool_type, pool_tokens, underlying_tokens, initial_amounts
+):
+    pool_receiver = boa.env.generate_address("pool_receiver")
+    swap.set_fee_receiver(pool_receiver, sender=owner)
+
+    swap.exchange(0, 1, initial_amounts[0], 0, sender=bob)
+    admin_balance = swap.admin_balances(1)
+    assert admin_balance > 0
+
+    swap.withdraw_admin_fees(sender=bob)
+
+    if pool_type == 0:
+        assert pool_tokens[1].balanceOf(pool_receiver) == pytest.approx(admin_balance, abs=1)
+        assert pool_tokens[1].balanceOf(fee_receiver) == 0
+    else:
+        assert underlying_tokens[1].balanceOf(pool_receiver) == pytest.approx(admin_balance, abs=1)
+        assert underlying_tokens[1].balanceOf(fee_receiver) == 0
+
+
+def test_fees_fallback_to_factory_receiver(
+    bob, swap, fee_receiver, pool_type, pool_tokens, underlying_tokens, initial_amounts
+):
+    assert swap.pool_fee_receiver() == boa.eval("empty(address)")
+
+    swap.exchange(0, 1, initial_amounts[0], 0, sender=bob)
+    admin_balance = swap.admin_balances(1)
+    assert admin_balance > 0
+
+    swap.withdraw_admin_fees(sender=bob)
+
+    if pool_type == 0:
+        assert pool_tokens[1].balanceOf(fee_receiver) == pytest.approx(admin_balance, abs=1)
+    else:
+        assert underlying_tokens[1].balanceOf(fee_receiver) == pytest.approx(admin_balance, abs=1)
+
+
+def test_fees_stay_when_no_receiver(bob, swap, owner, factory, initial_amounts):
+    assert swap.pool_fee_receiver() == boa.eval("empty(address)")
+    factory.set_fee_receiver(swap.address, boa.eval("empty(address)"), sender=owner)
+
+    swap.exchange(0, 1, initial_amounts[0], 0, sender=bob)
+    admin_balance = swap.admin_balances(1)
+    assert admin_balance > 0
+
+    swap.withdraw_admin_fees(sender=bob)
+
+    assert swap.admin_balances(1) == admin_balance
