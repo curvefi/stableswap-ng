@@ -262,6 +262,15 @@ ma_last_time: public(uint256)                     # packing: ma_last_time_p, ma_
 # shift(2**32 - 1, 224)
 ORACLE_BIT_MASK: constant(uint256) = (2**32 - 1) * 256**28
 
+# The stored spot price is clamped to [ema / K, ema * K], where ema is the price
+# EMA computed in the same oracle update and K = SPOT_BAND_NUM / SPOT_BAND_DEN.
+# The band is relative, so it follows the EMA: any price level is reachable over
+# time, but one update (one block) cannot move the EMA by more than
+# (K - 1) * (1 - exp(-dt / ma_exp_time)), whatever the spot is pushed to.
+# With K = 1.1 and ma_exp_time = 866 that is 0.14% per 12 s block.
+SPOT_BAND_NUM: constant(uint256) = 11  # K = 11 / 10 = 1.1
+SPOT_BAND_DEN: constant(uint256) = 10
+
 # --------------------------- ERC20 Specific Vars ----------------------------
 
 name: public(immutable(String[64]))
@@ -849,14 +858,15 @@ def add_liquidity(
 
         mint_amount = D1  # Take the dust if there was any
 
-        # (re)instantiate D oracle if totalSupply is zero.
+        # (re)instantiate price and D oracles if totalSupply is zero: the stored
+        # spot can only move within the relative band around the EMA, so the
+        # EMA must start from the actual price of the first deposit.
+        p: uint256 = self._get_p(self._xp_mem(rates, new_balances), amp, D1)
+        self.last_prices_packed = self.pack_2(p, p)
         self.last_D_packed = self.pack_2(D1, D1)
 
-        # Update D ma time:
-        ma_last_time_unpacked: uint256[2] = self.unpack_2(self.ma_last_time)
-        if ma_last_time_unpacked[1] < block.timestamp:
-            ma_last_time_unpacked[1] = block.timestamp
-            self.ma_last_time = self.pack_2(ma_last_time_unpacked[0], ma_last_time_unpacked[1])
+        # Update ma time of both oracles:
+        self.ma_last_time = self.pack_2(block.timestamp, block.timestamp)
 
     assert mint_amount >= _min_mint_amount, "Slippage screwed you"
 
@@ -1402,14 +1412,21 @@ def upkeep_oracles(xp: uint256[N_COINS], amp: uint256, D: uint256):
     # Metapools are always 2-coin pools, so we care about idx=0 only:
     if spot_price != 0:
 
+        ema_new: uint256 = self._calc_moving_average(
+            last_prices_packed_current,
+            self.ma_exp_time,
+            ma_last_time_unpacked[0],  # index 0 is ma_exp_time for prices
+        )
+
         # Update packed prices -----------------
+        # Spot is clamped to [ema_new / K, ema_new * K]. ema_new < 2**128
+        # (pack_2 invariant), so the products cannot overflow.
         last_prices_packed_new = self.pack_2(
-            min(spot_price, 2 * 10**18),  # <----- Cap spot value by 2.
-            self._calc_moving_average(
-                last_prices_packed_current,
-                self.ma_exp_time,
-                ma_last_time_unpacked[0],  # index 0 is ma_exp_time for prices
-            )
+            min(
+                max(spot_price, ema_new * SPOT_BAND_DEN / SPOT_BAND_NUM),
+                ema_new * SPOT_BAND_NUM / SPOT_BAND_DEN,
+            ),
+            ema_new,
         )
 
     self.last_prices_packed = last_prices_packed_new

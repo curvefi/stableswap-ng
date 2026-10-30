@@ -6,11 +6,29 @@ import pytest
 from boa.test import strategy
 from hypothesis import HealthCheck, given, settings
 
+from tests.constants import POOL_TYPES, TOKEN_TYPES
+from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils import approx
 from tests.utils.tokens import mint_for_testing
 
 SETTINGS = {"max_examples": 10, "deadline": None, "suppress_health_check": [HealthCheck.function_scoped_fixture]}
 pytestmark = pytest.mark.usefixtures("initial_setup")
+
+MA_EXP_TIME = 866
+# Mirrors SPOT_BAND_NUM / SPOT_BAND_DEN in the contracts: the stored spot price is
+# clamped to [ema / K, ema * K], where ema is the EMA computed in the same update.
+SPOT_BAND = 11 / 10
+
+
+def clamp_spot(p, ema):
+    return min(max(p, ema / SPOT_BAND), ema * SPOT_BAND)
+
+
+def precision(swap):
+    try:
+        return 1e-2 if swap._immutables.pool_contains_rebasing_tokens else 1e-5
+    except AttributeError:  # ABIContract (vvm-compiled) has no _immutables
+        return 1e-2
 
 
 def get_D(swap, math):
@@ -26,18 +44,11 @@ def check_oracle(swap, dt):
     p_amm = []
     coins = swap.N_COINS() - 1
     assert 0 < coins < 10
-    if swap._immutables.pool_contains_rebasing_tokens:
-        prec = 1e-2
-    else:
-        prec = 1e-5
+    prec = precision(swap)
     for n in range(coins):
-        _p = swap.get_p(n)
-        if _p > 2 * 10**18 or _p < 0.5 * 10**18:
-            # oracle price can't go more than 2 (but can be less than 0.5)
-            # Contract code: min(spot_price[i], 2 * 10**18),  # <----- Cap spot value by 2.
-            # If first (idx = 0) token depegs, then spot_price[1] can become >> 2, but will be capped
-            # If second (idx = 1) token depegs, then spot_price[1] can become << 0.5, but _WILL_NOT_ be capped
-            pytest.skip("Oracle threshold exceeded, xfail")
+        # No time has passed since the last oracle update, so the EMA is still
+        # 10**18 and the stored spot is clamped to [10**18 / K, 10**18 * K]:
+        _p = clamp_spot(swap.get_p(n), 10**18)
         assert approx(swap.last_price(n), _p, prec)
         assert approx(swap.price_oracle(n), 10**18, prec)
 
@@ -47,7 +58,7 @@ def check_oracle(swap, dt):
     boa.env.time_travel(dt)
 
     # calculate weights based on time travelled:
-    w = exp(-dt / 866)
+    w = exp(-dt / MA_EXP_TIME)
 
     # check:
     for n in range(coins):
@@ -168,13 +179,65 @@ def test_manipulate_ema(basic_swap, bob, pool_tokens, underlying_tokens, decimal
     except boa.BoaError:
         return  # we're okay with failure to manipulate here
 
+    # the stored spot can't leave [ema / K, ema * K] (ema is still 10**18 here):
+    ema0 = basic_swap.price_oracle(0)
+    assert approx(ema0, 10**18, 1e-5)
+    assert ema0 / SPOT_BAND * (1 - 1e-9) <= basic_swap.last_price(0) <= ema0 * SPOT_BAND * (1 + 1e-9)
+
     # time travel
+    dt = 500 * 12
     boa.env.time_travel(blocks=500)
 
-    # check if price oracle is way too high
+    # check if price oracle is way too high: the EMA can't move by more than
+    # (K - 1) * (1 - exp(-dt / ma_exp_time)) from a single swap
     p_oracle_after = basic_swap.price_oracle(0)
+    w = exp(-dt / MA_EXP_TIME)
 
+    assert p_oracle_after <= ema0 * (1 + (SPOT_BAND - 1) * (1 - w)) * (1 + 1e-5)
     assert p_oracle_after < 2 * 10**18
+
+
+@pytest.mark.only_basic_pool
+def test_initial_deposit_sets_oracle(basic_swap, pool_type):
+    # the first deposit (re)instantiates the price oracle at the actual spot, so a pool
+    # whose fair price is far from 1 does not have to walk there through the band
+    assert pool_type == POOL_TYPES["basic"]
+    prec = precision(basic_swap)
+    p_spot = basic_swap.get_p(0)
+    assert approx(basic_swap.last_price(0), p_spot, prec)
+    assert approx(basic_swap.price_oracle(0), p_spot, prec)
+
+
+@pytest.mark.only_basic_pool
+@pytest.mark.parametrize("i,j", [(0, 1), (1, 0)])
+def test_spot_band(basic_swap, bob, pool_tokens, pool_token_types, pool_type, decimals, i, j):
+    assert pool_type == POOL_TYPES["basic"]
+    prec = 1e-2 if TOKEN_TYPES["rebasing"] in pool_token_types else 1e-5
+
+    # swap the whole pool balance one way: spot leaves the band on side i
+    amount_in = INITIAL_AMOUNT * 10 ** decimals[i]
+    mint_for_testing(bob, amount_in, pool_tokens[i], False)
+    basic_swap.exchange(i, j, amount_in, 0, sender=bob)
+
+    # EMA computed in the same update is still 10**18, stored spot sits on the band edge:
+    ema0 = basic_swap.price_oracle(0)
+    p_spot = basic_swap.get_p(0)
+    last_p = basic_swap.last_price(0)
+    assert approx(ema0, 10**18, prec)
+    if i == 0:
+        assert p_spot > ema0 * SPOT_BAND
+        assert approx(last_p, ema0 * SPOT_BAND, 1e-9)
+    else:
+        assert p_spot < ema0 / SPOT_BAND
+        assert approx(last_p, ema0 / SPOT_BAND, 1e-9)
+
+    # after dt the EMA moved towards the clamped spot, i.e. by at most (K - 1) * (1 - w):
+    dt = MA_EXP_TIME
+    boa.env.time_travel(dt)
+    w = exp(-dt / MA_EXP_TIME)
+    p_oracle = basic_swap.price_oracle(0)
+    assert approx(p_oracle, ema0 * w + last_p * (1 - w), 1e-5)
+    assert abs(p_oracle / ema0 - 1) <= (SPOT_BAND - 1) * (1 - w) * (1 + 1e-5)
 
 
 @given(
@@ -204,7 +267,7 @@ def test_D_ema(swap, bob, pool_tokens, underlying_tokens, decimals, amount, dt0,
     boa.env.time_travel(dt)
 
     # calculate weights based on time travelled:
-    w = exp(-dt / 866)
+    w = exp(-dt / MA_EXP_TIME)
 
     # check:
     D1 = get_D(swap, math_implementation)
