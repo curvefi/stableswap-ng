@@ -1912,6 +1912,24 @@ def get_virtual_price() -> uint256:
 
 @view
 @external
+@nonreentrant('lock')
+def virtual_price_bounded() -> uint256:
+    """
+    @notice The virtual price at the rates this block prices trades at
+    @dev get_virtual_price values the LP at what it redeems for, so it reads the
+         sources. Quotes, mints and burns price at the bounded rates instead, and the
+         two differ while a rate is still catching up. An integrator that values LP and
+         transacts in the same breath needs both sides on one of them, or it measures
+         the gap between them as profit; this is the side the pool transacts at.
+         Reverts while the pool is halted, as every quote does.
+    @return LP token virtual price at the bounded rates, normalized to 1e18
+    """
+    D: uint256 = self.get_D_mem(self._stored_rates(), self._balances(), self._A())
+    return D * PRECISION / self.total_supply
+
+
+@view
+@external
 def calc_token_amount(
     _amounts: uint256[N_COINS],
     _is_deposit: bool
