@@ -955,15 +955,22 @@ def test_a_backwards_clock_does_not_stop_the_pool_answering(plain):
 
     oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 101 // 100)
     boa.env.time_travel(blocks=5, block_delta=0)
-    boa.env.evm.patch.timestamp -= 600  # ten minutes into the past
 
-    rates = swap.stored_rates()  # must not revert
-    moved = (rates[0] - before) / before
-    want = 1_000_000 / FEE_DENOMINATOR
-    assert abs(moved - want) <= 1e-9, (
-        f"a backwards clock admitted {moved * 1e4:.2f} bp, not the one step of " f"{want * 1e4:.2f} bp"
-    )
-    swap.exchange(0, 1, 10**18, 0, sender=lp)  # and the pool still trades
+    # boa.env is process-global and xdist runs several modules per worker, so the clock
+    # goes back for this one assertion and no further: left rewound, it is the next
+    # module that fails, in CI, days later, on something that has nothing to do with it.
+    was = boa.env.evm.patch.timestamp
+    boa.env.evm.patch.timestamp = was - 600  # ten minutes into the past
+    try:
+        rates = swap.stored_rates()  # must not revert
+        moved = (rates[0] - before) / before
+        want = 1_000_000 / FEE_DENOMINATOR
+        assert abs(moved - want) <= 1e-9, (
+            f"a backwards clock admitted {moved * 1e4:.2f} bp, not the one step of " f"{want * 1e4:.2f} bp"
+        )
+        swap.exchange(0, 1, 10**18, 0, sender=lp)  # and the pool still trades
+    finally:
+        boa.env.evm.patch.timestamp = was
 
 
 # <---------------------   Metapool base LP at its true value   --------------------->
