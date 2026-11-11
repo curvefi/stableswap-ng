@@ -9,7 +9,8 @@ from tests.fixtures.constants import INITIAL_AMOUNT
 from tests.utils.tokens import mint_for_testing
 
 
-@pytest.fixture()
+# module-scoped so the module-scoped implementations can deploy from it; it is never asserted on
+@pytest.fixture(scope="module")
 def deployer():
     return boa.env.generate_address()
 

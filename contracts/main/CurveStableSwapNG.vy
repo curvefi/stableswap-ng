@@ -1,6 +1,6 @@
 # pragma version 0.3.10
 # pragma optimize codesize
-# pragma evm-version shanghai
+# pragma evm-version cancun
 """
 @title CurveStableSwapNG
 @author Curve.Fi
@@ -63,6 +63,45 @@ interface Factory:
     def fee_receiver() -> address: view
     def admin() -> address: view
     def views_implementation() -> address: view
+    def math_implementation() -> address: view
+
+interface Math:
+    def get_y(
+        i: int128,
+        j: int128,
+        x: uint256,
+        xp: DynArray[uint256, MAX_COINS],
+        _amp: uint256,
+        _D: uint256,
+        _n_coins: uint256
+    ) -> uint256: view
+    def get_y_D(
+        A: uint256,
+        i: int128,
+        xp: DynArray[uint256, MAX_COINS],
+        D: uint256,
+        _n_coins: uint256
+    ) -> uint256: view
+    def get_D(
+        _xp: DynArray[uint256, MAX_COINS],
+        _amp: uint256,
+        _n_coins: uint256
+    ) -> uint256: view
+    def exp(_power: int256) -> uint256: view
+    def bound_rates(
+        _rates: DynArray[uint256, MAX_COINS],
+        _last: DynArray[uint256, MAX_COINS],
+        _bump: uint256,
+        _limit: uint256,
+    ) -> (DynArray[uint256, MAX_COINS], bool): view
+    def rate_now(
+        _coin: address,
+        _asset_type: uint8,
+        _rate_oracle: uint256,
+        _rate_multiplier: uint256,
+        _call_amount: uint256,
+        _scale_factor: uint256,
+    ) -> uint256: view
 
 interface ERC1271:
     def isValidSignature(_hash: bytes32, _signature: Bytes[65]) -> bytes32: view
@@ -159,9 +198,11 @@ N_COINS_128: immutable(int128)
 PRECISION: constant(uint256) = 10 ** 18
 
 factory: immutable(Factory)
+math: immutable(Math)
 coins: public(immutable(DynArray[address, MAX_COINS]))
 asset_types: immutable(DynArray[uint8, MAX_COINS])
 pool_contains_rebasing_tokens: immutable(bool)
+has_rate_source: immutable(bool)  # any coin priced by an oracle or an ERC4626 vault
 stored_balances: DynArray[uint256, MAX_COINS]
 
 # Fee specific vars
@@ -170,6 +211,10 @@ fee: public(uint256)  # fee * 1e10
 offpeg_fee_multiplier: public(uint256)  # * 1e10
 admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
+MIN_FEE: constant(uint256) = 10 ** 4  # 0.0001%; a zero fee gives a zero bound
+BUMP_CEILING: constant(uint256) = 10 ** 8  # 1%: the widest rate bound, whatever the fee
+HALT_THRESHOLD: constant(uint256) = 500000000  # 5%: a reading this far from its anchor halts trading
+HALTED: constant(uint256) = 2**255  # flag in last_rates_block: a halt was recorded
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -231,6 +276,12 @@ CACHED_CHAIN_ID: immutable(uint256)
 salt: public(immutable(bytes32))
 CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
 
+# --------------------------- Oracle rate bound ------------------------------
+
+# Appended last so the existing storage layout is preserved.
+last_rates: DynArray[uint256, MAX_COINS]
+last_rates_block: uint256
+
 
 # ------------------------------ AMM Setup -----------------------------------
 
@@ -285,7 +336,14 @@ def __init__(
     rate_multipliers = _rate_multipliers
 
     factory = Factory(msg.sender)
+    # immutable, and the rate seed below calls it for every coin, so a factory with no
+    # math implementation cannot deploy a pool
+    math = Math(Factory(msg.sender).math_implementation())
 
+    # the range ramp_A enforces
+    assert 0 < _A and _A < MAX_A  # dev: A out of range
+    assert MIN_FEE < _fee and _fee <= MAX_FEE  # dev: fee out of range
+    assert _offpeg_fee_multiplier > FEE_DENOMINATOR  # dev: offpeg fee disabled
     A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
     self.future_A = A
@@ -302,12 +360,17 @@ def __init__(
     _call_amount: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _scale_factor: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     _rate_oracles: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    _has_rate_source: bool = False
+    # seeded at deploy with each source's reading; a coin reading zero stays unseeded
+    _seed: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     for i in range(N_COINS_128, bound=MAX_COINS_128):
 
         if i < N_COINS_128 - 1:
             self.last_prices_packed.append(self.pack_2(10**18, 10**18))
 
         _rate_oracles.append(convert(_method_ids[i], uint256) * 2**224 | convert(_oracles[i], uint256))
+        if (_asset_types[i] == 1 and _rate_oracles[i] != 0) or _asset_types[i] == 3:
+            _has_rate_source = True
         self.stored_balances.append(0)
         self.admin_balances.append(0)
 
@@ -322,9 +385,17 @@ def __init__(
             _call_amount.append(0)
             _scale_factor.append(0)
 
+        _seed.append(math.rate_now(
+            _coins[i], _asset_types[i], _rate_oracles[i], _rate_multipliers[i], _call_amount[i], _scale_factor[i]
+        ))
+
     call_amount = _call_amount
     scale_factor = _scale_factor
     rate_oracles = _rate_oracles
+    has_rate_source = _has_rate_source
+    if _has_rate_source:
+        self.last_rates = _seed
+        self.last_rates_block = block.number - 1  # deploy block stays unfrozen
 
     # ----------------------------- ERC20 stuff ------------------------------
 
@@ -430,12 +501,13 @@ def _transfer_out(_coin_idx: int128, _amount: uint256, receiver: address):
 
 @view
 @internal
-def _stored_rates() -> DynArray[uint256, MAX_COINS]:
+def _fetch_rates() -> DynArray[uint256, MAX_COINS]:
     """
-    @notice Gets rate multipliers for each coin.
-    @dev If the coin has a rate oracle that has been properly initialised,
-         this method queries that rate by static-calling an external
-         contract.
+    @notice Gets rate multipliers for each coin, as their sources report them now.
+    @dev Fails closed: a source that reverts, or answers with anything but 32 bytes,
+         reverts the call rather than degrading to a remembered rate for a coin the
+         pool can no longer value. Proportional remove_liquidity reads no rates, so
+         LPs can always leave.
     """
     rates: DynArray[uint256, MAX_COINS] = rate_multipliers
 
@@ -465,6 +537,94 @@ def _stored_rates() -> DynArray[uint256, MAX_COINS]:
                 PRECISION
             )  # 1e18 precision
 
+    return rates
+
+
+@view
+@internal
+def _max_rate_bump() -> uint256:
+    """
+    @notice The furthest one update may move a rate, FEE_DENOMINATOR-scaled.
+    @dev Follows the current fee. fee * N / (2 * (N - 1)) is the break-even for the
+         cheapest way to cash a rate pushed for one block (a flash donation to a
+         vault, say): a single-sided deposit, which pays about half a fee, then a
+         proportional withdrawal, which reads no rates and pays nothing. A swap
+         into the pushed rate pays a whole fee, which this never exceeds.
+         It does not stop a trader positioned ahead of a lasting step, and a genuine
+         step reprices at one bound per block. A fee whose bound covers the oracle's
+         largest step answers both: the step then lands in one update.
+    """
+    return min(self.fee * N_COINS / (2 * (N_COINS - 1)), BUMP_CEILING)
+
+
+@view
+@internal
+def _rates_this_block(_poke: bool) -> (DynArray[uint256, MAX_COINS], uint256):
+    """
+    @notice The rates this block prices at, and the last_rates_block to record with them.
+    @dev Frozen once a block has accepted them, so a trade already in flight cannot
+         be repriced underneath it; the block to record is then 0. Otherwise the
+         readings are bounded against last_rates, see math.bound_rates.
+         A reading more than HALT_THRESHOLD from its anchor halts the pool rather
+         than being clamped to a near-par rate for a coin that has collapsed: a
+         trade reverts, and only poke_rates records the halt. A recorded halt clears
+         once every reading is within two bounds of its anchor, so trading resumes
+         at most one bound from the source.
+         An empty pool exposes nobody to the rate: its bound accrues per block since
+         the last update, up to BUMP_CEILING, and it never halts, so a source that
+         moved while it sat empty cannot lock it.
+    """
+    lrb: uint256 = self.last_rates_block
+    if lrb & ~HALTED >= block.number:
+        assert lrb < HALTED and not _poke  # dev: rates halted, or already set this block
+        return self.last_rates, 0
+    _halted: bool = lrb >= HALTED
+    bump: uint256 = self._max_rate_bump()
+    limit: uint256 = HALT_THRESHOLD
+    if _halted:
+        limit = 2 * bump
+    if self.total_supply == 0:
+        bump = min(bump * (block.number - (self.last_rates_block & ~HALTED)), BUMP_CEILING)
+        limit = 0
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    halt: bool = False
+    rates, halt = math.bound_rates(self._fetch_rates(), self.last_rates, bump, limit)
+    if halt:
+        assert _poke  # dev: rates halted
+        return rates, block.number | HALTED
+    return rates, block.number
+
+
+@view
+@internal
+def _stored_rates() -> DynArray[uint256, MAX_COINS]:
+    """
+    @notice The rates a trade in this block would be priced at.
+    @dev See _rates_this_block. Reverts while the pool is halted.
+    """
+    if not has_rate_source:
+        return rate_multipliers
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(False)
+    return rates
+
+
+@internal
+def _stored_rates_w() -> DynArray[uint256, MAX_COINS]:
+    """
+    @notice _stored_rates, accepting the result as the new starting point.
+    @dev Called from every path that prices at the rates. A pool with no rated coin
+         has constant rates and keeps no cache, sparing every swap the SSTOREs.
+    """
+    if not has_rate_source:
+        return rate_multipliers
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(False)
+    if lrb != 0:
+        self.last_rates = rates
+        self.last_rates_block = lrb
     return rates
 
 
@@ -583,7 +743,7 @@ def add_liquidity(
 
     amp: uint256 = self._A()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
+    rates: DynArray[uint256, MAX_COINS] = self._stored_rates_w()
 
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
@@ -654,7 +814,7 @@ def add_liquidity(
             new_balances[i] -= fees[i]
 
         xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, new_balances)
-        D1 = self.get_D(xp, amp)  # <--------------- Reuse D1 for new D value.
+        D1 = math.get_D(xp, amp, N_COINS)  # <--------------- Reuse D1 for new D value.
         mint_amount = unsafe_div(total_supply * (D1 - D0), D0)
         self.upkeep_oracles(xp, amp, D1)
 
@@ -707,7 +867,7 @@ def remove_liquidity_one_coin(
     amp: uint256 = empty(uint256)
     D: uint256 = empty(uint256)
 
-    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i)
+    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i, self._stored_rates_w())
     assert dy >= _min_received, "Not enough coins removed"
 
     self.admin_balances[i] += unsafe_div(fee * admin_fee, FEE_DENOMINATOR)
@@ -738,7 +898,7 @@ def remove_liquidity_imbalance(
     @return Actual amount of the LP token burned in the withdrawal
     """
     amp: uint256 = self._A()
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
+    rates: DynArray[uint256, MAX_COINS] = self._stored_rates_w()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
     new_balances: DynArray[uint256, MAX_COINS] = old_balances
@@ -910,8 +1070,8 @@ def __exchange(
 ) -> uint256:
 
     amp: uint256 = self._A()
-    D: uint256 = self.get_D(_xp, amp)
-    y: uint256 = self.get_y(i, j, x, _xp, amp, D)
+    D: uint256 = math.get_D(_xp, amp, N_COINS)
+    y: uint256 = math.get_y(i, j, x, _xp, amp, D, N_COINS)
 
     dy: uint256 = _xp[j] - y - 1  # -1 just in case there were some rounding errors
     dy_fee: uint256 = unsafe_div(
@@ -953,7 +1113,7 @@ def _exchange(
     assert i != j  # dev: coin index out of range
     assert _dx > 0  # dev: do not exchange 0 coins
 
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
+    rates: DynArray[uint256, MAX_COINS] = self._stored_rates_w()
     old_balances: DynArray[uint256, MAX_COINS] = self._balances()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, old_balances)
 
@@ -1001,187 +1161,6 @@ def _withdraw_admin_fees():
     self.admin_balances = admin_balances
 
 
-# --------------------------- AMM Math Functions -----------------------------
-
-
-@view
-@internal
-def get_y(
-    i: int128,
-    j: int128,
-    x: uint256,
-    xp: DynArray[uint256, MAX_COINS],
-    _amp: uint256,
-    _D: uint256
-) -> uint256:
-    """
-    Calculate x[j] if one makes x[i] = x
-
-    Done by solving quadratic equation iteratively.
-    x_1**2 + x_1 * (sum' - (A*n**n - 1) * D / (A * n**n)) = D ** (n + 1) / (n ** (2 * n) * prod' * A)
-    x_1**2 + b*x_1 = c
-
-    x_1 = (x_1**2 + c) / (2*x_1 + b)
-    """
-    # x in the input is converted to the same price/precision
-
-    assert i != j       # dev: same coin
-    assert j >= 0       # dev: j below zero
-    assert j < N_COINS_128  # dev: j above N_COINS
-
-    # should be unreachable, but good for safety
-    assert i >= 0
-    assert i < N_COINS_128
-
-    amp: uint256 = _amp
-    D: uint256 = _D
-
-    S_: uint256 = 0
-    _x: uint256 = 0
-    y_prev: uint256 = 0
-    c: uint256 = D
-    Ann: uint256 = amp * N_COINS
-
-    for _i in range(MAX_COINS_128):
-
-        if _i == N_COINS_128:
-            break
-
-        if _i == i:
-            _x = x
-        elif _i != j:
-            _x = xp[_i]
-        else:
-            continue
-
-        S_ += _x
-        c = c * D / (_x * N_COINS)
-
-    c = c * D * A_PRECISION / (Ann * N_COINS)
-    b: uint256 = S_ + D * A_PRECISION / Ann  # - D
-    y: uint256 = D
-
-    for _i in range(255):
-        y_prev = y
-        y = (y*y + c) / (2 * y + b - D)
-        # Equality with the precision of 1
-        if y > y_prev:
-            if y - y_prev <= 1:
-                return y
-        else:
-            if y_prev - y <= 1:
-                return y
-    raise
-
-
-@pure
-@internal
-def get_D(_xp: DynArray[uint256, MAX_COINS], _amp: uint256) -> uint256:
-    """
-    D invariant calculation in non-overflowing integer operations
-    iteratively
-
-    A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
-
-    Converging solution:
-    D[j+1] = (A * n**n * sum(x_i) - D[j]**(n+1) / (n**n prod(x_i))) / (A * n**n - 1)
-    """
-    S: uint256 = 0
-    for x in _xp:
-        S += x
-    if S == 0:
-        return 0
-
-    D: uint256 = S
-    Ann: uint256 = _amp * N_COINS
-
-    for i in range(255):
-
-        D_P: uint256 = D
-        for x in _xp:
-            D_P = D_P * D / x
-        D_P /= pow_mod256(N_COINS, N_COINS)
-        Dprev: uint256 = D
-
-        # (Ann * S / A_PRECISION + D_P * N_COINS) * D / ((Ann - A_PRECISION) * D / A_PRECISION + (N_COINS + 1) * D_P)
-        D = (
-            (unsafe_div(Ann * S, A_PRECISION) + D_P * N_COINS) * D
-            /
-            (
-                unsafe_div((Ann - A_PRECISION) * D, A_PRECISION) +
-                unsafe_add(N_COINS, 1) * D_P
-            )
-        )
-
-        # Equality with the precision of 1
-        if D > Dprev:
-            if D - Dprev <= 1:
-                return D
-        else:
-            if Dprev - D <= 1:
-                return D
-    # convergence typically occurs in 4 rounds or less, this should be unreachable!
-    # if it does happen the pool is borked and LPs can withdraw via `remove_liquidity`
-    raise
-
-
-@pure
-@internal
-def get_y_D(
-    A: uint256,
-    i: int128,
-    xp: DynArray[uint256, MAX_COINS],
-    D: uint256
-) -> uint256:
-    """
-    Calculate x[i] if one reduces D from being calculated for xp to D
-
-    Done by solving quadratic equation iteratively.
-    x_1**2 + x_1 * (sum' - (A*n**n - 1) * D / (A * n**n)) = D ** (n + 1) / (n ** (2 * n) * prod' * A)
-    x_1**2 + b*x_1 = c
-
-    x_1 = (x_1**2 + c) / (2*x_1 + b)
-    """
-    # x in the input is converted to the same price/precision
-
-    assert i >= 0  # dev: i below zero
-    assert i < N_COINS_128  # dev: i above N_COINS
-
-    S_: uint256 = 0
-    _x: uint256 = 0
-    y_prev: uint256 = 0
-    c: uint256 = D
-    Ann: uint256 = A * N_COINS
-
-    for _i in range(MAX_COINS_128):
-
-        if _i == N_COINS_128:
-            break
-
-        if _i != i:
-            _x = xp[_i]
-        else:
-            continue
-        S_ += _x
-        c = c * D / (_x * N_COINS)
-
-    c = c * D * A_PRECISION / (Ann * N_COINS)
-    b: uint256 = S_ + D * A_PRECISION / Ann
-    y: uint256 = D
-
-    for _i in range(255):
-        y_prev = y
-        y = (y*y + c) / (2 * y + b - D)
-        # Equality with the precision of 1
-        if y > y_prev:
-            if y - y_prev <= 1:
-                return y
-        else:
-            if y_prev - y <= 1:
-                return y
-    raise
-
-
 @view
 @internal
 def _A() -> uint256:
@@ -1225,14 +1204,15 @@ def get_D_mem(
     _amp: uint256
 ) -> uint256:
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(_rates, _balances)
-    return self.get_D(xp, _amp)
+    return math.get_D(xp, _amp, N_COINS)
 
 
 @view
 @internal
 def _calc_withdraw_one_coin(
     _burn_amount: uint256,
-    i: int128
+    i: int128,
+    rates: DynArray[uint256, MAX_COINS]
 ) -> (
     uint256,
     uint256,
@@ -1244,13 +1224,12 @@ def _calc_withdraw_one_coin(
     # * Get current D
     # * Solve Eqn against y_i for D - _token_amount
     amp: uint256 = self._A()
-    rates: DynArray[uint256, MAX_COINS] = self._stored_rates()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(rates, self._balances())
-    D0: uint256 = self.get_D(xp, amp)
+    D0: uint256 = math.get_D(xp, amp, N_COINS)
 
     total_supply: uint256 = self.total_supply
     D1: uint256 = D0 - _burn_amount * D0 / total_supply
-    new_y: uint256 = self.get_y_D(amp, i, xp, D1)
+    new_y: uint256 = math.get_y_D(amp, i, xp, D1, N_COINS)
 
     base_fee: uint256 = unsafe_div(
         unsafe_mul(self.fee, N_COINS),
@@ -1282,7 +1261,7 @@ def _calc_withdraw_one_coin(
         dynamic_fee = self._dynamic_fee(xavg, ys, base_fee)
         xp_reduced[j] = xp_j - unsafe_div(dynamic_fee * dx_expected, FEE_DENOMINATOR)
 
-    dy: uint256 = xp_reduced[i] - self.get_y_D(amp, i, xp_reduced, D1)
+    dy: uint256 = xp_reduced[i] - math.get_y_D(amp, i, xp_reduced, D1, N_COINS)
     dy_0: uint256 = (xp[i] - new_y) * PRECISION / rates[i]  # w/o fees
     dy = unsafe_div((dy - 1) * PRECISION, rates[i])  # Withdraw less to account for rounding errors
 
@@ -1400,7 +1379,7 @@ def _calc_moving_average(
     last_ema_value: uint256 = (packed_value >> 128)
 
     if ma_last_time < block.timestamp:  # calculate new_ema_value and return that.
-        alpha: uint256 = self.exp(
+        alpha: uint256 = math.exp(
             -convert(
                 unsafe_div(unsafe_mul(unsafe_sub(block.timestamp, ma_last_time), 10**18), averaging_window), int256
             )
@@ -1435,7 +1414,7 @@ def get_p(i: uint256) -> uint256:
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
         self._stored_rates(), self._balances()
     )
-    D: uint256 = self.get_D(xp, amp)
+    D: uint256 = math.get_D(xp, amp, N_COINS)
     return self._get_p(xp, amp, D)[i]
 
 
@@ -1459,79 +1438,6 @@ def D_oracle() -> uint256:
         self.D_ma_time,
         self.ma_last_time >> 128
     )
-
-
-# ----------------------------- Math Utils -----------------------------------
-
-
-@internal
-@pure
-def exp(x: int256) -> uint256:
-    """
-    @dev Calculates the natural exponential function of a signed integer with
-         a precision of 1e18.
-    @notice Note that this function consumes about 810 gas units. The implementation
-            is inspired by Remco Bloemen's implementation under the MIT license here:
-            https://xn--2-umb.com/22/exp-ln.
-    @dev This implementation is derived from Snekmate, which is authored
-         by pcaversaccio (Snekmate), distributed under the AGPL-3.0 license.
-         https://github.com/pcaversaccio/snekmate
-    @param x The 32-byte variable.
-    @return int256 The 32-byte calculation result.
-    """
-    value: int256 = x
-
-    # If the result is `< 0.5`, we return zero. This happens when we have the following:
-    # "x <= floor(log(0.5e18) * 1e18) ~ -42e18".
-    if (x <= -41446531673892822313):
-        return empty(uint256)
-
-    # When the result is "> (2 ** 255 - 1) / 1e18" we cannot represent it as a signed integer.
-    # This happens when "x >= floor(log((2 ** 255 - 1) / 1e18) * 1e18) ~ 135".
-    assert x < 135305999368893231589, "wad_exp overflow"
-
-    # `x` is now in the range "(-42, 136) * 1e18". Convert to "(-42, 136) * 2 ** 96" for higher
-    # intermediate precision and a binary base. This base conversion is a multiplication with
-    # "1e18 / 2 ** 96 = 5 ** 18 / 2 ** 78".
-    value = unsafe_div(x << 78, 5 ** 18)
-
-    # Reduce the range of `x` to "(-½ ln 2, ½ ln 2) * 2 ** 96" by factoring out powers of two
-    # so that "exp(x) = exp(x') * 2 ** k", where `k` is a signer integer. Solving this gives
-    # "k = round(x / log(2))" and "x' = x - k * log(2)". Thus, `k` is in the range "[-61, 195]".
-    k: int256 = unsafe_add(unsafe_div(value << 96, 54916777467707473351141471128), 2 ** 95) >> 96
-    value = unsafe_sub(value, unsafe_mul(k, 54916777467707473351141471128))
-
-    # Evaluate using a "(6, 7)"-term rational approximation. Since `p` is monic,
-    # we will multiply by a scaling factor later.
-    y: int256 = unsafe_add(unsafe_mul(unsafe_add(value, 1346386616545796478920950773328), value) >> 96, 57155421227552351082224309758442)
-    p: int256 = unsafe_add(unsafe_mul(unsafe_add(unsafe_mul(unsafe_sub(unsafe_add(y, value), 94201549194550492254356042504812), y) >> 96,\
-                           28719021644029726153956944680412240), value), 4385272521454847904659076985693276 << 96)
-
-    # We leave `p` in the "2 ** 192" base so that we do not have to scale it up
-    # again for the division.
-    q: int256 = unsafe_add(unsafe_mul(unsafe_sub(value, 2855989394907223263936484059900), value) >> 96, 50020603652535783019961831881945)
-    q = unsafe_sub(unsafe_mul(q, value) >> 96, 533845033583426703283633433725380)
-    q = unsafe_add(unsafe_mul(q, value) >> 96, 3604857256930695427073651918091429)
-    q = unsafe_sub(unsafe_mul(q, value) >> 96, 14423608567350463180887372962807573)
-    q = unsafe_add(unsafe_mul(q, value) >> 96, 26449188498355588339934803723976023)
-
-    # The polynomial `q` has no zeros in the range because all its roots are complex.
-    # No scaling is required, as `p` is already "2 ** 96" too large. Also,
-    # `r` is in the range "(0.09, 0.25) * 2**96" after the division.
-    r: int256 = unsafe_div(p, q)
-
-    # To finalise the calculation, we have to multiply `r` by:
-    #   - the scale factor "s = ~6.031367120",
-    #   - the factor "2 ** k" from the range reduction, and
-    #   - the factor "1e18 / 2 ** 96" for the base conversion.
-    # We do this all at once, with an intermediate result in "2**213" base,
-    # so that the final right shift always gives a positive value.
-
-    # Note that to circumvent Vyper's safecast feature for the potentially
-    # negative parameter value `r`, we first convert `r` to `bytes32` and
-    # subsequently to `uint256`. Remember that the EVM default behaviour is
-    # to use two's complement representation to handle signed integers.
-    return unsafe_mul(convert(convert(r, bytes32), uint256), 3822833074963236453042738258902158003155416615667) >> convert(unsafe_sub(195, k), uint256)
 
 
 # ---------------------------- ERC20 Utils -----------------------------------
@@ -1720,7 +1626,7 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256:
     @param i Index value of the coin to withdraw
     @return Amount of coin received
     """
-    return self._calc_withdraw_one_coin(_burn_amount, i)[0]
+    return self._calc_withdraw_one_coin(_burn_amount, i, self._stored_rates())[0]
 
 
 @view
@@ -1745,11 +1651,14 @@ def get_virtual_price() -> uint256:
          contains rebasing tokens. For integrators, caution is advised.
     @return LP token virtual price normalized to 1e18
     """
+    # At the rates the sources report now, not the bounded trading rates: LP
+    # redeems proportionally without reading rates, and a virtual price trailing
+    # that would let a metapool sell base LP for less than it redeems for.
     amp: uint256 = self._A()
     xp: DynArray[uint256, MAX_COINS] = self._xp_mem(
-        self._stored_rates(), self._balances()
+        self._fetch_rates(), self._balances()
     )
-    D: uint256 = self.get_D(xp, amp)
+    D: uint256 = math.get_D(xp, amp, N_COINS)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
     return D * PRECISION / self.total_supply
@@ -1864,14 +1773,42 @@ def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
     assert msg.sender == factory.admin()
 
     # set new fee:
-    assert _new_fee <= MAX_FEE
+    assert MIN_FEE < _new_fee and _new_fee <= MAX_FEE
     self.fee = _new_fee
 
     # set new offpeg_fee_multiplier:
+    assert _new_offpeg_fee_multiplier > FEE_DENOMINATOR  # dev: offpeg fee disabled
     assert _new_offpeg_fee_multiplier * _new_fee <= MAX_FEE * FEE_DENOMINATOR  # dev: offpeg multiplier exceeds maximum
     self.offpeg_fee_multiplier = _new_offpeg_fee_multiplier
 
     log ApplyNewFee(_new_fee, _new_offpeg_fee_multiplier)
+
+
+@view
+@external
+def max_rate_bump() -> uint256:
+    """
+    @notice The furthest one update may move a rate, FEE_DENOMINATOR-scaled.
+    @dev Derived from the current fee and the number of coins; see _max_rate_bump.
+    """
+    return self._max_rate_bump()
+
+
+@external
+@nonreentrant('lock')
+def poke_rates():
+    """
+    @notice Walk a halted pool's rates one bound towards their sources
+    @dev A trade that would halt the pool reverts, so without this a genuine step
+         past HALT_THRESHOLD would halt it for good. Moves the anchors as far as a
+         trade would, once per block. An empty pool never halts and is not walked.
+    """
+    assert self.total_supply != 0  # dev: nothing to walk
+    rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(True)
+    self.last_rates = rates
+    self.last_rates_block = lrb
 
 
 @external
