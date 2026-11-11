@@ -1,11 +1,11 @@
 """Properties the oracle rate path must hold.
 
-The rate path bounds each update to min(fee * N / (2(N - 1)), 1%) - one fee in a
-two-coin pool - and keeps rated coins from moving apart by more than one bound. It
-freezes rates once a block has accepted them, fails closed on a source that cannot
-answer, and halts on a reading more than 5% from its anchor until poke_rates walks the
-anchor back. Each test states one property in its name, so that a red test names the
-defect rather than just the symptom.
+The rate path bounds each update to min(step * blocks, step + 0.01%/s * seconds, 0.25%)
+where step = fee * N / (2(N - 1)) - one fee in a two-coin pool - and keeps rated coins
+from moving apart by more than one bound. It freezes rates once a block has accepted
+them, fails closed on a source that cannot answer, and halts on a reading more than 5%
+from its anchor until poke_rates walks the anchor back. Each test states one property in
+its name, so that a red test names the defect rather than just the symptom.
 
 Two tests are strict xfails, recording limits of the rate path rather than bugs in it:
 
@@ -38,6 +38,7 @@ FEE_DENOMINATOR = 10**10
 OFFPEG = 20_000_000_000
 TVL = 1_000_000 * 10**18
 BUMP_CEILING = 25 * 10**6  # 0.25%, the widest bound the pool admits however long the wait
+DRIFT_PER_SECOND = 10**6  # 0.01%/s, how fast the accrual may widen a bound in wall-clock time
 
 # Runtime bytecode for oracles that have stopped answering usefully.
 BROKEN_ORACLES = {
@@ -728,6 +729,241 @@ def test_the_metapool_bound_accrues_too(meta):
     moved = (m.stored_rates()[0] - before) / before
     want = 20 * 1_000_000 / FEE_DENOMINATOR
     assert abs(moved - want) <= 1e-9, f"20 idle blocks at 1 bp admitted {moved * 1e4:.2f} bp"
+
+
+# <---------------------   The accrual is paced by the clock   --------------------->
+
+
+def test_the_accrual_is_paced_by_the_clock_not_the_block_count(plain):
+    """Blocks inside one second buy one step of bound, not one per block.
+
+    The accrual pays for a catch-up and a catch-up accrues in time, so counting it in
+    blocks hands a fast chain a wider bound for the same feed: the same pool with the
+    same fee opens its whole ceiling in 236 seconds on Ethereum and 3.6 on a 0.2-second
+    chain. Measured over the whole population that difference is $130.6M a day against
+    $94.9M. Here twenty-five blocks pass with the clock standing still, which is what a
+    sub-second chain looks like, and the pool must still admit only the one step every
+    update gets.
+    """
+    swap, coins, oracles, lp = plain(rated=(0,), fee=1_000_000)  # 1 bp a block
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()
+    before = swap.stored_rates()[0]
+
+    oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 101 // 100)  # 1%, past any bound
+    boa.env.time_travel(blocks=25, block_delta=0)  # 25 blocks, no seconds
+
+    moved = (swap.stored_rates()[0] - before) / before
+    want = 1_000_000 / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, (
+        f"25 blocks in one second admitted {moved * 1e4:.2f} bp, not the one step " f"of {want * 1e4:.2f} bp"
+    )
+
+
+def test_the_accrual_follows_the_seconds_that_do_pass(plain):
+    """Between the two limits it is the clock that decides, at DRIFT_PER_SECOND.
+
+    The block count alone would allow twenty-six steps here and the ceiling would cap
+    that at 0.25%. Twelve seconds of clock allow one step plus twelve seconds of drift,
+    and the bound is the smaller of the two, so the pool prices at 0.13% - which pins
+    that the time term is a term and not just a floor.
+    """
+    swap, coins, oracles, lp = plain(rated=(0,), fee=1_000_000)
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()
+    before = swap.stored_rates()[0]
+
+    oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 101 // 100)
+    boa.env.time_travel(blocks=25, block_delta=0)  # 25 blocks, no seconds
+    boa.env.time_travel(blocks=1, block_delta=12)  # one more block, twelve seconds
+
+    moved = (swap.stored_rates()[0] - before) / before
+    want = (1_000_000 + 12 * DRIFT_PER_SECOND) / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, (
+        f"26 blocks over 12 seconds admitted {moved * 1e4:.2f} bp against the " f"{want * 1e4:.2f} bp the clock allows"
+    )
+
+
+def test_a_twelve_second_chain_is_not_slowed_by_the_clock(plain):
+    """Where a block is longer than the drift justifies, nothing changes.
+
+    The time term is a conjunction, so it can only ever withhold what the block count
+    would have allowed. On Ethereum's blocks it never does - replayed over the rate
+    history it costs $151.23 against the $151.23 the block count alone costs, the same
+    to the cent - and this is that property as a test rather than as a claim.
+    """
+    swap, coins, oracles, lp = plain(rated=(0,), fee=1_000_000)
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()
+    before = swap.stored_rates()[0]
+
+    oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 101 // 100)
+    boa.env.time_travel(blocks=20)  # 20 blocks, 240 seconds
+
+    moved = (swap.stored_rates()[0] - before) / before
+    want = 20 * 1_000_000 / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, (
+        f"20 blocks over 240 seconds admitted {moved * 1e4:.2f} bp, so the clock "
+        f"bound a chain it had no business binding"
+    )
+
+
+def test_the_deploy_seed_stamps_the_clock_as_well_as_the_block(plain):
+    """A pool's first update is paced too, which takes a seeded timestamp.
+
+    The constructor writes both halves of last_rates_block. Leave the clock half at
+    zero and the elapsed time reads as the whole unix epoch, the time term never binds
+    again, and the pool silently reverts to counting blocks - which no behavioural test
+    would catch on its own, because the loose direction is the old behaviour. So this
+    reads the stamp, and then checks that thirty blocks inside one second buy only the
+    seconds that really passed: an unseeded clock would hand over the whole ceiling.
+    """
+    swap, coins, oracles, lp = plain(rated=(0,), fee=1_000_000)
+    stamped = (swap._storage.last_rates_block.get() >> 64) % 2**64
+    assert stamped != 0, "the constructor left the clock half of last_rates_block at zero"
+    before = swap.stored_rates()[0]
+
+    oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 101 // 100)
+    boa.env.time_travel(blocks=30, block_delta=0)
+
+    moved = (swap.stored_rates()[0] - before) / before
+    elapsed = boa.env.evm.patch.timestamp - stamped
+    want = (1_000_000 + elapsed * DRIFT_PER_SECOND) / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, (
+        f"a freshly deployed pool admitted {moved * 1e4:.2f} bp over 30 blocks and "
+        f"{elapsed}s, against the {want * 1e4:.2f} bp the clock allows"
+    )
+    assert (
+        moved < BUMP_CEILING / FEE_DENOMINATOR
+    ), "30 blocks inside one second reached the ceiling, so the clock paced nothing"
+
+
+def test_last_rates_block_packs_the_block_and_the_clock(plain):
+    """[halted][timestamp][block], and the block still decodes where the freeze reads it.
+
+    The freeze compares the low word against block.number and the accrual reads the
+    clock out of the next one, so a packing mistake would either freeze the pool for
+    good or stop freezing it at all. Both halves are checked against the chain rather
+    than against each other.
+    """
+    swap, coins, oracles, lp = plain(rated=(0,), fee=1_000_000)
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()
+
+    packed = swap._storage.last_rates_block.get()
+    assert packed < 2**255, "a pool that did not halt recorded the halt flag"
+    assert (
+        packed % 2**64 == boa.env.evm.patch.block_number
+    ), "the low word of last_rates_block is not the block the rates were accepted in"
+    assert (packed >> 64) % 2**64 == boa.env.evm.patch.timestamp, "the clock was not recorded beside the block"
+
+
+def test_the_metapool_accrual_is_paced_by_the_clock_too(meta):
+    """The same for a metapool's coin 0."""
+    m, base, meta_coin, base_coins, oracle, _, lp = meta(fee=1_000_000)
+    boa.env.time_travel(blocks=1)
+    m.poke_rates()
+    before = m.stored_rates()[0]
+
+    oracle.set_exchange_rate(oracle.exchangeRate() * 101 // 100)
+    boa.env.time_travel(blocks=25, block_delta=0)
+
+    moved = (m.stored_rates()[0] - before) / before
+    want = 1_000_000 / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, f"25 metapool blocks in one second admitted {moved * 1e4:.2f} bp"
+
+
+def _push_after_idle(plain, idle_blocks, block_delta):
+    """What a one-block 5% push pays, after the pool has been left alone.
+
+    The accrual is what the push is actually spending: left alone for long enough the
+    next update admits BUMP_CEILING in one go, and a push that lasts a single block can
+    cash all of it for a single fee. `test_transient_manipulation_is_capped` pokes first
+    and so only ever sees one step - this is the same attack against a pool nobody has
+    touched, which is the case the accrual pays for and the case it sells.
+
+    Returns the excess over par, as a fraction of the amount sold.
+    """
+    swap, coins, oracles, lp = plain(rated=(1,), fee=1_000_000)  # 1 bp, so a 1 bp step
+    atk = boa.env.generate_address()
+    amount = 10**22
+    mint_for_testing(atk, amount + 10**20, coins[1], False)  # the anchoring trade spends some
+    coins[1].approve(swap.address, 2**256 - 1, sender=atk)
+
+    swap.exchange(1, 0, 10**18, 0, sender=atk)  # anchor the cache here
+    boa.env.time_travel(blocks=idle_blocks, block_delta=block_delta)
+    oracles[1].set_exchange_rate(10**18 * 105 // 100)
+    got = swap.exchange(1, 0, amount, 0, sender=atk)
+    oracles[1].set_exchange_rate(10**18)
+    return (got - amount) / amount
+
+
+def test_a_push_after_an_idle_stretch_pays_up_to_the_ceiling(plain):
+    """The accrual's cost, pinned: idle blocks turn one fee's bound into the ceiling.
+
+    This is the trade-off v2 took on purpose, and it had no test. Over the measured
+    population it is worth $164,093 in a single trade against $5,487 for one fee per
+    update - though per unit of time the two are within 1.4x, because the same movement
+    just costs more fees to collect. Both halves are pinned: the push does beat one
+    step, and it does not beat the ceiling.
+    """
+    excess = _push_after_idle(plain, idle_blocks=40, block_delta=12)
+    step = 1_000_000 / FEE_DENOMINATOR
+    ceiling = BUMP_CEILING / FEE_DENOMINATOR
+    assert excess > step, (
+        f"a push after 40 idle blocks paid {excess * 1e4:.2f} bp, no more than the one "
+        f"step a poked pool gives - the accrual is not accruing"
+    )
+    assert excess <= ceiling, (
+        f"a push after 40 idle blocks paid {excess * 1e4:.2f} bp, past the " f"{ceiling * 1e4:.2f} bp ceiling"
+    )
+
+
+def test_the_clock_denies_an_idle_stretch_spent_inside_one_second(plain):
+    """The same attack on a sub-second chain must not reach the ceiling.
+
+    Forty blocks of accrual at a tenth of a second is four seconds of drift, not forty
+    blocks of it, and this is the whole point of pacing the accrual by the clock: the
+    attack above is worth the ceiling on a 12-second chain and a fraction of it here,
+    on the same pool with the same fee.
+    """
+    slow = _push_after_idle(plain, idle_blocks=40, block_delta=12)
+    fast = _push_after_idle(plain, idle_blocks=40, block_delta=0)
+    assert fast < slow, (
+        f"40 blocks inside one second paid {fast * 1e4:.2f} bp against {slow * 1e4:.2f} "
+        f"bp over 480 seconds, so the clock bought nothing"
+    )
+    step = 1_000_000 / FEE_DENOMINATOR
+    assert fast <= 2 * step, (
+        f"40 blocks inside one second still paid {fast * 1e4:.2f} bp, more than the "
+        f"{step * 1e4:.2f} bp a single update is worth"
+    )
+
+
+def test_a_backwards_clock_does_not_stop_the_pool_answering(plain):
+    """A chain whose timestamp steps back must still quote, at one step of bound.
+
+    `_rates_this_block` runs on every quote and every value-moving path, so an
+    underflow there is not a wrong number, it is a pool that has stopped working until
+    the clock catches up. Reorgs and loose sequencer clocks both do this. The elapsed
+    time is clamped at zero instead, which leaves the one step every update gets.
+    """
+    swap, coins, oracles, lp = plain(rated=(0,), fee=1_000_000)
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()
+    before = swap.stored_rates()[0]
+
+    oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 101 // 100)
+    boa.env.time_travel(blocks=5, block_delta=0)
+    boa.env.evm.patch.timestamp -= 600  # ten minutes into the past
+
+    rates = swap.stored_rates()  # must not revert
+    moved = (rates[0] - before) / before
+    want = 1_000_000 / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, (
+        f"a backwards clock admitted {moved * 1e4:.2f} bp, not the one step of " f"{want * 1e4:.2f} bp"
+    )
+    swap.exchange(0, 1, 10**18, 0, sender=lp)  # and the pool still trades
 
 
 # <---------------------   Metapool base LP at its true value   --------------------->
