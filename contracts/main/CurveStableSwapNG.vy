@@ -212,7 +212,7 @@ offpeg_fee_multiplier: public(uint256)  # * 1e10
 admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
 MIN_FEE: constant(uint256) = 10 ** 4  # 0.0001%; a zero fee gives a zero bound
-BUMP_CEILING: constant(uint256) = 10 ** 8  # 1%: the widest rate bound, whatever the fee
+BUMP_CEILING: constant(uint256) = 25 * 10 ** 6  # 0.25%: the widest bound, whatever the fee and however long the wait
 HALT_THRESHOLD: constant(uint256) = 500000000  # 5%: a reading this far from its anchor halts trading
 HALTED: constant(uint256) = 2**255  # flag in last_rates_block: a halt was recorded
 
@@ -544,15 +544,16 @@ def _fetch_rates() -> DynArray[uint256, MAX_COINS]:
 @internal
 def _max_rate_bump() -> uint256:
     """
-    @notice The furthest one update may move a rate, FEE_DENOMINATOR-scaled.
+    @notice How far one block widens a rate's bound, FEE_DENOMINATOR-scaled.
     @dev Follows the current fee. fee * N / (2 * (N - 1)) is the break-even for the
          cheapest way to cash a rate pushed for one block (a flash donation to a
          vault, say): a single-sided deposit, which pays about half a fee, then a
          proportional withdrawal, which reads no rates and pays nothing. A swap
          into the pushed rate pays a whole fee, which this never exceeds.
-         It does not stop a trader positioned ahead of a lasting step, and a genuine
-         step reprices at one bound per block. A fee whose bound covers the oracle's
-         largest step answers both: the step then lands in one update.
+         What an update actually gets is this times the blocks since the last one,
+         capped at BUMP_CEILING; see _rates_this_block. A source that moves no
+         faster than it genuinely accrues is never withheld, so it is the ceiling,
+         not the fee, that holds a source pushed on demand.
     """
     return min(self.fee * N_COINS / (2 * (N_COINS - 1)), BUMP_CEILING)
 
@@ -570,8 +571,12 @@ def _rates_this_block(_poke: bool) -> (DynArray[uint256, MAX_COINS], uint256):
          trade reverts, and only poke_rates records the halt. A recorded halt clears
          once every reading is within two bounds of its anchor, so trading resumes
          at most one bound from the source.
-         An empty pool exposes nobody to the rate: its bound accrues per block since
-         the last update, up to BUMP_CEILING, and it never halts, so a source that
+         The bound accrues per block since the last update, up to BUMP_CEILING, so
+         an update may move a rate by min(bump * blocks, BUMP_CEILING). A source
+         left alone and then read is not held to one block's worth of the move it
+         made in the meantime, and the ceiling is what a source that can be pushed
+         on demand is held to, whatever its pool's fee.
+         An empty pool exposes nobody to the rate and never halts, so a source that
          moved while it sat empty cannot lock it.
     """
     lrb: uint256 = self.last_rates_block
@@ -579,12 +584,11 @@ def _rates_this_block(_poke: bool) -> (DynArray[uint256, MAX_COINS], uint256):
         assert lrb < HALTED and not _poke  # dev: rates halted, or already set this block
         return self.last_rates, 0
     _halted: bool = lrb >= HALTED
-    bump: uint256 = self._max_rate_bump()
+    bump: uint256 = min(self._max_rate_bump() * (block.number - (lrb & ~HALTED)), BUMP_CEILING)
     limit: uint256 = HALT_THRESHOLD
     if _halted:
         limit = 2 * bump
     if self.total_supply == 0:
-        bump = min(bump * (block.number - (self.last_rates_block & ~HALTED)), BUMP_CEILING)
         limit = 0
     rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     halt: bool = False
@@ -1806,8 +1810,10 @@ def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
 @external
 def max_rate_bump() -> uint256:
     """
-    @notice The furthest one update may move a rate, FEE_DENOMINATOR-scaled.
-    @dev Derived from the current fee and the number of coins; see _max_rate_bump.
+    @notice How far one block widens a rate's bound, FEE_DENOMINATOR-scaled.
+    @dev Derived from the current fee and the number of coins. An update may move a
+         rate by this times the blocks since the last one, up to BUMP_CEILING; see
+         _max_rate_bump.
     """
     return self._max_rate_bump()
 

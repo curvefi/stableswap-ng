@@ -37,6 +37,7 @@ ORACLE_METHOD_ID = function_signature_to_4byte_selector("exchangeRate()")
 FEE_DENOMINATOR = 10**10
 OFFPEG = 20_000_000_000
 TVL = 1_000_000 * 10**18
+BUMP_CEILING = 25 * 10**6  # 0.25%, the widest bound the pool admits however long the wait
 
 # Runtime bytecode for oracles that have stopped answering usefully.
 BROKEN_ORACLES = {
@@ -524,6 +525,7 @@ def test_the_bound_applies_to_an_erc4626_coin(
     plain_coin.approve(swap.address, 2**256 - 1, sender=lp)
     swap.add_liquidity([vault.balanceOf(lp), TVL], 0, sender=lp)
     boa.env.time_travel(blocks=1)
+    swap.poke_rates()  # the bound accrues, so the donation gets exactly one block of it
     before = swap.stored_rates()[0]
 
     # a donation the vault counts as assets: its share price jumps with no shares minted.
@@ -547,6 +549,8 @@ def test_two_rated_coins_cannot_be_pushed_apart(plain):
     rather than halted.
     """
     swap, coins, oracles, lp = plain(rated=(0, 1))
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()  # the bound accrues, so the pair gets exactly one block of it
     before = swap.stored_rates()[0] / swap.stored_rates()[1]
 
     oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 105 // 100)
@@ -606,10 +610,16 @@ def test_poke_cannot_seed_an_empty_pool(plain):
 
 
 def _accepted_step(swap, i, oracle, owner, new_fee):
-    """Change the fee, step the oracle past any bound, and return the accepted step."""
+    """Change the fee, step the oracle past any bound, and return the accepted step.
+
+    The bound accrues per block, so the anchor is poked to this block first and the
+    step read exactly one block later: what comes back is one block of bound at the
+    new fee, whatever the fixture left behind.
+    """
     boa.env.time_travel(blocks=1)
     with boa.env.prank(owner):
         swap.set_new_fee(new_fee, OFFPEG)
+    swap.poke_rates()
     before = swap.stored_rates()[i]
     oracle.set_exchange_rate(oracle.exchangeRate() * 101 // 100)  # 1%, far past any bound
     boa.env.time_travel(blocks=1)
@@ -817,17 +827,17 @@ def test_a_halted_pool_reopens_one_bound_per_poke(plain, owner):
 
 
 def test_the_bound_never_exceeds_its_ceiling(plain, owner):
-    """However large the fee, one update may not move the rate more than BUMP_CEILING.
+    """However long the wait and however large the fee, an update stops at BUMP_CEILING.
 
-    The bound tracks the fee, and `set_new_fee` accepts far more than the 1% the
-    factory allows at deploy. Without the ceiling a 5% fee would license a 5% move per
-    block, which is the size of move the halt exists to catch.
+    The bound tracks the fee and accrues with the blocks, and `set_new_fee` accepts far
+    more than the 1% the factory allows at deploy. Without the ceiling a 5% fee would
+    license a 5% move per block, which is the size of move the halt exists to catch,
+    and any fee at all would reach that size given enough idle blocks.
     """
     swap, coins, oracles, lp = plain(fee=30_000_000)
     with boa.env.prank(owner):
         swap.set_new_fee(500_000_000, OFFPEG)  # 5%
-
-    assert swap.max_rate_bump() == 10**8, "a 5% fee licensed a bound above the 1% ceiling"
+    assert swap.max_rate_bump() == BUMP_CEILING, "a 5% fee licensed a bound above the ceiling"
 
 
 # <---------------------   Empty metapools set no anchor   --------------------->
