@@ -669,6 +669,67 @@ def test_liquidity_round_trip_cannot_bracket_a_step(plain, n):
     assert gain <= 5e-6, f"N={n}: a liquidity round trip across one step gained {gain * 1e4:+.3f} bp of LP share"
 
 
+# <---------------------   The bound accrues with the wait   --------------------->
+
+
+def test_the_bound_accrues_one_fee_per_idle_block(plain):
+    """A pool left alone for g blocks admits g blocks of bound, not one.
+
+    Without this a source that genuinely accrued while nobody traded is withheld, and
+    the first trade after the quiet stretch prices at a rate the pool knows is stale;
+    whoever trades it takes the difference from the LPs. Replayed over the Ethereum
+    rate history, one fee per update costs honest flow $19,769 against $151 for this.
+    """
+    swap, coins, oracles, lp = plain(rated=(0,), fee=1_000_000)  # 1 bp a block
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()  # start the count here, whatever the fixture left behind
+    before = swap.stored_rates()[0]
+
+    oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 101 // 100)  # 1%, past any bound
+    boa.env.time_travel(blocks=20)
+
+    moved = (swap.stored_rates()[0] - before) / before
+    want = 20 * 1_000_000 / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, f"20 idle blocks at 1 bp admitted {moved * 1e4:.2f} bp"
+
+
+def test_the_accrual_stops_at_the_ceiling(plain):
+    """However long the wait, one update stops at BUMP_CEILING.
+
+    The accrual is what lets an idle pool catch up, and it is also the whole budget an
+    operator who controls the source has to spend in a single trade. The ceiling caps
+    that trade, so on such a pool it is the ceiling, and not the fee, that is binding -
+    which is also why the fee is no lever here: raising it buys nothing that waiting
+    does not give away for free.
+    """
+    swap, coins, oracles, lp = plain(rated=(0,), fee=1_000_000)
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()
+    before = swap.stored_rates()[0]
+
+    oracles[0].set_exchange_rate(oracles[0].exchangeRate() * 104 // 100)  # 4%: bounded, not halted
+    boa.env.time_travel(blocks=10_000)  # 100 bp of fee, four times the ceiling
+
+    moved = (swap.stored_rates()[0] - before) / before
+    want = BUMP_CEILING / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, f"10,000 idle blocks admitted {moved * 1e4:.2f} bp"
+
+
+def test_the_metapool_bound_accrues_too(meta):
+    """The same for a metapool's coin 0."""
+    m, base, meta_coin, base_coins, oracle, _, lp = meta(fee=1_000_000)
+    boa.env.time_travel(blocks=1)
+    m.poke_rates()
+    before = m.stored_rates()[0]
+
+    oracle.set_exchange_rate(oracle.exchangeRate() * 101 // 100)
+    boa.env.time_travel(blocks=20)
+
+    moved = (m.stored_rates()[0] - before) / before
+    want = 20 * 1_000_000 / FEE_DENOMINATOR
+    assert abs(moved - want) <= 1e-9, f"20 idle blocks at 1 bp admitted {moved * 1e4:.2f} bp"
+
+
 # <---------------------   Metapool base LP at its true value   --------------------->
 
 
