@@ -1922,6 +1922,8 @@ def get_virtual_price() -> uint256:
     """
     # Valued at the rates the sources report now, not the bounded trading rate:
     # LP redeems proportionally for the underlying coins, which reads no rates.
+    # StableSwapNGLPOracle values LP through this, so a halt stops the pool trading
+    # without stopping LP from being priced.
     xp: uint256[N_COINS] = self._xp_mem([self._coin0_rate(), self._base_vp()], self._balances())
     D: uint256 = math.get_D([xp[0], xp[1]], self._A(), N_COINS)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
@@ -2000,6 +2002,13 @@ def get_balances() -> DynArray[uint256, MAX_COINS]:
 @view
 @external
 def stored_rates() -> DynArray[uint256, MAX_COINS]:
+    """
+    @notice The rates this block prices trades at, one per coin
+    @dev Reverts while the pool is halted, as every quote does. StableSwapNGLPOracle
+         documents this as the place to read a single coin's rate from, and on a halted
+         pool that read reverts rather than handing back a rate nothing will trade at.
+    @return Rates normalized to 1e18
+    """
     rates: uint256[N_COINS] = self._stored_rates()
     return [rates[0], rates[1]]
 
