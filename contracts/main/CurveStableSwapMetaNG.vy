@@ -244,6 +244,8 @@ MIN_FEE: constant(uint256) = 10 ** 4  # 0.0001%; a zero fee gives a zero bound
 BUMP_CEILING: constant(uint256) = 25 * 10 ** 6  # 0.25%: the widest bound, whatever the fee and however long the wait
 HALT_THRESHOLD: constant(uint256) = 500000000  # 5%: a reading this far from its anchor halts trading
 HALTED: constant(uint256) = 2**255  # flag in last_rates_block: a halt was recorded
+STAMP_MASK: constant(uint256) = 2**64 - 1  # last_rates_block: [halted][timestamp][block]
+DRIFT_PER_SECOND: constant(uint256) = 10 ** 6  # 0.01%/s: how fast a bound may widen
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -428,7 +430,8 @@ def __init__(
     )
     if success and len(response) == 32:
         self.last_base_vp = convert(response, uint256)
-    self.last_rates_block = block.number - 1  # deploy block stays unfrozen
+    # deploy block stays unfrozen; the timestamp wants no slack, one step is free
+    self.last_rates_block = (block.number - 1) | shift(block.timestamp, 64)
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -630,16 +633,17 @@ def _rates_this_block(_poke: bool) -> (uint256[N_COINS], uint256):
          _bounded_rates for the bound and the halt.
     """
     lrb: uint256 = self.last_rates_block
-    if lrb & ~HALTED >= block.number:
+    if lrb & STAMP_MASK >= block.number:
         assert lrb < HALTED and not _poke  # dev: rates halted, or already set this block
         return [self.last_rate, self.last_base_vp], 0
     rates: uint256[N_COINS] = empty(uint256[N_COINS])
     halt: bool = False
     rates, halt = self._bounded_rates(lrb >= HALTED)
+    stamp: uint256 = block.number | shift(block.timestamp, 64)
     if halt:
         assert _poke  # dev: rates halted
-        return rates, block.number | HALTED
-    return rates, block.number
+        return rates, stamp | HALTED
+    return rates, stamp
 
 
 @view
@@ -660,11 +664,23 @@ def _bounded_rates(_halted: bool) -> (uint256[N_COINS], bool):
          whose virtual price grew while nobody traded here is not held to one
          block's worth of that growth, and the ceiling is what a coin-0 source that
          can be pushed on demand is held to, whatever this pool's fee.
+         What the accrual pays for is a catch-up, and a catch-up accrues in seconds
+         rather than in blocks, so it is held to DRIFT_PER_SECOND of elapsed time as
+         well - above the one step every update gets regardless, since blocks shorter
+         than a second share a timestamp and a bare time term would be zero. See
+         CurveStableSwapNG._rates_this_block for the measurement behind the rate.
          An empty pool exposes nobody to the rate and never halts, so a source that
          moved while it sat empty cannot lock it.
     """
-    bump: uint256 = min(self._max_rate_bump() * (block.number - (self.last_rates_block & ~HALTED)),
-                        BUMP_CEILING)
+    lrb: uint256 = self.last_rates_block
+    step: uint256 = self._max_rate_bump()
+    ts: uint256 = (lrb >> 64) % 2**64
+    # max(): see CurveStableSwapNG._rates_this_block - a backwards clock must not
+    # revert every quote, and unsafe_sub would not prevent that
+    bump: uint256 = min(min(
+        step * (block.number - (lrb & STAMP_MASK)),
+        step + DRIFT_PER_SECOND * (max(block.timestamp, ts) - ts),
+    ), BUMP_CEILING)
     limit: uint256 = HALT_THRESHOLD
     if _halted:
         limit = 2 * bump
@@ -1994,7 +2010,8 @@ def max_rate_bump() -> uint256:
     """
     @notice How far one block widens either rate's bound, FEE_DENOMINATOR-scaled.
     @dev Derived from the current fee. An update may move a rate by this times the
-         blocks since the last one, up to BUMP_CEILING; see _max_rate_bump.
+         blocks since the last one, no faster than DRIFT_PER_SECOND of elapsed time,
+         and never past BUMP_CEILING; see _max_rate_bump and _bounded_rates.
     """
     return self._max_rate_bump()
 
