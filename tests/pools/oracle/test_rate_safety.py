@@ -526,12 +526,15 @@ def test_the_bound_applies_to_an_erc4626_coin(
     boa.env.time_travel(blocks=1)
     before = swap.stored_rates()[0]
 
-    # a donation the vault counts as assets: its share price jumps with no shares minted
-    mint_for_testing(vault.address, TVL // 50, asset, False)  # +2% of the vault
+    # a donation the vault counts as assets: its share price jumps with no shares minted.
+    # mint_for_testing tops a balance up rather than adding to it, and the vault already
+    # holds more than this, so it has to be a transfer or nothing arrives.
+    asset.transfer(vault.address, TVL // 50, sender=lp)  # +2% of the vault
     boa.env.time_travel(blocks=1)
 
     moved = (swap.stored_rates()[0] - before) / before
     bound = swap.max_rate_bump() / FEE_DENOMINATOR
+    assert moved > 0, "the donation did not reach the vault's share price"
     assert moved <= bound + 1e-12, f"a 2% donation moved a vault coin's rate {moved * 1e4:.2f} bp in one update"
 
 
