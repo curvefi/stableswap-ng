@@ -960,3 +960,288 @@ def test_factory_without_math_cannot_deploy_a_metapool(
             base.address, "m", "m", coin.address, 1000, 1_000_000, OFFPEG, 866, 0, 0, b"", zero_address
         )
     ), "a factory with no math implementation deployed a metapool"
+
+
+# <---------------------   The two virtual prices   --------------------->
+
+
+def _tilt(swap, coins, lp, multiple=3):
+    """Leave the pool imbalanced, where D and the sum of the scaled balances diverge."""
+    swap.add_liquidity([0] + [TVL * multiple] * (len(coins) - 1), 0, sender=lp)
+    boa.env.time_travel(blocks=1)
+
+
+def _get_D(xp, amp, n=2):
+    """The pool's invariant, computed here rather than read from it.
+
+    Independent of the pool so that a bounded virtual price computed over anything other
+    than D - the sum of the scaled balances, say, which sits above D by the curve's own
+    curvature - fails rather than passes by a rounding margin.
+    """
+    S = sum(xp)
+    if S == 0:
+        return 0
+    D, Ann = S, amp * n
+    for _ in range(255):
+        D_P = D
+        for x in xp:
+            D_P = D_P * D // x
+        D_P //= n**n
+        prev = D
+        D = (Ann * S // 100 + D_P * n) * D // ((Ann - 100) * D // 100 + (n + 1) * D_P)
+        if abs(D - prev) <= 1:
+            return D
+    raise AssertionError("D did not converge")
+
+
+def _single_sided_pnl(swap, coins, lp, unit_price, amount):
+    """What a single-sided deposit's LP is worth at `unit_price`, against what it cost."""
+    before = swap.balanceOf(lp)
+    swap.add_liquidity([amount] + [0] * (len(coins) - 1), 0, sender=lp)
+    minted = swap.balanceOf(lp) - before
+    return minted * unit_price() // 10**18 - amount
+
+
+def test_virtual_price_bounded_matches_the_redemption_price_without_a_lag(plain):
+    """With no lag the two virtual prices are the same number.
+
+    stored_rates and the sources agree whenever the last update absorbed the whole
+    move, which is every pool that is not mid-catch-up, so an integrator reading the
+    bounded price gets today's behaviour until a rate actually runs ahead.
+    """
+    swap, coins, oracles, lp = plain()
+
+    assert swap.virtual_price_bounded() == swap.get_virtual_price()
+
+
+def test_virtual_price_bounded_is_the_price_a_deposit_actually_pays(plain):
+    """A deposit priced at the bounded rates must cost what it costs without the lag.
+
+    get_virtual_price moves with the source at once while mints price one bound per block
+    behind it, so LP minted at the second and valued at the first books the gap: the hole
+    every integrator that values LP and transacts in one breath falls into. The deposit
+    here is into an imbalanced pool, so it earns a real premium - the test is that the
+    premium is the same with the lag as without it, and that the redemption price inflates
+    it. Measured: 89.285 bp honest, 89.358 bp at the bounded price, 165.100 bp at the
+    redemption price.
+    """
+    amount = TVL // 10
+    one_fee = 4_000_000
+
+    def deposit(lag, price):
+        """The same deposit into the same pool, with and without a rate catching up."""
+        swap, coins, oracles, lp = plain(fee=one_fee, A=200)
+        _tilt(swap, coins, lp)  # imbalanced, so the deposit earns a premium worth measuring
+        if lag:
+            oracles[1].set_exchange_rate(oracles[1].exchangeRate() * 101 // 100)  # far past the bound
+        boa.env.time_travel(blocks=1)
+        return _single_sided_pnl(swap, coins, lp, getattr(swap, price), amount)
+
+    honest = deposit(False, "virtual_price_bounded")
+    at_bounded = deposit(True, "virtual_price_bounded")
+    at_truth = deposit(True, "get_virtual_price")
+
+    # one bound is one fee at N=2, so the accepted step can shift the premium by that much
+    band = amount * one_fee // FEE_DENOMINATOR
+    assert deposit(False, "get_virtual_price") == honest, "the two prices disagreed with no lag"
+    assert (
+        at_truth - honest > band
+    ), f"the lag should show as profit at the redemption price: {(at_truth - honest) / amount * 1e4:.3f} bp"
+    assert abs(at_bounded - honest) <= band, (
+        f"priced at the bounded rates the 1% step still moved the deposit by "
+        f"{(at_bounded - honest) / amount * 1e4:.3f} bp, against a fee of {one_fee / FEE_DENOMINATOR * 1e4:.3f} bp"
+    )
+
+
+def test_virtual_price_bounded_reverts_while_the_pool_is_halted(plain):
+    """It must answer only when the pool would trade, and get_virtual_price must not.
+
+    The bounded price is what quotes cost, so a halt takes it with them; the redemption
+    price is what LP still redeems for through a halt, and proportional withdrawal
+    keeps working, so it must keep answering.
+    """
+    swap, coins, oracles, lp = plain()
+    oracles[1].set_exchange_rate(oracles[1].exchangeRate() * 110 // 100)  # past HALT_THRESHOLD
+    boa.env.time_travel(blocks=1)
+
+    assert _reverts(lambda: swap.virtual_price_bounded()), "the bounded price answered on a halted pool"
+    assert swap.get_virtual_price() > 0, "the redemption price stopped answering on a halted pool"
+
+
+def test_metapool_virtual_price_bounded_trails_a_pushed_base_pool(meta):
+    """The metapool's bounded price must follow its bounded base LP rate, not the base pool.
+
+    Coin 1 is the base pool's virtual price, bounded here like any other rate, so a base
+    pool that jumps reaches this pool's quotes one bound per block. A bounded virtual
+    price that read the base pool directly would hand an integrator the same gap the
+    plain pool's does.
+    """
+    m, base, meta_coin, base_coins, _, base_oracle, lp = meta(base_rated=True)
+    assert m.virtual_price_bounded() == m.get_virtual_price()
+    boa.env.time_travel(blocks=1)
+    m.poke_rates()  # the bound accrues, so coin 1 gets exactly one block of it
+    base_vp_before = base.get_virtual_price()
+    coin1_before = m.stored_rates()[1]
+
+    base_oracle.set_exchange_rate(base_oracle.exchangeRate() * 103 // 100)
+    boa.env.time_travel(blocks=1)
+
+    assert base.get_virtual_price() > base_vp_before, "the base pool's virtual price did not move"
+    moved = (m.stored_rates()[1] - coin1_before) / coin1_before
+    assert (
+        0 < moved <= m.max_rate_bump() / FEE_DENOMINATOR + 1e-12
+    ), f"coin 1 moved {moved * 1e4:.2f} bp against a bound of {m.max_rate_bump() / FEE_DENOMINATOR * 1e4:.2f} bp"
+    assert m.virtual_price_bounded() < m.get_virtual_price(), "the metapool's bounded price did not trail"
+
+
+def test_virtual_price_bounded_is_D_over_the_bounded_rates(plain):
+    """It must be the invariant over the bounded rates, not the sum of the scaled balances.
+
+    The two agree on a balanced pool and diverge with the imbalance, by the curvature of
+    the curve itself: at A=200 and a 1:4 pool the sum sits about 14 bp above D. An
+    integrator that values LP with the sum rather than D therefore prices above what a
+    mint settles at, which is most of the way back to the gap this getter exists to close.
+    """
+    swap, coins, oracles, lp = plain(fee=4_000_000, A=200)
+    _tilt(swap, coins, lp)
+    oracles[1].set_exchange_rate(oracles[1].exchangeRate() * 101 // 100)
+    boa.env.time_travel(blocks=1)
+
+    rates = swap.stored_rates()
+    xp = [rates[i] * swap.balances(i) // 10**18 for i in range(len(coins))]
+    supply = swap.totalSupply()
+    as_D = _get_D(xp, swap.A_precise()) * 10**18 // supply
+    as_sum = sum(xp) * 10**18 // supply
+    reported = swap.virtual_price_bounded()
+
+    assert abs(reported - as_D) <= 1, f"not D over the bounded rates: {reported} against {as_D}"
+    gap = (as_sum - as_D) / as_D
+    assert gap > 10 / 1e4, f"the pool is too balanced for this test to tell D from the sum ({gap * 1e4:.2f} bp)"
+
+
+def _probe_coin():
+    return boa.load("contracts/mocks/ERC20Probe.vy", "HOOK", "HOOK", 18)
+
+
+def test_neither_virtual_price_answers_from_inside_a_locked_call(
+    factory, amm_deployer, erc20_deployer, erc20oracle_deployer, zero_address, set_pool_implementations
+):
+    """A coin that calls back during a transfer must not be able to read either price.
+
+    remove_liquidity transfers coins out while holding the pool's lock, so a price read
+    from that callback is a read of a half-finished pool - the read-only-reentrancy
+    vector that cost Curve pools money in 2023. Both prices carry @nonreentrant('lock');
+    this is the test that the lock bites on a view, which the compiler does not promise
+    by inspection.
+    """
+    probe = _probe_coin()
+    plain_coin = erc20_deployer.deploy("C", "C", 18)
+    oracle = erc20oracle_deployer.deploy("O", "O", 18, 10**18)
+    swap = amm_deployer.at(
+        factory.deploy_plain_pool(
+            "p",
+            "p",
+            [probe.address, plain_coin.address],
+            1000,
+            4_000_000,
+            OFFPEG,
+            866,
+            0,
+            [0, 1],
+            [b"", ORACLE_METHOD_ID],
+            [zero_address, oracle.address],
+        )
+    )
+    lp = boa.env.generate_address()
+    probe._mint_for_testing(lp, TVL)
+    mint_for_testing(lp, TVL, plain_coin, False)
+    probe.approve(swap.address, 2**256 - 1, sender=lp)
+    plain_coin.approve(swap.address, 2**256 - 1, sender=lp)
+    swap.add_liquidity([TVL, TVL], 0, sender=lp)
+    boa.env.time_travel(blocks=1)
+
+    probe.arm(swap.address)
+    swap.remove_liquidity(10**20, [0, 0], sender=lp)
+
+    assert probe.fired(), "the probe never ran, so this test proves nothing"
+    assert not probe.bounded_answered(), "virtual_price_bounded answered from inside a locked call"
+    assert not probe.redemption_answered(), "get_virtual_price answered from inside a locked call"
+
+
+def test_a_frozen_metapool_prices_without_reading_its_base_pool(
+    factory,
+    owner,
+    amm_deployer,
+    meta_deployer,
+    erc20_deployer,
+    erc20oracle_deployer,
+    zero_address,
+    set_pool_implementations,
+    set_metapool_implementations,
+):
+    """Once a block has accepted a metapool's rates, its prices stop depending on the base.
+
+    Coin 1 is the base pool's virtual price, and the freeze caches it. So on a frozen
+    block the bounded price answers while the base pool is mid-call - from the value this
+    block already committed, before that call began - where get_virtual_price, which
+    reads the base live, reverts on the base's own guard. The freeze, not the base's
+    nonreentrant, is what keeps a metapool off a mid-trade base price; an integrator that
+    treats a revert as its only safety signal should know the signal moved.
+    """
+    probe = _probe_coin()
+    base_coin = erc20_deployer.deploy("BP", "BP", 18)
+    base = amm_deployer.at(
+        factory.deploy_plain_pool(
+            "b",
+            "b",
+            [probe.address, base_coin.address],
+            1000,
+            4_000_000,
+            OFFPEG,
+            866,
+            0,
+            [0, 0],
+            [b"", b""],
+            [zero_address, zero_address],
+        )
+    )
+    lp = boa.env.generate_address()
+    probe._mint_for_testing(lp, TVL)
+    mint_for_testing(lp, TVL, base_coin, False)
+    probe.approve(base.address, 2**256 - 1, sender=lp)
+    base_coin.approve(base.address, 2**256 - 1, sender=lp)
+    base.add_liquidity([TVL, TVL], 0, sender=lp)
+    with boa.env.prank(owner):
+        factory.add_base_pool(base.address, base.address, [0, 0], 2)
+
+    meta_coin = erc20_deployer.deploy("M", "M", 18)
+    meta_oracle = erc20oracle_deployer.deploy("MO", "MO", 18, 10**18)
+    m = meta_deployer.at(
+        factory.deploy_metapool(
+            base.address,
+            "m",
+            "m",
+            meta_coin.address,
+            1000,
+            4_000_000,
+            OFFPEG,
+            866,
+            0,
+            1,
+            ORACLE_METHOD_ID,
+            meta_oracle.address,
+        )
+    )
+    mint_for_testing(lp, 10 * TVL, meta_coin, False)
+    meta_coin.approve(m.address, 2**256 - 1, sender=lp)
+    base.approve(m.address, 2**256 - 1, sender=lp)
+    m.add_liquidity([TVL // 2, base.balanceOf(lp) // 2], 0, sender=lp)
+    boa.env.time_travel(blocks=1)
+
+    m.exchange(0, 1, 10**20, 0, sender=lp)  # this block now holds the metapool's rates
+    probe.arm(m.address)
+    base.remove_liquidity(10**20, [0, 0], sender=lp)
+
+    assert probe.fired(), "the probe never ran, so this test proves nothing"
+    assert probe.bounded_answered(), "a frozen metapool still read its base pool to price itself"
+    assert not probe.redemption_answered(), "the redemption price answered while the base was locked"
