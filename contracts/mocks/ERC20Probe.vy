@@ -44,6 +44,9 @@ def arm(_target: address):
 def _probe():
     if not self.armed:
         return
+    # one transfer only: remove_liquidity sweeps admin fees as a second transfer of
+    # the same coin, and the answers recorded would then be that one instead
+    self.armed = False
     answered: bool = False
     response: Bytes[32] = b""
     answered, response = raw_call(

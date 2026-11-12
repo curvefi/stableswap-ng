@@ -28,6 +28,11 @@ def erc20oracle_deployer():
 
 
 @pytest.fixture(scope="session")
+def erc20probe_deployer():
+    return boa.load_partial("contracts/mocks/ERC20Probe.vy")
+
+
+@pytest.fixture(scope="session")
 def erc20rebasing_conditional_deployer():
     return boa.load_partial("contracts/mocks/ERC20RebasingConditional.vy")
 
