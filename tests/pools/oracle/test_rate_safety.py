@@ -21,13 +21,12 @@ Three tests are strict xfails, recording limits of the rate path rather than bug
       sizes the fee to each taker's tolerance and reopens the skim that
       test_min_dy_is_a_safety_bound_not_a_price guards.
 
-  test_first_deposit_after_a_genuine_move_while_empty
-      An unfunded pool keeps the anchor the constructor seeded, so the first deposit
-      after the source genuinely moved is priced at that seed plus BUMP_CEILING, and
-      the rest is open to the next buyer. Unresolved by design rather than overlooked:
-      the two readings the pool would have to tell apart - a source that moved and a
-      source that was pushed - are the same reading, and the accrual is the only thing
-      that separates them. See the test for what each candidate fix reopens.
+  test_a_kept_dust_deposit_cannot_anchor_an_unfunded_pool
+      An empty pool takes its sources as it finds them, which is what prices its first
+      deposit correctly and what leaves a pusher who keeps a dust deposit holding the
+      anchor they wrote. Bounding an empty pool against its deploy seed instead costs
+      every pool funded later more, and HALT_THRESHOLD caps the plant; both measured
+      in the test.
 
 Every pool here uses a plain token with a separate oracle contract as its rate
 source. The repo's ERC20Oracle mock is its own oracle, which would let an ordinary
@@ -201,6 +200,7 @@ def meta(
     meta_deployer,
     erc20_deployer,
     erc20oracle_deployer,
+    erc20probe_deployer,
     zero_address,
     set_pool_implementations,
     set_metapool_implementations,
@@ -615,31 +615,46 @@ def test_poke_cannot_seed_an_empty_pool(plain):
     assert _reverts(lambda: swap.poke_rates()), "poke_rates wrote a rate to an unfunded pool"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="an unfunded pool keeps its deploy seed as the anchor, so the first deposit after a "
-    "genuine move is priced at the seed plus BUMP_CEILING. Letting the source through unbounded "
-    "while the supply is zero reopens the hole test_dust_cannot_anchor_an_unfunded_pool guards, "
-    "for a pusher who keeps a dust deposit; recorded rather than papered over.",
-)
+def test_draining_a_halted_pool_does_not_reopen_it(plain):
+    """A halt outlives the supply that was in the pool when it fired.
+
+    Proportional withdrawal reads no rates, by design, so the LPs of a halted pool can
+    all leave and take the supply to zero. An empty pool otherwise takes its sources as
+    it finds them, which would make that drain a way to clear the halt and would hand
+    `stored_rates()` out unfiltered on exactly the pool whose source is known bad - the
+    collapsed readings in the Arbitrum incident were 0.0028 and 1,073 against a par of
+    one. The halt is recorded in `last_rates_block`, which the drain does not touch, so
+    it stays closed.
+    """
+    swap, coins, oracles, lp = plain()
+    # 50% off: far past HALT_THRESHOLD, and a number _fetch_rates will hand back
+    # happily - a reading of 0 would fail closed in the fetch and prove nothing here
+    oracles[1].set_exchange_rate(10**18 * 150 // 100)
+    boa.env.time_travel(blocks=1)
+    swap.poke_rates()  # record the halt
+    swap.remove_liquidity(swap.balanceOf(lp), [0, 0], sender=lp)  # and every LP leaves
+    boa.env.time_travel(blocks=1)  # past the poke's own block, or the freeze answers instead
+
+    assert swap.totalSupply() == 0, "the drain did not empty the pool"
+    assert _reverts(lambda: swap.stored_rates()), "an emptied halted pool handed out its raw source"
+    assert _reverts(lambda: swap.get_dy(0, 1, 10**18)), "an emptied halted pool quoted a trade"
+
+    mint_for_testing(lp, TVL, coins[0], False)
+    mint_for_testing(lp, TVL, coins[1], False)
+    assert _reverts(
+        lambda: swap.add_liquidity([TVL, TVL], 0, sender=lp)
+    ), "a deposit into an emptied halted pool anchored it at the collapsed source"
+
+
 def test_first_deposit_after_a_genuine_move_while_empty(plain):
-    """The first LP of a pool funded later pays the deploy seed, not the live rate.
+    """The first LP of a pool funded later prices at the live rate, not the deploy seed.
 
-    The constructor seeds `last_rates` from the source and nothing walks it afterwards:
-    `total_supply == 0` turns the halt test off but not the bound, and `poke_rates`
-    refuses an empty pool, so no keeper can close the gap either. Measured on this pool
-    at a 1 bp fee: a source that moved +1% while the pool sat empty is deposited against
-    at 1.0025, and the next buyer takes $3,306 of a $2M deposit. At +3% the deposit
-    prices at 1.0025 against a live 1.03 and the buyer takes $13,273; at +10% the pool
-    halts from the next block instead.
-
-    For a rate accruing 5-10% a year the seed is BUMP_CEILING behind after nine to
-    eighteen days of sitting empty, so this is ordinary, not adversarial.
-
-    Both ends of it leak, which is why it is recorded and not fixed here. Dropping the
-    bound while the supply is zero prices this deposit correctly and hands the anchor to
-    whoever pushes the source and keeps a dust deposit, since the push is then written
-    unbounded and the bound defends it from the next honest LP onwards.
+    Nothing walks the seed the constructor wrote while the pool is empty - `poke_rates`
+    refuses an unfunded pool - and the first LP owns the whole pool, so `_min_mint_amount`
+    is no defence and `calc_token_amount` quotes the same stale number. Bounding against
+    that seed taxed every pool funded later: at a 1 bp fee on a $2M deposit a source that
+    had moved +1% was deposited against at 1.0025 and the next trade took $4,187, +3% took
+    $19,121, and past 6% the pool halted the moment it was funded, 556 pokes from reopening.
     """
     swap, coins, oracles, lp = plain(seed=False)
     boa.env.time_travel(blocks=1000)
@@ -652,6 +667,64 @@ def test_first_deposit_after_a_genuine_move_while_empty(plain):
         f"the first deposit priced coin 1 at {priced / 1e18:.6f}, the source reads "
         f"{oracles[1].exchangeRate() / 1e18:.6f}"
     )
+
+
+def test_a_funded_pool_is_still_bounded_from_its_first_deposit(plain):
+    """Passing the source through must stop the moment the pool holds anything.
+
+    The deposit that funds an empty pool writes the anchor on its way through, so the
+    block after it the bound is live again. Without this the passthrough would be a
+    standing hole rather than a rule about empty pools.
+    """
+    swap, coins, oracles, lp = plain(seed=False)
+    swap.add_liquidity([TVL, TVL], 0, sender=lp)
+    boa.env.time_travel(blocks=1)
+    before = swap.stored_rates()[1]
+
+    oracles[1].set_exchange_rate(oracles[1].exchangeRate() * 101 // 100)  # 1%, past the bound
+    boa.env.time_travel(blocks=1)
+
+    moved = (swap.stored_rates()[1] - before) / before
+    assert (
+        moved <= BUMP_CEILING / FEE_DENOMINATOR + 1e-12
+    ), f"a funded pool took {moved * 1e4:.2f} bp in one update, past the {BUMP_CEILING / 1e6:.2f}% ceiling"
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="a pusher who keeps a dust deposit never lets the supply return to zero, so the anchor "
+    "they wrote while the pool was empty is defended by the bound from the next depositor onwards. "
+    "HALT_THRESHOLD caps it: a plant further out halts the pool rather than mispricing it. The "
+    "alternative, bounding an empty pool against its deploy seed, costs every pool funded later "
+    "more: $4,187 of a $2M deposit after a 1% move, against $28,151 here.",
+)
+def test_a_kept_dust_deposit_cannot_anchor_an_unfunded_pool(plain):
+    """A pusher who keeps the dust keeps the rate it wrote.
+
+    `test_dust_cannot_anchor_an_unfunded_pool` covers the pusher who withdraws: the supply
+    returns to zero, so the next deposit reads its source afresh. Keeping the dust is what
+    defends the plant, and the honest LP funding the pool afterwards deposits against a
+    rate 4% from the source and loses $28,151 of a $2M deposit to the next trade.
+
+    A cost, not a defect: it buys correct pricing for every pool funded later, the case
+    nobody has to attack, and HALT_THRESHOLD caps the plant at 5% - further out the pool
+    halts instead of mispricing.
+    """
+    swap, coins, oracles, attacker = plain(seed=False)
+    boa.env.time_travel(blocks=1000)
+    oracles[1].set_exchange_rate(10**18 * 104 // 100)  # 4%, just inside the halt
+    swap.add_liquidity([10**6, 10**6], 0, sender=attacker)  # dust, and kept
+    oracles[1].set_exchange_rate(10**18)  # and the push is released
+    boa.env.time_travel(blocks=1)
+
+    honest = boa.env.generate_address()
+    for c in coins:
+        mint_for_testing(honest, TVL, c, False)
+        c.approve(swap.address, 2**256 - 1, sender=honest)
+    swap.add_liquidity([TVL, TVL], 0, sender=honest)
+
+    priced = swap.stored_rates()[1] / 10**18
+    assert abs(priced - 1) <= 0.01, f"the first honest deposit was priced at {priced:.4f} against a true rate of 1"
 
 
 # <---------------------   Bound tracks the fee   --------------------->
@@ -1480,12 +1553,18 @@ def test_virtual_price_bounded_is_D_over_the_bounded_rates(plain):
     assert gap > 10 / 1e4, f"the pool is too balanced for this test to tell D from the sum ({gap * 1e4:.2f} bp)"
 
 
-def _probe_coin():
-    return boa.load("contracts/mocks/ERC20Probe.vy", "HOOK", "HOOK", 18)
+def _probe_coin(erc20probe_deployer):
+    return erc20probe_deployer.deploy("HOOK", "HOOK", 18)
 
 
 def test_neither_virtual_price_answers_from_inside_a_locked_call(
-    factory, amm_deployer, erc20_deployer, erc20oracle_deployer, zero_address, set_pool_implementations
+    factory,
+    amm_deployer,
+    erc20_deployer,
+    erc20oracle_deployer,
+    erc20probe_deployer,
+    zero_address,
+    set_pool_implementations,
 ):
     """A coin that calls back during a transfer must not be able to read either price.
 
@@ -1495,7 +1574,7 @@ def test_neither_virtual_price_answers_from_inside_a_locked_call(
     this is the test that the lock bites on a view, which the compiler does not promise
     by inspection.
     """
-    probe = _probe_coin()
+    probe = _probe_coin(erc20probe_deployer)
     plain_coin = erc20_deployer.deploy("C", "C", 18)
     oracle = erc20oracle_deployer.deploy("O", "O", 18, 10**18)
     swap = amm_deployer.at(
@@ -1536,6 +1615,7 @@ def test_a_frozen_metapool_prices_without_reading_its_base_pool(
     meta_deployer,
     erc20_deployer,
     erc20oracle_deployer,
+    erc20probe_deployer,
     zero_address,
     set_pool_implementations,
     set_metapool_implementations,
@@ -1549,7 +1629,7 @@ def test_a_frozen_metapool_prices_without_reading_its_base_pool(
     nonreentrant, is what keeps a metapool off a mid-trade base price; an integrator that
     treats a revert as its only safety signal should know the signal moved.
     """
-    probe = _probe_coin()
+    probe = _probe_coin(erc20probe_deployer)
     base_coin = erc20_deployer.deploy("BP", "BP", 18)
     base = amm_deployer.at(
         factory.deploy_plain_pool(
