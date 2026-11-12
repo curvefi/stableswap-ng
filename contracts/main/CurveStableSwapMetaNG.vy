@@ -654,27 +654,13 @@ def _bounded_rates(_halted: bool) -> (uint256[N_COINS], bool):
     @dev Coin 1, the base pool's virtual price, is bounded like coin 0: a rate
          pushed for one block in the base reaches this pool through it. The bound
          itself is math.bound_rates.
-         A reading more than HALT_THRESHOLD from its anchor halts the pool rather
-         than being clamped to a near-par rate for a coin that has collapsed: a
-         trade reverts, and only poke_rates records the halt. A recorded halt clears
-         once every reading is within two bounds of its anchor, so trading resumes
-         at most one bound from the source.
-         The bound accrues per block since the last update, up to BUMP_CEILING, so
-         an update may move a rate by min(bump * blocks, BUMP_CEILING). A base pool
-         whose virtual price grew while nobody traded here is not held to one
-         block's worth of that growth, and the ceiling is what a coin-0 source that
-         can be pushed on demand is held to, whatever this pool's fee.
-         What the accrual pays for is a catch-up, and a catch-up accrues in seconds
-         rather than in blocks, so it is held to DRIFT_PER_SECOND of elapsed time as
-         well - above the one step every update gets regardless, since blocks shorter
-         than a second share a timestamp and a bare time term would be zero. See
-         CurveStableSwapNG._rates_this_block for the measurement behind the rate.
-         An empty pool exposes nobody to the rate, so it never halts. It does keep
-         the anchor the constructor seeded, and the bound still holds a reading to
-         it: a source that moved while the pool sat empty is taken only as far as
-         BUMP_CEILING, and the first deposit is priced there. Nothing walks that
-         anchor in the meantime, poke_rates included. See
-         test_first_deposit_after_a_genuine_move_while_empty.
+         One update may move a rate by min(step * blocks, step + elapsed seconds *
+         DRIFT_PER_SECOND, BUMP_CEILING), so a base pool whose virtual price grew
+         while nobody traded here is not charged as one block, and a coin-0 source
+         pushed on demand is held to the ceiling whatever this pool's fee.
+         A reading further than HALT_THRESHOLD from its anchor halts the pool, and
+         an empty pool that is not halted takes its sources as it finds them.
+         CurveStableSwapNG._rates_this_block states all three in full.
     """
     lrb: uint256 = self.last_rates_block
     step: uint256 = self._max_rate_bump()
@@ -688,8 +674,8 @@ def _bounded_rates(_halted: bool) -> (uint256[N_COINS], bool):
     limit: uint256 = HALT_THRESHOLD
     if _halted:
         limit = 2 * bump
-    if self.total_supply == 0:
-        limit = 0
+    if self.total_supply == 0 and not _halted:
+        return [self._coin0_rate(), self._base_vp()], False
     res: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     halt: bool = False
     now: uint256[N_COINS] = [self._coin0_rate(), self._base_vp()]

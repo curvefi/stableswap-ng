@@ -553,10 +553,8 @@ def _max_rate_bump() -> uint256:
          vault, say): a single-sided deposit, which pays about half a fee, then a
          proportional withdrawal, which reads no rates and pays nothing. A swap
          into the pushed rate pays a whole fee, which this never exceeds.
-         What an update actually gets is this times the blocks since the last one,
-         capped by elapsed time and by BUMP_CEILING; see _rates_this_block. A source
-         that moves no faster than it genuinely accrues is never withheld, so it is
-         the ceiling, not the fee, that holds a source pushed on demand.
+         What an update actually gets is this accrued over the wait and capped at
+         BUMP_CEILING; see _rates_this_block.
     """
     return min(self.fee * N_COINS / (2 * (N_COINS - 1)), BUMP_CEILING)
 
@@ -569,31 +567,19 @@ def _rates_this_block(_poke: bool) -> (DynArray[uint256, MAX_COINS], uint256):
     @dev Frozen once a block has accepted them, so a trade already in flight cannot
          be repriced underneath it; the block to record is then 0. Otherwise the
          readings are bounded against last_rates, see math.bound_rates.
-         A reading more than HALT_THRESHOLD from its anchor halts the pool rather
-         than being clamped to a near-par rate for a coin that has collapsed: a
-         trade reverts, and only poke_rates records the halt. A recorded halt clears
-         once every reading is within two bounds of its anchor, so trading resumes
-         at most one bound from the source.
-         The bound accrues per block since the last update, up to BUMP_CEILING, so
-         an update may move a rate by min(bump * blocks, BUMP_CEILING). A source
-         left alone and then read is not held to one block's worth of the move it
-         made in the meantime, and the ceiling is what a source that can be pushed
-         on demand is held to, whatever its pool's fee.
-         What the accrual pays for is a catch-up, and a catch-up accrues in seconds
-         rather than in blocks, so it is held to DRIFT_PER_SECOND of elapsed time as
-         well - above the one step every update gets regardless, since blocks shorter
-         than a second share a timestamp and a bare time term would be zero. Counted
-         in blocks alone the same pool with the same fee opens its whole ceiling in
-         236 seconds on a 12-second chain and 3.6 on a 0.2-second one, a difference
-         about the chain and not about the feed. The fastest drift measured on any
-         feed is 0.0065%/s, so the term is slack on an honest source and binds only
-         where a block is shorter than the drift justifies.
-         An empty pool exposes nobody to the rate, so it never halts. It does keep
-         the anchor the constructor seeded, and the bound still holds a reading to
-         it: a source that moved while the pool sat empty is taken only as far as
-         BUMP_CEILING, and the first deposit is priced there. Nothing walks that
-         anchor in the meantime, poke_rates included. See
-         test_first_deposit_after_a_genuine_move_while_empty.
+         One update may move a rate by min(step * blocks, step + elapsed seconds *
+         DRIFT_PER_SECOND, BUMP_CEILING): a wait is not charged as one block, by
+         either clock, and a source pushed on demand is held to the ceiling whatever
+         the pool's fee.
+         A reading further than HALT_THRESHOLD from its anchor halts the pool rather
+         than being clamped to a near-par rate for a coin that has collapsed: trades
+         revert, only poke_rates records the halt, and it clears once every reading
+         is within two bounds of its anchor.
+         An empty pool exposes nobody to the rate, so unless it is halted it takes
+         its sources as it finds them; a halt outlives the supply, proportional
+         withdrawal reading no rates. What the passthrough gives up is a pusher who
+         keeps a dust deposit, capped by HALT_THRESHOLD.
+         tests/pools/oracle/test_rate_safety.py carries the reasoning and the costs.
     """
     lrb: uint256 = self.last_rates_block
     blk: uint256 = lrb & STAMP_MASK
@@ -615,8 +601,8 @@ def _rates_this_block(_poke: bool) -> (DynArray[uint256, MAX_COINS], uint256):
     limit: uint256 = HALT_THRESHOLD
     if _halted:
         limit = 2 * bump
-    if self.total_supply == 0:
-        limit = 0
+    if self.total_supply == 0 and not _halted:
+        return self._fetch_rates(), block.number | shift(block.timestamp, 64)
     rates: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
     halt: bool = False
     rates, halt = math.bound_rates(self._fetch_rates(), self.last_rates, bump, limit)
