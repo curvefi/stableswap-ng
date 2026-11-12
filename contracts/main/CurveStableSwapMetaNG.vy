@@ -669,8 +669,12 @@ def _bounded_rates(_halted: bool) -> (uint256[N_COINS], bool):
          well - above the one step every update gets regardless, since blocks shorter
          than a second share a timestamp and a bare time term would be zero. See
          CurveStableSwapNG._rates_this_block for the measurement behind the rate.
-         An empty pool exposes nobody to the rate and never halts, so a source that
-         moved while it sat empty cannot lock it.
+         An empty pool exposes nobody to the rate, so it never halts. It does keep
+         the anchor the constructor seeded, and the bound still holds a reading to
+         it: a source that moved while the pool sat empty is taken only as far as
+         BUMP_CEILING, and the first deposit is priced there. Nothing walks that
+         anchor in the meantime, poke_rates included. See
+         test_first_deposit_after_a_genuine_move_while_empty.
     """
     lrb: uint256 = self.last_rates_block
     step: uint256 = self._max_rate_bump()

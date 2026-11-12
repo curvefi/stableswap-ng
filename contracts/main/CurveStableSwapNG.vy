@@ -588,8 +588,12 @@ def _rates_this_block(_poke: bool) -> (DynArray[uint256, MAX_COINS], uint256):
          about the chain and not about the feed. The fastest drift measured on any
          feed is 0.0065%/s, so the term is slack on an honest source and binds only
          where a block is shorter than the drift justifies.
-         An empty pool exposes nobody to the rate and never halts, so a source that
-         moved while it sat empty cannot lock it.
+         An empty pool exposes nobody to the rate, so it never halts. It does keep
+         the anchor the constructor seeded, and the bound still holds a reading to
+         it: a source that moved while the pool sat empty is taken only as far as
+         BUMP_CEILING, and the first deposit is priced there. Nothing walks that
+         anchor in the meantime, poke_rates included. See
+         test_first_deposit_after_a_genuine_move_while_empty.
     """
     lrb: uint256 = self.last_rates_block
     blk: uint256 = lrb & STAMP_MASK

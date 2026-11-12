@@ -7,7 +7,7 @@ them, fails closed on a source that cannot answer, and halts on a reading more t
 from its anchor until poke_rates walks the anchor back. Each test states one property in
 its name, so that a red test names the defect rather than just the symptom.
 
-Two tests are strict xfails, recording limits of the rate path rather than bugs in it:
+Three tests are strict xfails, recording limits of the rate path rather than bugs in it:
 
   test_informed_prepositioning_is_not_prevented
   test_genuine_step_leaves_no_free_arbitrage_when_the_fee_is_undersized
@@ -20,6 +20,14 @@ Two tests are strict xfails, recording limits of the rate path rather than bugs 
       Charging the lag as a fee does not work: the operator controls the lag, so it
       sizes the fee to each taker's tolerance and reopens the skim that
       test_min_dy_is_a_safety_bound_not_a_price guards.
+
+  test_first_deposit_after_a_genuine_move_while_empty
+      An unfunded pool keeps the anchor the constructor seeded, so the first deposit
+      after the source genuinely moved is priced at that seed plus BUMP_CEILING, and
+      the rest is open to the next buyer. Unresolved by design rather than overlooked:
+      the two readings the pool would have to tell apart - a source that moved and a
+      source that was pushed - are the same reading, and the accrual is the only thing
+      that separates them. See the test for what each candidate fix reopens.
 
 Every pool here uses a plain token with a separate oracle contract as its rate
 source. The repo's ERC20Oracle mock is its own oracle, which would let an ordinary
@@ -605,6 +613,45 @@ def test_poke_cannot_seed_an_empty_pool(plain):
     swap, coins, oracles, lp = plain(seed=False)
 
     assert _reverts(lambda: swap.poke_rates()), "poke_rates wrote a rate to an unfunded pool"
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="an unfunded pool keeps its deploy seed as the anchor, so the first deposit after a "
+    "genuine move is priced at the seed plus BUMP_CEILING. Letting the source through unbounded "
+    "while the supply is zero reopens the hole test_dust_cannot_anchor_an_unfunded_pool guards, "
+    "for a pusher who keeps a dust deposit; recorded rather than papered over.",
+)
+def test_first_deposit_after_a_genuine_move_while_empty(plain):
+    """The first LP of a pool funded later pays the deploy seed, not the live rate.
+
+    The constructor seeds `last_rates` from the source and nothing walks it afterwards:
+    `total_supply == 0` turns the halt test off but not the bound, and `poke_rates`
+    refuses an empty pool, so no keeper can close the gap either. Measured on this pool
+    at a 1 bp fee: a source that moved +1% while the pool sat empty is deposited against
+    at 1.0025, and the next buyer takes $3,306 of a $2M deposit. At +3% the deposit
+    prices at 1.0025 against a live 1.03 and the buyer takes $13,273; at +10% the pool
+    halts from the next block instead.
+
+    For a rate accruing 5-10% a year the seed is BUMP_CEILING behind after nine to
+    eighteen days of sitting empty, so this is ordinary, not adversarial.
+
+    Both ends of it leak, which is why it is recorded and not fixed here. Dropping the
+    bound while the supply is zero prices this deposit correctly and hands the anchor to
+    whoever pushes the source and keeps a dust deposit, since the push is then written
+    unbounded and the bound defends it from the next honest LP onwards.
+    """
+    swap, coins, oracles, lp = plain(seed=False)
+    boa.env.time_travel(blocks=1000)
+    oracles[1].set_exchange_rate(10**18 * 101 // 100)  # +1% while the pool sits empty
+
+    swap.add_liquidity([TVL, TVL], 0, sender=lp)
+
+    priced = swap.stored_rates()[1]
+    assert priced == oracles[1].exchangeRate(), (
+        f"the first deposit priced coin 1 at {priced / 1e18:.6f}, the source reads "
+        f"{oracles[1].exchangeRate() / 1e18:.6f}"
+    )
 
 
 # <---------------------   Bound tracks the fee   --------------------->
