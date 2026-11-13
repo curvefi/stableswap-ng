@@ -132,3 +132,67 @@ def test_invalidated_reward_skipped_by_default(owner, coin_reward, coin_reward_b
         gauge.set_reward_invalidated(coin_reward.address, False)
         gauge.claim_rewards()
     assert coin_reward.balanceOf(owner) - balances[0] > pending
+
+
+def test_refill_of_empty_gauge_keeps_rewards(owner, coin_reward, swap, gauge):
+    with boa.env.prank(owner):
+        gauge.withdraw(LP_AMOUNT)
+        gauge.add_reward(coin_reward.address, owner)
+        coin_reward._mint_for_testing(owner, 2 * REWARD)
+        coin_reward.approve(gauge.address, 2 * REWARD)
+        gauge.deposit_reward_token(coin_reward.address, REWARD)
+
+    # nobody is staked for half of the period, then the reward is topped up
+    boa.env.time_travel(seconds=WEEK // 2)
+    with boa.env.prank(owner):
+        gauge.deposit_reward_token(coin_reward.address, REWARD)
+    assert gauge.reward_remaining(coin_reward.address) == 2 * REWARD
+
+    balance = coin_reward.balanceOf(owner)
+    with boa.env.prank(owner):
+        swap.approve(gauge.address, LP_AMOUNT)
+        gauge.deposit(LP_AMOUNT)
+    boa.env.time_travel(seconds=WEEK)
+    with boa.env.prank(owner):
+        gauge.claim_rewards()
+    assert coin_reward.balanceOf(owner) - balance == 2 * REWARD
+
+
+def test_recover_remaining(owner, coin_reward, gauge):
+    amount = REWARD + 12345  # not divisible by the period: leaves dust behind
+    with boa.env.prank(owner):
+        gauge.add_reward(coin_reward.address, owner)
+        coin_reward._mint_for_testing(owner, amount)
+        coin_reward.approve(gauge.address, amount)
+        gauge.deposit_reward_token(coin_reward.address, amount)
+
+    boa.env.time_travel(seconds=WEEK // 2)
+    with boa.reverts():
+        gauge.recover_remaining(coin_reward.address)  # period is not over
+
+    boa.env.time_travel(seconds=WEEK)
+    balance = coin_reward.balanceOf(owner)
+    gauge.recover_remaining(coin_reward.address)  # what was not allocated goes to the distributor
+    recovered = coin_reward.balanceOf(owner) - balance
+    assert gauge.reward_remaining(coin_reward.address) == 0
+
+    # the allocated rewards stay claimable
+    with boa.env.prank(owner):
+        gauge.claim_rewards()
+    claimed = gauge.claimed_reward(owner, coin_reward.address)
+    assert claimed > 0
+    assert claimed + recovered + coin_reward.balanceOf(gauge.address) == amount
+    assert coin_reward.balanceOf(gauge.address) <= 1
+
+
+def test_withdraw_to_receiver(owner, swap, gauge):
+    receiver = boa.env.generate_address("receiver")
+    with boa.env.prank(owner):
+        gauge.withdraw(LP_AMOUNT, False, receiver)
+    assert swap.balanceOf(receiver) == LP_AMOUNT
+    assert gauge.balanceOf(owner) == 0
+
+
+def test_lp_token_is_not_a_reward(owner, swap, gauge):
+    with boa.env.prank(owner), boa.reverts():
+        gauge.add_reward(swap.address, owner)
