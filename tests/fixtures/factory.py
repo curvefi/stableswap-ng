@@ -1,32 +1,36 @@
+import inspect
+
 import boa
 import pytest
 
 
-@pytest.fixture()
+# implementations are immutable, so deploy once per module rather than per test;
+# not per session, because boa_setup swaps in a fresh boa.Env for every module
+@pytest.fixture(scope="module")
 def gauge_implementation(deployer, gauge_deployer):
     with boa.env.prank(deployer):
         return gauge_deployer.deploy_as_blueprint()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def amm_implementation(deployer, amm_deployer):
     with boa.env.prank(deployer):
         return amm_deployer.deploy_as_blueprint()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def amm_implementation_meta(deployer, meta_deployer):
     with boa.env.prank(deployer):
         return meta_deployer.deploy_as_blueprint()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def views_implementation(deployer, views_deployer):
     with boa.env.prank(deployer):
         return views_deployer.deploy()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def math_implementation(deployer, math_deployer):
     with boa.env.prank(deployer):
         return math_deployer.deploy()
@@ -45,6 +49,24 @@ def factory(
         factory.set_math_implementation(math_implementation.address)
 
     return factory
+
+
+# titanoboa anchors fixtures and unwinds them in reverse: an implementation first created inside a test
+# would sit above that test's function fixtures, and their block/timestamp changes would never be unwound.
+# Forking modules skip this, since a fork replaces the state under anchors already taken.
+@pytest.fixture(scope="module", autouse=True)
+def implementations_before_any_test(request, boa_setup):
+    items = [item for item in request.session.items if item.module is request.module]
+    if any("forked_chain" in item.fixturenames for item in items) or "env.fork(" in inspect.getsource(request.module):
+        return
+    for name in (
+        "gauge_implementation",
+        "amm_implementation",
+        "amm_implementation_meta",
+        "views_implementation",
+        "math_implementation",
+    ):
+        request.getfixturevalue(name)
 
 
 # <---------------------   Functions   --------------------->

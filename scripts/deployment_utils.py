@@ -120,3 +120,19 @@ CURVE_DAO_OWNERSHIP = {
     "token": "0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2",
     "quorum": 30,
 }
+
+
+# probed with eth_call state overrides: TLOAD, TSTORE and MCOPY revert as invalid opcodes
+CHAINS_WITHOUT_CANCUN = ("polygon-zkevm", "fantom")
+
+
+def check_evm_version(source: str, network: str) -> None:
+    """Refuse a cancun source on a chain that cannot run it.
+
+    The pools are cancun builds and exceed the blueprint size limit as shanghai or
+    paris, so they cannot be retargeted: shipping one would deploy bytecode whose every
+    nonreentrant call reverts.
+    """
+    chain = network.split(":")[0]
+    if "# pragma evm-version cancun" in source and chain in CHAINS_WITHOUT_CANCUN:
+        raise ValueError(f"{network} rejects cancun opcodes, and the pools do not fit as an older EVM version")

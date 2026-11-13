@@ -1,6 +1,6 @@
 # pragma version 0.3.10
 # pragma optimize codesize
-# pragma evm-version paris
+# pragma evm-version cancun
 """
 @title CurveStableSwapMetaNG
 @author Curve.Fi
@@ -125,6 +125,20 @@ interface Math:
         _n_coins: uint256
     ) -> uint256: view
     def exp(x: int256) -> uint256: view
+    def bound_rates(
+        _rates: DynArray[uint256, MAX_COINS],
+        _last: DynArray[uint256, MAX_COINS],
+        _bump: uint256,
+        _limit: uint256,
+    ) -> (DynArray[uint256, MAX_COINS], bool): view
+    def rate_now(
+        _coin: address,
+        _asset_type: uint8,
+        _rate_oracle: uint256,
+        _rate_multiplier: uint256,
+        _call_amount: uint256,
+        _scale_factor: uint256,
+    ) -> uint256: view
 
 # --------------------------------- Events -----------------------------------
 
@@ -226,6 +240,12 @@ fee: public(uint256)  # fee * 1e10
 offpeg_fee_multiplier: public(uint256)  # * 1e10
 admin_fee: public(constant(uint256)) = 5000000000
 MAX_FEE: constant(uint256) = 5 * 10 ** 9
+MIN_FEE: constant(uint256) = 10 ** 4  # 0.0001%; a zero fee gives a zero bound
+BUMP_CEILING: constant(uint256) = 25 * 10 ** 6  # 0.25%: the widest bound, whatever the fee and however long the wait
+HALT_THRESHOLD: constant(uint256) = 500000000  # 5%: a reading this far from its anchor halts trading
+HALTED: constant(uint256) = 2**255  # flag in last_rates_block: a halt was recorded
+STAMP_MASK: constant(uint256) = 2**64 - 1  # last_rates_block: [halted][timestamp][block]
+DRIFT_PER_SECOND: constant(uint256) = 10 ** 6  # 0.01%/s: how fast a bound may widen
 
 # ---------------------- Pool Amplification Parameters -----------------------
 
@@ -284,6 +304,12 @@ NAME_HASH: immutable(bytes32)
 CACHED_CHAIN_ID: immutable(uint256)
 salt: public(immutable(bytes32))
 CACHED_DOMAIN_SEPARATOR: immutable(bytes32)
+
+# --------------------------- Oracle rate bound ------------------------------
+
+last_rate: uint256  # coin 0's last accepted rate
+last_base_vp: uint256  # coin 1's last accepted rate
+last_rates_block: uint256
 
 
 # ------------------------------ AMM Setup -----------------------------------
@@ -374,6 +400,9 @@ def __init__(
 
     factory = Factory(msg.sender)
 
+    assert 0 < _A and _A < MAX_A  # dev: A out of range
+    assert MIN_FEE < _fee and _fee <= MAX_FEE  # dev: fee out of range
+    assert _offpeg_fee_multiplier > FEE_DENOMINATOR  # dev: offpeg fee disabled
     A: uint256 = unsafe_mul(_A, A_PRECISION)
     self.initial_A = A
     self.future_A = A
@@ -390,6 +419,19 @@ def __init__(
     self.stored_balances = [0, 0]
 
     rate_oracle = convert(_method_ids[0], uint256) * 2**224 | convert(_oracles[0], uint256)
+    # seed at deploy; a zero reading stays unseeded and seeds at its first write
+    self.last_rate = math.rate_now(_coins[0], asset_type, rate_oracle, rate_multiplier, call_amount, scale_factor)
+    # an empty base pool's get_virtual_price divides by zero, so this read must not revert
+    success: bool = False
+    response: Bytes[32] = b""
+    success, response = raw_call(
+        _base_pool, method_id("get_virtual_price()"), max_outsize=32, is_static_call=True,
+        revert_on_failure=False
+    )
+    if success and len(response) == 32:
+        self.last_base_vp = convert(response, uint256)
+    # deploy block stays unfrozen; the timestamp wants no slack, one step is free
+    self.last_rates_block = (block.number - 1) | shift(block.timestamp, 64)
 
     # --------------------------- ERC20 stuff ----------------------------
 
@@ -525,15 +567,25 @@ def _transfer_out(
 
 @view
 @internal
-def _stored_rates() -> uint256[N_COINS]:
+def _base_vp() -> uint256:
     """
-    @notice Gets rate multipliers for each coin.
-    @dev If the coin has a rate oracle that has been properly initialised,
-         this method queries that rate by static-calling an external
-         contract.
+    @notice Coin 1's rate as the base pool reports it now: its virtual price.
+    @dev Fails closed. Where the base pool's get_virtual_price is @nonreentrant,
+         a revert is its read-only-reentrancy guard, and catching it would swallow
+         the guard.
     """
-    rates: uint256[N_COINS] = [rate_multiplier, StableSwap(BASE_POOL).get_virtual_price()]
+    return StableSwap(BASE_POOL).get_virtual_price()
 
+
+@view
+@internal
+def _coin0_rate() -> uint256:
+    """
+    @notice Coin 0's rate as its source reports it now.
+    @dev Fails closed: a source that reverts, or answers with anything but 32
+         bytes, reverts the call rather than degrading to a remembered rate.
+         Proportional remove_liquidity reads no rates, so LPs can always leave.
+    """
     if asset_type == 1 and not rate_oracle == 0:
 
         # NOTE: fetched_rate is assumed to be 10**18 precision
@@ -544,19 +596,119 @@ def _stored_rates() -> uint256[N_COINS]:
             is_static_call=True,
         )
         assert len(oracle_response) == 32
-        fetched_rate: uint256 = convert(oracle_response, uint256)
+        return unsafe_div(rate_multiplier * convert(oracle_response, uint256), PRECISION)
+
+    if asset_type == 3:  # ERC4626
 
         # rates[0] * fetched_rate / PRECISION
-        rates[0] = unsafe_div(rates[0] * fetched_rate, PRECISION)
-
-    elif asset_type == 3:  # ERC4626
-
-        # rates[0] * fetched_rate / PRECISION
-        rates[0] = unsafe_div(
-            rates[0] * ERC4626(coins[0]).convertToAssets(call_amount) * scale_factor,
+        return unsafe_div(
+            rate_multiplier * ERC4626(coins[0]).convertToAssets(call_amount) * scale_factor,
             PRECISION
         )  # 1e18 precision
 
+    return rate_multiplier
+
+
+@view
+@internal
+def _max_rate_bump() -> uint256:
+    """
+    @notice How far one block widens a rate's bound, FEE_DENOMINATOR-scaled.
+    @dev Follows the current fee. fee is the break-even for cashing a rate pushed
+         for one block, both by a single-sided deposit (about half a fee) then a
+         proportional withdrawal (reads no rates, pays nothing), and by a swap into
+         the pushed rate (one fee). What an update actually gets is this times the
+         blocks since the last one, capped at BUMP_CEILING; see _bounded_rates.
+    """
+    return min(self.fee, BUMP_CEILING)
+
+
+@view
+@internal
+def _rates_this_block(_poke: bool) -> (uint256[N_COINS], uint256):
+    """
+    @notice The rates this block prices at, and the last_rates_block to record with them.
+    @dev Frozen once a block has accepted them, so a trade already in flight cannot
+         be repriced underneath it; the block to record is then 0. See
+         _bounded_rates for the bound and the halt.
+    """
+    lrb: uint256 = self.last_rates_block
+    if lrb & STAMP_MASK >= block.number:
+        assert lrb < HALTED and not _poke  # dev: rates halted, or already set this block
+        return [self.last_rate, self.last_base_vp], 0
+    rates: uint256[N_COINS] = empty(uint256[N_COINS])
+    halt: bool = False
+    rates, halt = self._bounded_rates(lrb >= HALTED)
+    stamp: uint256 = block.number | shift(block.timestamp, 64)
+    if halt:
+        assert _poke  # dev: rates halted
+        return rates, stamp | HALTED
+    return rates, stamp
+
+
+@view
+@internal
+def _bounded_rates(_halted: bool) -> (uint256[N_COINS], bool):
+    """
+    @notice Both rates as their sources report them now, bounded, and whether they halt the pool.
+    @dev Coin 1, the base pool's virtual price, is bounded like coin 0: a rate
+         pushed for one block in the base reaches this pool through it. The bound
+         itself is math.bound_rates.
+         One update may move a rate by min(step * blocks, step + elapsed seconds *
+         DRIFT_PER_SECOND, BUMP_CEILING), so a base pool whose virtual price grew
+         while nobody traded here is not charged as one block, and a coin-0 source
+         pushed on demand is held to the ceiling whatever this pool's fee.
+         A reading further than HALT_THRESHOLD from its anchor halts the pool, and
+         an empty pool that is not halted takes its sources as it finds them.
+         CurveStableSwapNG._rates_this_block states all three in full.
+    """
+    lrb: uint256 = self.last_rates_block
+    step: uint256 = self._max_rate_bump()
+    ts: uint256 = (lrb >> 64) % 2**64
+    # max(): see CurveStableSwapNG._rates_this_block - a backwards clock must not
+    # revert every quote, and unsafe_sub would not prevent that
+    bump: uint256 = min(min(
+        step * (block.number - (lrb & STAMP_MASK)),
+        step + DRIFT_PER_SECOND * (max(block.timestamp, ts) - ts),
+    ), BUMP_CEILING)
+    limit: uint256 = HALT_THRESHOLD
+    if _halted:
+        limit = 2 * bump
+    if self.total_supply == 0 and not _halted:
+        return [self._coin0_rate(), self._base_vp()], False
+    res: DynArray[uint256, MAX_COINS] = empty(DynArray[uint256, MAX_COINS])
+    halt: bool = False
+    now: uint256[N_COINS] = [self._coin0_rate(), self._base_vp()]
+    res, halt = math.bound_rates([now[0], now[1]], [self.last_rate, self.last_base_vp], bump, limit)
+    return [res[0], res[1]], halt
+
+
+@view
+@internal
+def _stored_rates() -> uint256[N_COINS]:
+    """
+    @notice The rates a trade in this block would be priced at.
+    @dev See _rates_this_block. Reverts while the pool is halted.
+    """
+    rates: uint256[N_COINS] = empty(uint256[N_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(False)
+    return rates
+
+
+@internal
+def _stored_rates_w() -> uint256[N_COINS]:
+    """
+    @notice _stored_rates, accepting the result as the new starting point.
+    @dev Called from every path that prices at this pool's rates.
+    """
+    rates: uint256[N_COINS] = empty(uint256[N_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(False)
+    if lrb != 0:
+        self.last_rate = rates[0]
+        self.last_base_vp = rates[1]
+        self.last_rates_block = lrb
     return rates
 
 
@@ -674,7 +826,12 @@ def exchange_underlying(
     """
     assert _receiver != empty(address)  # dev: do not send tokens to zero_address
 
-    rates: uint256[N_COINS] = self._stored_rates()
+    # A base-to-base swap never prices at this pool's rates, so it must not commit
+    # them: it is free and works on an empty metapool, where a commit would let
+    # anyone move the anchors to a pushed rate that the first depositor inherits.
+    rates: uint256[N_COINS] = empty(uint256[N_COINS])
+    if i == 0 or j == 0:
+        rates = self._stored_rates_w()
     old_balances: uint256[N_COINS] = self._balances()
     xp: uint256[N_COINS]  = self._xp_mem(rates, old_balances)
 
@@ -767,7 +924,7 @@ def add_liquidity(
 
     amp: uint256 = self._A()
     old_balances: uint256[N_COINS] = self._balances()
-    rates: uint256[N_COINS] = self._stored_rates()
+    rates: uint256[N_COINS] = self._stored_rates_w()
 
     # Initial invariant
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
@@ -906,7 +1063,7 @@ def remove_liquidity_one_coin(
     amp: uint256 = empty(uint256)
     D: uint256 = empty(uint256)
 
-    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i)
+    dy, fee, xp, amp, D = self._calc_withdraw_one_coin(_burn_amount, i, self._stored_rates_w())
     assert dy >= _min_received, "Not enough coins removed"
 
     # fee * admin_fee / FEE_DENOMINATOR
@@ -939,7 +1096,7 @@ def remove_liquidity_imbalance(
     """
 
     amp: uint256 = self._A()
-    rates: uint256[N_COINS] = self._stored_rates()
+    rates: uint256[N_COINS] = self._stored_rates_w()
     old_balances: uint256[N_COINS] = self._balances()
     D0: uint256 = self.get_D_mem(rates, old_balances, amp)
     new_balances: uint256[N_COINS] = old_balances
@@ -1159,7 +1316,7 @@ def _exchange(
     assert i != j  # dev: coin index out of range
     assert _dx > 0  # dev: do not exchange 0 coins
 
-    rates: uint256[N_COINS] = self._stored_rates()
+    rates: uint256[N_COINS] = self._stored_rates_w()
     old_balances: uint256[N_COINS] = self._balances()
     xp: uint256[N_COINS] = self._xp_mem(rates, old_balances)
 
@@ -1291,7 +1448,8 @@ def get_D_mem(
 @internal
 def _calc_withdraw_one_coin(
     _burn_amount: uint256,
-    i: int128
+    i: int128,
+    rates: uint256[N_COINS]
 ) -> (
     uint256,
     uint256,
@@ -1306,7 +1464,6 @@ def _calc_withdraw_one_coin(
 
     # get pool state
     amp: uint256 = self._A()
-    rates: uint256[N_COINS] = self._stored_rates()
     xp: uint256[N_COINS] = self._xp_mem(rates, self._balances())
     D0: uint256 = math.get_D([xp[0], xp[1]], amp, N_COINS)
 
@@ -1728,7 +1885,7 @@ def calc_withdraw_one_coin(_burn_amount: uint256, i: int128) -> uint256:
     @param i Index value of the coin to withdraw
     @return Amount of coin received
     """
-    return self._calc_withdraw_one_coin(_burn_amount, i)[0]
+    return self._calc_withdraw_one_coin(_burn_amount, i, self._stored_rates())[0]
 
 
 @view
@@ -1753,10 +1910,32 @@ def get_virtual_price() -> uint256:
          contains rebasing tokens. For integrators, caution is advised.
     @return LP token virtual price normalized to 1e18
     """
-    xp: uint256[N_COINS] = self._xp_mem(self._stored_rates(), self._balances())
+    # Valued at the rates the sources report now, not the bounded trading rate:
+    # LP redeems proportionally for the underlying coins, which reads no rates.
+    # StableSwapNGLPOracle values LP through this, so a halt stops the pool trading
+    # without stopping LP from being priced.
+    xp: uint256[N_COINS] = self._xp_mem([self._coin0_rate(), self._base_vp()], self._balances())
     D: uint256 = math.get_D([xp[0], xp[1]], self._A(), N_COINS)
     # D is in the units similar to DAI (e.g. converted to precision 1e18)
     # When balanced, D = n * x_u - total virtual value of the portfolio
+    return D * PRECISION / self.total_supply
+
+
+@view
+@external
+@nonreentrant('lock')
+def virtual_price_bounded() -> uint256:
+    """
+    @notice The virtual price at the rates this block prices trades at
+    @dev get_virtual_price values the LP at what it redeems for, so it reads the
+         sources. Quotes, mints and burns price at the bounded rates instead, and the
+         two differ while a rate is still catching up. An integrator that values LP and
+         transacts in the same breath needs both sides on one of them, or it measures
+         the gap between them as profit; this is the side the pool transacts at.
+         Reverts while the pool is halted, as every quote does.
+    @return LP token virtual price at the bounded rates, normalized to 1e18
+    """
+    D: uint256 = self.get_D_mem(self._stored_rates(), self._balances(), self._A())
     return D * PRECISION / self.total_supply
 
 
@@ -1813,8 +1992,45 @@ def get_balances() -> DynArray[uint256, MAX_COINS]:
 @view
 @external
 def stored_rates() -> DynArray[uint256, MAX_COINS]:
+    """
+    @notice The rates this block prices trades at, one per coin
+    @dev Reverts while the pool is halted, as every quote does. StableSwapNGLPOracle
+         documents this as the place to read a single coin's rate from, and on a halted
+         pool that read reverts rather than handing back a rate nothing will trade at.
+    @return Rates normalized to 1e18
+    """
     rates: uint256[N_COINS] = self._stored_rates()
     return [rates[0], rates[1]]
+
+
+@view
+@external
+def max_rate_bump() -> uint256:
+    """
+    @notice How far one block widens either rate's bound, FEE_DENOMINATOR-scaled.
+    @dev Derived from the current fee. An update may move a rate by this times the
+         blocks since the last one, no faster than DRIFT_PER_SECOND of elapsed time,
+         and never past BUMP_CEILING; see _max_rate_bump and _bounded_rates.
+    """
+    return self._max_rate_bump()
+
+
+@external
+@nonreentrant('lock')
+def poke_rates():
+    """
+    @notice Walk a halted pool's rates one bound towards their sources
+    @dev A trade that would halt the pool reverts, so without this a genuine step
+         past HALT_THRESHOLD would halt it for good. Moves the anchors as far as a
+         trade would, once per block. An empty pool never halts and is not walked.
+    """
+    assert self.total_supply != 0  # dev: nothing to walk
+    rates: uint256[N_COINS] = empty(uint256[N_COINS])
+    lrb: uint256 = 0
+    rates, lrb = self._rates_this_block(True)
+    self.last_rate = rates[0]
+    self.last_base_vp = rates[1]
+    self.last_rates_block = lrb
 
 
 @view
@@ -1875,10 +2091,11 @@ def set_new_fee(_new_fee: uint256, _new_offpeg_fee_multiplier: uint256):
     assert msg.sender == factory.admin()
 
     # set new fee:
-    assert _new_fee <= MAX_FEE
+    assert MIN_FEE < _new_fee and _new_fee <= MAX_FEE
     self.fee = _new_fee
 
     # set new offpeg_fee_multiplier:
+    assert _new_offpeg_fee_multiplier > FEE_DENOMINATOR  # dev: offpeg fee disabled
     assert _new_offpeg_fee_multiplier * _new_fee <= MAX_FEE * FEE_DENOMINATOR  # dev: offpeg multiplier exceeds maximum
     self.offpeg_fee_multiplier = _new_offpeg_fee_multiplier
 
